@@ -36,18 +36,18 @@
 | 8 | Code Quality | 5% | {{CODE_QUALITY_STATUS}} | {{CODE_QUALITY_POINTS}}/5 |
 | 9 | State Management | 5% | {{STATE_STATUS}} | {{STATE_POINTS}}/5 |
 | 10 | Progressive Rollout | 5% | {{ROLLOUT_STATUS}} | {{ROLLOUT_POINTS}}/5 |
-| | **Total** | **100%** | | **{{OVERALL_SCORE_POINTS}}/{{MAX_POSSIBLE_POINTS}}** |
+| | **Total** | **100%** | | **{{OVERALL_SCORE_POINTS}}/100** |
 
 **Status key:** ✅ Adopted · ⚠️ Partial · ❌ Missing · — N/A
 
-> **Scoring:** Adopted = full points · Partial = half points · Missing = 0 points · N/A = excluded (remove the row and reduce the denominator; score percentage = total points earned ÷ total points possible after removing N/A rows)
+> **Scoring:** Adopted = full points · Partial = half points · Missing = 0 points · N/A = excluded and weight redistributed proportionally
 
 ---
 
 ## Critical Gaps
 
 > Critical gaps carry significant risk or the highest remediation value. Address these first.
-> **Definition:** Any Missing category regardless of weight, or a Partial status in any category with weight ≥ 15% (Module Design, Testing, CI/CD, Security).
+> **Definition:** Any Missing category, or a Partial status in Security, Testing, or CI/CD (weight ≥ 15%).
 
 {{CRITICAL_GAPS_CONTENT}}
 
@@ -56,7 +56,7 @@
 ## Moderate Gaps
 
 > Moderate gaps are worth addressing after critical items are resolved.
-> **Definition:** Partial status in categories with weight < 15%. (Missing in any category is always classified as Critical.)
+> **Definition:** Partial or Missing status in categories with weight < 15%.
 
 {{MODERATE_GAPS_CONTENT}}
 
@@ -99,9 +99,9 @@ This report uses a weighted scoring model across 10 IaC practice areas:
 - Adopted = 100% of category weight (full points)
 - Partial = 50% of category weight (half points)
 - Missing = 0% of category weight (zero points)
-- N/A = category excluded; remove the row and reduce the denominator accordingly
+- N/A = category excluded; remaining weights renormalized to 100%
 
-**Overall score** = sum of all earned category points ÷ sum of applicable category weights × 100
+**Overall score** = sum of all earned category points, normalized to 100%
 
 **Maturity ratings:**
 - 🟢 Strong (80–100%): Best practices broadly followed; polish and sustain
