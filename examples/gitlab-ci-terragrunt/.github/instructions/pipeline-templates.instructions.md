@@ -1,6 +1,6 @@
 ---
 description: "GitLab CI pipeline standards for IaC deployments. Use when creating or modifying pipeline YAML for Terraform/Terragrunt plan, apply, destroy, or drift detection."
-applyTo: "{.gitlab-ci.yml,ci/**/*.yml}"
+applyTo: "**/*.yml"
 ---
 
 # GitLab CI Pipeline Standards

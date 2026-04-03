@@ -47,6 +47,10 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: '~1.9'
+      - name: Install Terragrunt
+        run: |
+          curl -sL https://github.com/gruntwork-io/terragrunt/releases/latest/download/terragrunt_linux_amd64 -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
       - name: Terragrunt Plan
         working-directory: config/{environment}/{region}/{stack}/{component}
         run: |

@@ -112,7 +112,7 @@ jobs:
 
 ## Authentication
 - OIDC only — never use long-lived IAM access key credentials
-- IAM role ARN stored in GitHub Actions variable `AWS_ROLE_ARN` (accessed via `${{ vars.AWS_ROLE_ARN }}`)
+- IAM role ARN stored in GitHub environment variable `AWS_ROLE_ARN`
 - Region stored in `AWS_REGION`
 
 ## Conventions
