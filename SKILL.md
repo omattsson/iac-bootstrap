@@ -92,6 +92,7 @@ Based on discovery + interview answers, generate customization files using templ
 | `.github/agents/terraform-module-builder.agent.md` | `copilot/agents/terraform-module-builder.agent.md.tmpl` |
 | `.github/agents/terraform-test-writer.agent.md` | `copilot/agents/terraform-test-writer.agent.md.tmpl` |
 | `.github/agents/*-stack-manager.agent.md` | `copilot/agents/orchestration-stack-manager.agent.md.tmpl` |
+| `.github/agents/orchestration-coordinator.agent.md` | `copilot/agents/orchestration-coordinator.agent.md.tmpl` |
 | `.github/skills/create-terraform-module/SKILL.md` | `copilot/skills/create-terraform-module.skill.md.tmpl` |
 | `.github/skills/create-*-stack/SKILL.md` | `copilot/skills/create-orchestration-stack.skill.md.tmpl` |
 | `.github/skills/create-infra-pipeline/SKILL.md` | `copilot/skills/create-infra-pipeline.skill.md.tmpl` |
@@ -112,6 +113,7 @@ Based on discovery + interview answers, generate customization files using templ
 | `.claude/commands/create-terraform-module.md` | `claude/commands/create-terraform-module.md.tmpl` |
 | `.claude/commands/create-orchestration-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` |
 | `.claude/commands/create-infra-pipeline.md` | `claude/commands/create-infra-pipeline.md.tmpl` |
+| `.claude/commands/coordinate-module-rollout.md` | `claude/commands/coordinate-module-rollout.md.tmpl` |
 
 #### Generation rules:
 1. Only generate orchestration files if the workspace uses Terragrunt/Terramate/etc.

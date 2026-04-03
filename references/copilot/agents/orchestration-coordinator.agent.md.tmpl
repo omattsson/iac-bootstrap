@@ -1,6 +1,6 @@
 ---
 description: "Coordinate cross-repo module changes across the {{COMPANY_NAME}} {{CLOUD_PROVIDER}} platform. Use when: releasing a new module version, propagating a breaking change across stacks, planning a full module → tag → config → pipeline rollout, identifying all downstream consumers of a module."
-tools: [read, search]
+tools: [read, search, agent, todo]
 ---
 
 # Orchestration Coordinator
@@ -19,7 +19,7 @@ You are an expert cross-repo change coordinator for {{COMPANY_NAME}}'s {{CLOUD_P
 ### Coordinating a module version bump:
 1. Search all orchestration configs for references to the module (search `{{MODULE_PREFIX}}-{name}` source strings)
 2. List every environment + stack + component that consumes the module
-3. Review the module's CHANGELOG or release notes for breaking changes (output/variable removals or renames)
+3. Check the module's tag history for breaking changes (output/variable removals or renames)
 4. Identify which {{VERSION_TAG_LOCATION}} files need updating
 5. Determine which stacks need a `plan` run after the version change
 6. Map any pipeline jobs that deploy the affected stacks
