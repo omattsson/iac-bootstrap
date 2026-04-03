@@ -246,13 +246,13 @@ After bootstrapping a workspace, run the placeholder validator to confirm every 
 
 ```bash
 # Validate the current workspace (run from the bootstrapped workspace root)
-bash ~/git/iac-bootstrap/scripts/validate.sh
+bash <path-to-iac-bootstrap>/scripts/validate.sh
 
 # Or pass the workspace path explicitly
-bash ~/git/iac-bootstrap/scripts/validate.sh ~/my-iac-workspace
+bash <path-to-iac-bootstrap>/scripts/validate.sh ~/my-iac-workspace
 ```
 
-The script scans `.github/`, `.claude/`, and `CLAUDE.md` for any remaining `{{TOKEN}}` tokens (uppercase letters and underscores only) across `.md`, `.yml`, `.yaml`, `.json`, `.hcl`, and `.tf` files. It prints each finding in `file:line: {{TOKEN}}` format, exits `0` when no placeholders are found and `1` when any remain — suitable for use in CI pipelines.
+The script scans `.github/`, `.claude/`, and `CLAUDE.md` for any remaining `{{TOKEN}}` tokens (uppercase letters, digits, and underscores) across `.md`, `.yml`, `.yaml`, `.json`, `.hcl`, and `.tf` files. It prints each finding in `file:line: {{TOKEN}}` format, exits `0` when no placeholders are found and `1` when any remain — suitable for use in CI pipelines.
 
 ## Contributing
 
