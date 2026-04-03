@@ -3,7 +3,13 @@
 import pytest
 from pathlib import Path
 
-from bootstrap_iac.generator import resolve_placeholders, generate_files, get_templates_dir
+from bootstrap_iac.generator import (
+    resolve_placeholders,
+    generate_files,
+    get_templates_dir,
+    _cloud_template,
+    _build_output_specs,
+)
 from bootstrap_iac.interview import build_context
 
 
@@ -334,3 +340,164 @@ def test_get_templates_dir_returns_directory():
     assert tdir.is_dir()
     # Should contain at least the copilot templates
     assert (tdir / "copilot").is_dir() or (tdir / "copilot/copilot-instructions.md.tmpl").exists()
+
+
+# ---------------------------------------------------------------------------
+# Cloud-variant template selection
+# ---------------------------------------------------------------------------
+
+
+def test_cloud_template_azure_returns_base():
+    """Azure always returns the base template path."""
+    base = "copilot/copilot-instructions.md.tmpl"
+    assert _cloud_template(base, "Azure", None) == base
+
+
+def test_cloud_template_aws_with_existing_variant(tmp_path):
+    """AWS returns the cloud-specific path when the variant file exists."""
+    base = "copilot/copilot-instructions.md.tmpl"
+    variant = tmp_path / "copilot" / "aws" / "copilot-instructions.md.tmpl"
+    variant.parent.mkdir(parents=True)
+    variant.write_text("AWS variant")
+
+    result = _cloud_template(base, "AWS", tmp_path)
+    assert result == "copilot/aws/copilot-instructions.md.tmpl"
+
+
+def test_cloud_template_aws_falls_back_when_missing(tmp_path):
+    """AWS falls back to base template when variant does not exist."""
+    base = "copilot/agents/infra-architect.agent.md.tmpl"
+    result = _cloud_template(base, "AWS", tmp_path)
+    assert result == base
+
+
+def test_cloud_template_gcp_with_existing_variant(tmp_path):
+    """GCP returns the cloud-specific path when the variant file exists."""
+    base = "claude/CLAUDE.md.tmpl"
+    variant = tmp_path / "claude" / "gcp" / "CLAUDE.md.tmpl"
+    variant.parent.mkdir(parents=True)
+    variant.write_text("GCP variant")
+
+    result = _cloud_template(base, "GCP", tmp_path)
+    assert result == "claude/gcp/CLAUDE.md.tmpl"
+
+
+def test_cloud_template_gcp_falls_back_when_missing(tmp_path):
+    """GCP falls back to base template when variant does not exist."""
+    base = "copilot/instructions/pipeline-templates.instructions.md.tmpl"
+    result = _cloud_template(base, "GCP", tmp_path)
+    assert result == base
+
+
+def test_build_output_specs_aws_uses_cloud_templates():
+    """AWS context should pick cloud-specific templates from bundled templates."""
+    tdir = get_templates_dir()
+    ctx = {
+        "CLOUD_PROVIDER": "AWS",
+        "ORCHESTRATION_TOOL": "None",
+        "ORCHESTRATION_TOOL_LOWER": "terraform",
+    }
+    specs = _build_output_specs(ctx, templates_dir=tdir)
+
+    # The copilot-instructions template should point to the aws variant
+    copilot_inst = [s for s in specs if s.output_rel == ".github/copilot-instructions.md"]
+    assert len(copilot_inst) == 1
+    assert "aws" in copilot_inst[0].template_rel
+
+    # The iac-best-practices template should use the base (no AWS variant exists)
+    best_practices = [
+        s for s in specs
+        if s.output_rel == ".github/instructions/iac-best-practices.instructions.md"
+    ]
+    assert len(best_practices) == 1
+    assert "aws" not in best_practices[0].template_rel
+
+
+def test_build_output_specs_gcp_uses_cloud_templates():
+    """GCP context should pick cloud-specific templates from bundled templates."""
+    tdir = get_templates_dir()
+    ctx = {
+        "CLOUD_PROVIDER": "GCP",
+        "ORCHESTRATION_TOOL": "None",
+        "ORCHESTRATION_TOOL_LOWER": "terraform",
+    }
+    specs = _build_output_specs(ctx, templates_dir=tdir)
+
+    # The CLAUDE.md template should point to the gcp variant
+    claude_md = [s for s in specs if s.output_rel == "CLAUDE.md"]
+    assert len(claude_md) == 1
+    assert "gcp" in claude_md[0].template_rel
+
+
+def test_build_output_specs_azure_uses_base_templates():
+    """Azure context should always use base templates."""
+    tdir = get_templates_dir()
+    ctx = {
+        "CLOUD_PROVIDER": "Azure",
+        "ORCHESTRATION_TOOL": "None",
+        "ORCHESTRATION_TOOL_LOWER": "terraform",
+    }
+    specs = _build_output_specs(ctx, templates_dir=tdir)
+
+    for spec in specs:
+        assert "/aws/" not in spec.template_rel
+        assert "/gcp/" not in spec.template_rel
+
+
+def test_generate_files_aws_uses_cloud_templates(tmp_path):
+    """AWS generation should use cloud-specific templates and produce AWS content."""
+    answers = {
+        "COMPANY_NAME": "AWSCo",
+        "CLOUD_PROVIDER": "AWS",
+        "MODULE_PREFIX": "terraform-aws",
+        "ORCHESTRATION_TOOL": "None",
+        "ORCHESTRATION_DIR": ".",
+        "CI_CD_PLATFORM": "GitHub Actions",
+        "AUTH_PATTERN": "IAM Roles via OIDC",
+        "STATE_BACKEND": "S3",
+        "NAMING_PATTERN": "{prefix}-{type}",
+        "TAG_STRATEGY": "merge(var.default_tags, var.tags)",
+        "STANDARD_VARIABLES": "- prefix\n- region",
+        "TARGET": "both",
+        "ORG": "awsco",
+    }
+    ctx = build_context(answers)
+    results = generate_files(ctx, tmp_path, target="both")
+    written = [r for r in results if not r.skipped]
+    assert len(written) > 0
+
+    # Check that the module builder agent uses the AWS variant template
+    agent_results = [
+        r for r in written
+        if "terraform-module-builder" in str(r.output_path)
+    ]
+    assert len(agent_results) == 1
+    assert "aws" in agent_results[0].template_path.parts
+
+
+def test_generate_files_gcp_uses_cloud_templates(tmp_path):
+    """GCP generation should use cloud-specific templates and produce GCP content."""
+    answers = {
+        "COMPANY_NAME": "GCPCo",
+        "CLOUD_PROVIDER": "GCP",
+        "MODULE_PREFIX": "tf-gcp",
+        "ORCHESTRATION_TOOL": "None",
+        "ORCHESTRATION_DIR": ".",
+        "CI_CD_PLATFORM": "GitHub Actions",
+        "AUTH_PATTERN": "Workload Identity Federation",
+        "STATE_BACKEND": "GCS",
+        "NAMING_PATTERN": "{prefix}-{type}",
+        "TAG_STRATEGY": "merge(var.default_labels, var.labels)",
+        "STANDARD_VARIABLES": "- prefix\n- location",
+        "TARGET": "both",
+        "ORG": "gcpco",
+    }
+    ctx = build_context(answers)
+    results = generate_files(ctx, tmp_path, target="both")
+    written = [r for r in results if not r.skipped]
+    assert len(written) > 0
+
+    # Check that CLAUDE.md uses the GCP variant template
+    claude_results = [r for r in written if r.output_path.name == "CLAUDE.md"]
+    assert len(claude_results) == 1
+    assert "gcp" in claude_results[0].template_path.parts

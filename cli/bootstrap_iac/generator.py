@@ -89,62 +89,99 @@ class OutputSpec:
     skip_when_no_orchestration: bool = False
 
 
-def _build_output_specs(context: dict) -> list[OutputSpec]:
+_CLOUD_SUBDIRS: dict[str, str] = {
+    "AWS": "aws",
+    "GCP": "gcp",
+}
+
+
+def _cloud_template(base_rel: str, cloud: str, templates_dir: Path | None) -> str:
+    """Return the cloud-specific template path if it exists, else the base path.
+
+    For AWS/GCP the convention is to check for a variant under the cloud
+    subdirectory (e.g. ``copilot/aws/copilot-instructions.md.tmpl``).
+    Azure (the default) always uses the base templates.
+    """
+    subdir = _CLOUD_SUBDIRS.get(cloud)
+    if not subdir:
+        return base_rel
+
+    # Build candidate: insert cloud subdir after the tool prefix
+    # e.g. "copilot/agents/foo.tmpl" → "copilot/aws/agents/foo.tmpl"
+    parts = base_rel.split("/", 1)
+    if len(parts) != 2:
+        return base_rel
+    candidate = f"{parts[0]}/{subdir}/{parts[1]}"
+
+    # Only return the candidate when a concrete templates_dir is available and
+    # the file actually exists there.  This avoids referencing cloud paths when
+    # the bundled templates do not ship the variant.
+    if templates_dir is not None and (templates_dir / candidate).exists():
+        return candidate
+
+    return base_rel
+
+
+def _build_output_specs(context: dict, templates_dir: Path | None = None) -> list[OutputSpec]:
     """Return the list of files to generate based on *context*."""
     orch_lower = context.get("ORCHESTRATION_TOOL_LOWER", "terraform")
     has_orchestration = context.get("ORCHESTRATION_TOOL", "None") != "None"
+    cloud = context.get("CLOUD_PROVIDER", "Azure")
+
+    def _ct(base: str) -> str:
+        return _cloud_template(base, cloud, templates_dir)
 
     specs: list[OutputSpec] = []
 
     # ---- Copilot outputs ----
     specs += [
         OutputSpec(
-            "copilot/copilot-instructions.md.tmpl",
+            _ct("copilot/copilot-instructions.md.tmpl"),
             ".github/copilot-instructions.md",
             "copilot",
         ),
         OutputSpec(
-            "copilot/agents/infra-architect.agent.md.tmpl",
+            _ct("copilot/agents/infra-architect.agent.md.tmpl"),
             ".github/agents/infra-architect.agent.md",
             "copilot",
         ),
         OutputSpec(
-            "copilot/agents/terraform-module-builder.agent.md.tmpl",
+            _ct("copilot/agents/terraform-module-builder.agent.md.tmpl"),
             ".github/agents/terraform-module-builder.agent.md",
             "copilot",
         ),
         OutputSpec(
-            "copilot/agents/terraform-test-writer.agent.md.tmpl",
+            _ct("copilot/agents/terraform-test-writer.agent.md.tmpl"),
             ".github/agents/terraform-test-writer.agent.md",
             "copilot",
         ),
         OutputSpec(
-            "copilot/skills/create-terraform-module.skill.md.tmpl",
+            _ct("copilot/skills/create-terraform-module.skill.md.tmpl"),
             ".github/skills/create-terraform-module/SKILL.md",
             "copilot",
         ),
         OutputSpec(
-            "copilot/skills/create-infra-pipeline.skill.md.tmpl",
+            _ct("copilot/skills/create-infra-pipeline.skill.md.tmpl"),
             ".github/skills/create-infra-pipeline/SKILL.md",
             "copilot",
         ),
         OutputSpec(
-            "copilot/instructions/terraform-modules.instructions.md.tmpl",
+            _ct("copilot/instructions/terraform-modules.instructions.md.tmpl"),
             ".github/instructions/terraform-modules.instructions.md",
             "copilot",
         ),
         OutputSpec(
-            "copilot/instructions/terraform-tests.instructions.md.tmpl",
+            _ct("copilot/instructions/terraform-tests.instructions.md.tmpl"),
             ".github/instructions/terraform-tests.instructions.md",
             "copilot",
         ),
         OutputSpec(
-            "copilot/instructions/pipeline-templates.instructions.md.tmpl",
+            _ct("copilot/instructions/pipeline-templates.instructions.md.tmpl"),
             ".github/instructions/pipeline-templates.instructions.md",
             "copilot",
         ),
         OutputSpec(
-            "copilot/instructions/iac-best-practices.instructions.md.tmpl",
+            _ct("copilot/instructions/iac-best-practices.instructions.md.tmpl"),
             ".github/instructions/iac-best-practices.instructions.md",
             "copilot",
         ),
@@ -153,17 +190,17 @@ def _build_output_specs(context: dict) -> list[OutputSpec]:
     if has_orchestration:
         specs += [
             OutputSpec(
-                "copilot/agents/orchestration-stack-manager.agent.md.tmpl",
+                _ct("copilot/agents/orchestration-stack-manager.agent.md.tmpl"),
                 f".github/agents/{orch_lower}-stack-manager.agent.md",
                 "copilot",
             ),
             OutputSpec(
-                "copilot/skills/create-orchestration-stack.skill.md.tmpl",
+                _ct("copilot/skills/create-orchestration-stack.skill.md.tmpl"),
                 f".github/skills/create-{orch_lower}-stack/SKILL.md",
                 "copilot",
             ),
             OutputSpec(
-                "copilot/instructions/orchestration-configs.instructions.md.tmpl",
+                _ct("copilot/instructions/orchestration-configs.instructions.md.tmpl"),
                 f".github/instructions/{orch_lower}-configs.instructions.md",
                 "copilot",
             ),
@@ -172,17 +209,17 @@ def _build_output_specs(context: dict) -> list[OutputSpec]:
     # ---- Claude Code outputs ----
     specs += [
         OutputSpec(
-            "claude/CLAUDE.md.tmpl",
+            _ct("claude/CLAUDE.md.tmpl"),
             "CLAUDE.md",
             "claude",
         ),
         OutputSpec(
-            "claude/commands/create-terraform-module.md.tmpl",
+            _ct("claude/commands/create-terraform-module.md.tmpl"),
             ".claude/commands/create-terraform-module.md",
             "claude",
         ),
         OutputSpec(
-            "claude/commands/create-infra-pipeline.md.tmpl",
+            _ct("claude/commands/create-infra-pipeline.md.tmpl"),
             ".claude/commands/create-infra-pipeline.md",
             "claude",
         ),
@@ -191,7 +228,7 @@ def _build_output_specs(context: dict) -> list[OutputSpec]:
     if has_orchestration:
         specs.append(
             OutputSpec(
-                "claude/commands/create-orchestration-stack.md.tmpl",
+                _ct("claude/commands/create-orchestration-stack.md.tmpl"),
                 ".claude/commands/create-orchestration-stack.md",
                 "claude",
             )
@@ -254,7 +291,7 @@ def generate_files(
         One entry per template, whether written, skipped, or dry-run.
     """
     tdir = templates_dir or get_templates_dir()
-    specs = _build_output_specs(context)
+    specs = _build_output_specs(context, templates_dir=tdir)
     results: list[GeneratedFile] = []
 
     for spec in specs:

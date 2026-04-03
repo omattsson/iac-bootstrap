@@ -1,0 +1,182 @@
+---
+name: create-terraform-module
+description: "Create a new reusable GCP Terraform module following {{COMPANY_NAME}} conventions. Use when: scaffolding a new {{MODULE_PREFIX}}-* repo, adding GCP resource modules, creating module boilerplate."
+---
+
+# Create Terraform Module — GCP
+
+Scaffolds a new `{{MODULE_PREFIX}}-{name}` directory following workspace conventions.
+
+## When to Use
+- Creating a new GCP resource module from scratch
+- Generating boilerplate for a new module repo
+- Adding standard files (tests, examples, pre-commit) to an existing module
+
+## Prerequisites
+- Module name (lowercase, hyphenated)
+- Primary GCP resource type(s)
+- Optional features needed (Private Service Connect, KMS encryption, IAM bindings)
+
+## Procedure
+
+### 1. Gather Requirements
+Ask for:
+- Module name: used as `{{MODULE_PREFIX}}-{name}`
+- Primary resource(s) to manage
+- Optional features: {{OPTIONAL_FEATURES}}
+<!-- Example GCP features: private_service_connect, kms_encryption, iam_bindings, vpc_peering -->
+
+### 2. Create Directory Structure
+```
+{{MODULE_PREFIX}}-{name}/
+├── main.tf                    # Provider requirements + data sources
+├── {resource}.tf              # Core resource(s)
+├── locals.tf                  # Name construction, label merging
+├── variables.tf               # Module-specific variables
+├── {{COMMON_VARS_FILE}}       # Standard cross-module variables
+├── outputs.tf                 # Module outputs
+├── versions.tf                # Version constraints
+├── README.md                  # Documentation
+├── .pre-commit-config.yaml    # Validation hooks
+├── .tflint.hcl                # TFLint rules
+├── .terraform-docs.yml        # Doc generation
+├── examples/
+│   └── basic/
+│       ├── main.tf
+│       └── variables.tf
+└── tests/
+    └── {resource}.tftest.hcl  # Native terraform tests
+```
+
+### 3. File Templates
+
+#### versions.tf
+```hcl
+terraform {
+  required_version = ">=1.3"
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = ">=5.0,<6.0"
+    }
+  }
+}
+```
+
+#### locals.tf — Naming and Label Pattern
+```hcl
+locals {
+  {{NAMING_LOCALS}}
+  # Labels: defaults + resource-specific, resource-specific wins
+  # GCP labels: lowercase, max 63 chars, alphanumeric + dashes + underscores
+  labels = merge(var.env_default_labels, var.labels)
+}
+```
+
+#### common.variables.tf — Standard Cross-Module Variables
+```hcl
+variable "prefix" {
+  type        = string
+  description = "Resource name prefix."
+}
+
+variable "project_id" {
+  type        = string
+  description = "GCP project ID."
+}
+
+variable "region" {
+  type        = string
+  description = "GCP region."
+}
+
+variable "labels" {
+  type        = map(string)
+  default     = {}
+  description = "Additional resource labels (take precedence over env_default_labels on conflict)."
+}
+
+variable "env_default_labels" {
+  type        = map(string)
+  default     = {}
+  description = "Default labels from the orchestration layer."
+}
+```
+
+#### Resource file pattern
+```hcl
+resource "{{PROVIDER_RESOURCE}}" "default" {
+  name       = local.name
+  project    = var.project_id
+  {{LOCATION_ATTRIBUTE}}
+
+  labels = local.labels
+
+  # Resource-specific configuration...
+}
+```
+
+#### outputs.tf
+```hcl
+output "name" {
+  value       = {{PROVIDER_RESOURCE}}.default.name
+  description = "Name of the resource."
+}
+
+output "id" {
+  value       = {{PROVIDER_RESOURCE}}.default.id
+  description = "The ID of the resource."
+}
+
+output "self_link" {
+  value       = {{PROVIDER_RESOURCE}}.default.self_link
+  description = "The self-link URI of the resource."
+}
+```
+
+#### Test file pattern
+```hcl
+mock_provider "google" {}
+
+override_data {
+  target = data.google_project.current
+  values = {
+    project_id = "test-project-123"
+    number     = 123456789
+    name       = "test-project"
+  }
+}
+
+variables {
+  prefix             = "test-auto"
+  project_id         = "test-project-123"
+  region             = "europe-west1"
+  labels             = {}
+  env_default_labels = { managed_by = "terraform" }
+}
+
+run "creates_resource_with_correct_name" {
+  command = plan
+  assert {
+    condition     = {{PROVIDER_RESOURCE}}.default.name == "{{EXPECTED_NAME_PATTERN}}"
+    error_message = "Name should follow naming convention"
+  }
+}
+
+run "merges_labels_correctly" {
+  command = plan
+  variables {
+    labels = { extra = "label" }
+  }
+  assert {
+    condition     = {{PROVIDER_RESOURCE}}.default.labels["extra"] == "label"
+    error_message = "Custom labels should be merged"
+  }
+}
+```
+
+### 4. Post-Creation
+1. `terraform fmt -recursive`
+2. `terraform validate`
+3. `terraform test`
+4. `terraform-docs` to generate README

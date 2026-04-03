@@ -1,0 +1,162 @@
+# {{COMPANY_NAME}} Infrastructure Automation
+
+You are working in an infrastructure-as-code workspace for {{COMPANY_NAME}}'s AWS platform.
+
+## Workspace Structure
+
+| Category | Path | Purpose |
+|----------|------|---------|
+| **Terraform Modules** | `{{MODULE_PREFIX}}-*` | Reusable AWS resource modules |
+| **Orchestration** | `{{ORCHESTRATION_DIR}}/` | {{ORCHESTRATION_TOOL}} config for all environments |
+| **Pipelines** | `{{PIPELINE_DIR}}/` | {{CI_CD_PLATFORM}} pipeline templates |
+
+## Module Source Convention
+
+{{MODULE_SOURCE_PATTERN}}
+
+Version tags managed in {{VERSION_TAG_LOCATION}}.
+
+## Standard Variable Set
+
+These variables appear across all modules:
+{{STANDARD_VARIABLES}}
+<!-- Example:
+- `prefix` — Resource name prefix
+- `region` — AWS region (e.g., `us-east-1`)
+- `tags` — Additional resource tags (map(string))
+- `env_default_tags` — Default tags from orchestration layer
+-->
+
+## Naming Convention
+
+{{NAMING_PATTERN}}
+
+## Tagging Standard
+
+{{TAG_STRATEGY}}
+<!-- Example:
+local.tags = merge(var.env_default_tags, var.tags)
+Required tags: environment, product, managed_by = "Terraform"
+-->
+
+## Environment Hierarchy
+
+{{ENVIRONMENT_HIERARCHY}}
+
+---
+
+## Coding Standards
+
+### Terraform Files (`{{MODULE_PREFIX}}-*/**/*.tf`)
+
+**File organization:**
+- `main.tf` — provider requirements + data sources
+- `{resource}.tf` — core resources, named by AWS resource type
+- `locals.tf` — name construction, tag merging, computed values
+- `variables.tf` — module-specific variables
+- `{{COMMON_VARS_FILE}}` — standard cross-module variables
+- `outputs.tf` — module outputs (at minimum: `name`/`arn` and `id`)
+- `versions.tf` — terraform and provider version constraints
+
+**Resource conventions:**
+- Single resources use identifier `"default"` (e.g., `aws_s3_bucket.default`)
+- Map-driven resources use `for_each` with descriptive keys
+- Boolean toggles use `count`
+- Tags: `merge(var.env_default_tags, var.tags)` — always
+- Never hardcode account IDs — use `data.aws_caller_identity.current.account_id`
+
+**Naming pattern:**
+```hcl
+{{NAMING_PATTERN_HCL}}
+```
+
+**Provider versions:**
+```hcl
+aws = { source = "hashicorp/aws", version = ">=5.0,<6.0" }
+```
+
+**No hardcoded secrets, account IDs, or credentials in module code.**
+
+### Test Files (`**/*.tftest.hcl`)
+
+**Required boilerplate in every test:**
+```hcl
+mock_provider "aws" {}
+
+override_data {
+  target = data.aws_caller_identity.current
+  values = {
+    account_id = "123456789012"
+    arn        = "arn:aws:iam::123456789012:root"
+    user_id    = "123456789012"
+  }
+}
+```
+
+- All tests use `command = plan` — never `command = apply`
+- Include all `{{COMMON_VARS_FILE}}` variables in the `variables {}` block
+- Standard test variables: `prefix = "test-auto"`, `region = "us-east-1"`, `tags = {}`, `env_default_tags = { managed_by = "Terraform" }`
+- One test file per concern: `naming.tftest.hcl`, `tags.tftest.hcl`, etc.
+
+### Orchestration Files (`{{ORCHESTRATION_DIR}}/**/*.hcl`)
+
+{{HIERARCHY_FILES_DESCRIPTION}}
+
+**Shared config pattern ({{ENVCOMMON_PATTERN}}):**
+- Read hierarchy variables from parent files (account ID, region, module versions)
+- Define source URL pointing to the module repo
+- Declare dependencies with realistic mock outputs
+- Provide inputs mapping hierarchy variables to module variables
+
+**Component config pattern:**
+```hcl
+{{COMPONENT_CONFIG_PATTERN}}
+```
+
+Version tags from {{VERSION_TAG_LOCATION}}. Never hardcode versions in component files.
+
+### Pipeline Files
+
+**Two-stage pattern:** Plan stage → Apply stage (on protected branches with approval).
+
+**AWS Authentication (OIDC — no static credentials):**
+```yaml
+- uses: aws-actions/configure-aws-credentials@v4
+  with:
+    role-to-assume: arn:aws:iam::{{AWS_ACCOUNT_ID}}:role/{{TERRAFORM_ROLE_NAME}}
+    aws-region: {{AWS_DEFAULT_REGION}}
+```
+
+{{TEMPLATE_REFERENCE_PATTERN}}
+
+---
+
+## Behavioral Rules
+
+### When building or modifying Terraform modules:
+- DO NOT run `terraform apply` or `terraform destroy`
+- DO NOT hardcode secrets, account IDs, or credentials
+- DO NOT change `{{COMMON_VARS_FILE}}` unless the variable is genuinely cross-module
+- DO NOT break backward compatibility without explicit approval
+- ONLY use `command = plan` in tests
+
+### When writing tests:
+- DO NOT use `command = apply`
+- DO NOT create real AWS resources
+- ALWAYS include all required `{{COMMON_VARS_FILE}}` variables
+- ALWAYS use `mock_provider "aws" {}`
+- ALWAYS override `data.aws_caller_identity.current`
+
+### When modifying orchestration configs:
+- DO NOT run apply or destroy without explicit approval
+- DO NOT hardcode account IDs or credentials
+- DO NOT modify root configs without understanding impact on all stacks
+- DO NOT bypass the DRY pattern
+- ALWAYS provide mock_outputs in dependency blocks
+
+### General principles:
+1. **Minimal intervention** — smallest change that fulfills the requirement
+2. **DRY** — common config extracted, variables flow from hierarchy
+3. **No hardcoded secrets** — use SSM Parameter Store, Secrets Manager, or OIDC
+4. **Plan-only tests** — mock providers, no real resources
+5. **Pre-commit hooks** — `terraform_fmt`, `tflint`, validation
