@@ -149,8 +149,8 @@ CHECKS=$(( CHECKS + 1 ))
 tf_count=$(find "$ROOT" -name "*.tf" ! -path '*/.terraform/*' 2>/dev/null | wc -l)
 
 if [ "$tf_count" -gt 0 ]; then
-  backend_files=$(grep -rl 'backend\s*"' "$ROOT" --include="*.tf" 2>/dev/null || true)
-  cloud_files=$(grep -rl '^\s*cloud\s*{' "$ROOT" --include="*.tf" 2>/dev/null || true)
+  backend_files=$(grep -rl 'backend[[:space:]]*"' "$ROOT" --include="*.tf" 2>/dev/null || true)
+  cloud_files=$(grep -rl '^[[:space:]]*cloud[[:space:]]*{' "$ROOT" --include="*.tf" 2>/dev/null || true)
 
   if [ -z "$backend_files" ] && [ -z "$cloud_files" ]; then
     _smell "missing-backend" "${ROOT}/" \
@@ -175,7 +175,7 @@ while IFS= read -r mdir; do
   [ "$res_count" -eq 0 ] && continue
 
   tag_count=$(grep -r '\btags\b\|\blabels\b' "$mdir" --include="*.tf" 2>/dev/null \
-    | grep -v '^\s*#' | wc -l)
+    | grep -v '^[[:space:]]*#' | wc -l)
 
   if [ "$tag_count" -eq 0 ]; then
     _smell "no-tagging-standard" "${mdir}/" \
@@ -293,8 +293,8 @@ PYEOF
         fi
       else
         # Fallback: compare count of source = vs version = lines inside required_providers
-        sources=$(awk '/required_providers/{f=1} f && /source\s*=/{c++} /^\s*\}\s*$/ && f{f=0} END{print c+0}' "$file")
-        versions=$(awk '/required_providers/{f=1} f && /version\s*=/{c++} /^\s*\}\s*$/ && f{f=0} END{print c+0}' "$file")
+        sources=$(awk '/required_providers/{f=1} f && /source[[:space:]]*=/{c++} /^[[:space:]]*\}[[:space:]]*$/ && f{f=0} END{print c+0}' "$file")
+        versions=$(awk '/required_providers/{f=1} f && /version[[:space:]]*=/{c++} /^[[:space:]]*\}[[:space:]]*$/ && f{f=0} END{print c+0}' "$file")
         if [ "$sources" -gt "$versions" ]; then
           _smell "missing-provider-version" "$file:?" \
             "Some providers in required_providers appear to be missing a version constraint"
