@@ -1,5 +1,5 @@
 ---
-description: "Build and modify Terraform modules following Contoso conventions. Use when: creating new tf-module-* repos, adding resources to existing modules, writing terraform tests, adding private endpoints or diagnostic settings."
+description: "Build and modify Terraform modules following Contoso conventions. Use when: scaffolding new tf-module-* repos, generating boilerplate for resource modules, adding private endpoints, RBAC role assignments, diagnostic settings, or any reusable module component."
 tools: [read, edit, search, execute, todo, agent]
 ---
 
