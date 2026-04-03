@@ -41,7 +41,7 @@ For each field below, run the indicated scan and record the result. Assign a con
 | **Q3 — Module source pattern** | Git URL template | Search `*.tf` and `*.hcl` for `source =` inside `module` blocks; extract the URL pattern (strip ref/version). |
 | **Q4 — Module prefix** | `tf-module-`, `terraform-aws-`, `modules/` | List top-level directories; find directories whose names match `tf-module-*` or `terraform-*`, and check whether a top-level `modules/` directory exists (optionally inspect its immediate children as a secondary signal). If both directory patterns and `source =` lines are found, prefer the directory names (High confidence) and use the source pattern as a secondary signal (Medium). If they conflict, list both and mark as Medium. |
 | **Q5 — Orchestration tool** | Terragrunt / Terramate / none | Check for `terragrunt.hcl` or `root.hcl` → Terragrunt. Check for `*.tm.hcl` or `terramate.tm.hcl` → Terramate. Check for `Pulumi.yaml` → Pulumi. If none, mark as "plain Terraform". |
-| **Q6 — CI/CD platform** | GitHub Actions / Azure DevOps / GitLab CI / Atlantis | Check for `.github/workflows/*.yml` → GitHub Actions. Check for `azure-pipelines.yml` or `azure-pipelines/` → Azure DevOps. Check for `.gitlab-ci.yml` → GitLab CI. Check for `.atlantis.yaml` or `atlantis.yaml` → Atlantis. |
+| **Q6 — CI/CD platform** | GitHub Actions / Azure DevOps / GitLab CI / Atlantis | Check for `.github/workflows/*.yml` or `.github/workflows/*.yaml` → GitHub Actions. Check for `azure-pipelines.yml` or `azure-pipelines/` → Azure DevOps. Check for `.gitlab-ci.yml` → GitLab CI. Check for `.atlantis.yaml` or `atlantis.yaml` → Atlantis. |
 | **Q7 — Auth pattern** | Managed Identity / OIDC / service principal / IAM roles | In `*.tf` provider blocks: `use_msi = true` → Managed Identity; `use_oidc = true` → OIDC; `client_secret` variable present → service principal. In pipeline YAML: `aws-actions/configure-aws-credentials` with `role-to-assume` → OIDC; `azure/login` with `creds` → service principal. For multi-cloud workspaces, list all distinct patterns found (one per provider). For single-cloud workspaces, report the one pattern detected. |
 | **Q8 — State backend** | Azure Blob / S3 / GCS / Terraform Cloud | Scan `*.tf` for `backend "azurerm"` → Azure Blob; `backend "s3"` → S3; `backend "gcs"` → GCS; `backend "remote"` or `cloud {}` block → Terraform Cloud. |
 | **Q9 — Naming convention** | Pattern like `prefix-type-suffix` | Read `locals.tf` files from 2–3 modules (prefer root-level modules with the most resources). Extract the `name =` expression in the `locals` block. If all modules share the same pattern → High confidence. If most share a pattern with one outlier → report the majority pattern at Medium confidence. If patterns are inconsistent across modules → list the variants and mark as Low confidence. |
@@ -86,6 +86,7 @@ Show the user the Pre-fill Profile built in Phase 1. Mark Medium confidence valu
 ```
 I scanned the workspace and pre-filled the following answers. Please confirm or correct each value.
 Values marked with (?) are Medium confidence — double-check these especially.
+Values marked with (??) are Low confidence — please verify or provide the correct value.
 
   Q2  Cloud provider      : <detected value>        [High]
   Q3  Module source       : <detected value>    (?) [Medium]
