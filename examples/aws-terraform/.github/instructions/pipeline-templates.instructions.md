@@ -11,14 +11,16 @@ All deployment workflows: Plan job → Apply job (on protected branches with env
 ## Authentication
 Use OIDC — never long-lived IAM access keys:
 ```yaml
-permissions:
-  id-token: write
-  contents: read
-
-- uses: aws-actions/configure-aws-credentials@v4
-  with:
-    role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-    aws-region: ${{ vars.AWS_REGION }}
+jobs:
+  terraform:
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
 ```
 
 ## Terraform Setup

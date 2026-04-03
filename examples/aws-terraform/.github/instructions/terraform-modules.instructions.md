@@ -24,7 +24,7 @@ applyTo: "tf-module-*/**/*.tf"
 ```hcl
 local.name = var.full_name != null ? var.full_name : "${var.prefix}-{abbr}-${local.name_suffix}"
 ```
-All names use `lower(replace(...))` — AWS resource names are case-sensitive and often lowercase-only.
+All names use `lower(regexreplace(...))` for sanitization — AWS resource names are case-sensitive and often lowercase-only.
 
 ## Variable Conventions
 - Use `optional(type, default)` syntax (Terraform 1.3+) for object attributes

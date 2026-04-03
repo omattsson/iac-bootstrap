@@ -31,7 +31,7 @@ These variables appear across all modules:
 `{prefix}-{resource_abbreviation}-{suffix}`
 - S3 bucket: `{prefix}-{suffix}` (globally unique, lowercase, max 63 chars)
 - IAM role: `{prefix}-{suffix}` (max 64 chars)
-- All names lowercase: `lower(replace(var.suffix, "/[^0-9a-zA-Z]+/", "-"))`
+- All names lowercase: `lower(regexreplace(var.suffix, "[^0-9a-zA-Z]+", "-"))`
 - Optional `full_name` override on most modules
 
 ## Tagging Standard

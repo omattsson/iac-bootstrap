@@ -39,7 +39,7 @@ module "{name}" {
 
   prefix           = var.prefix
   region           = var.region
-  env_default_tags = local.env_default_tags
+  env_default_tags = var.env_default_tags
 }
 ```
 

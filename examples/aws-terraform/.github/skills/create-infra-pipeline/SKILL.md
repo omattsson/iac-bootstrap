@@ -105,9 +105,9 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
       - uses: hashicorp/setup-terraform@v3
       - run: terraform init
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        working-directory: environments/${{ matrix.stack }}
       - run: terraform plan -detailed-exitcode -lock-timeout=20m
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        working-directory: environments/${{ matrix.stack }}
 ```
 
 ## Authentication
