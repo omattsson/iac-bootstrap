@@ -1,6 +1,6 @@
 ---
 name: create-infra-pipeline
-description: "Generate {{CI_CD_PLATFORM}} pipeline config for Terraform/{{ORCHESTRATION_TOOL}} deployments. Use when: creating CI/CD pipelines for infrastructure, adding plan/apply stages, configuring drift detection."
+description: "Generate {{CI_CD_PLATFORM}} pipeline config for Terraform/{{ORCHESTRATION_TOOL}} deployments. Use when: creating CI/CD pipelines for infrastructure, adding plan/apply stages, configuring drift detection, setting up destroy pipelines."
 ---
 
 # Create Infrastructure Pipeline
@@ -11,6 +11,7 @@ Generates {{CI_CD_PLATFORM}} pipeline configuration for infrastructure deploymen
 - Creating a new deployment pipeline for a component or stack
 - Setting up drift detection with notifications
 - Configuring plan→apply flow with approval gates
+- Adding a destroy pipeline
 
 ## Pipeline Architecture
 
@@ -49,13 +50,17 @@ extends:
 -->
 <!-- GitHub Actions example:
 ```yaml
-name: 'Terraform {component}'
+name: 'Terraform {component} — {environment}'
 on:
   push:
     branches: [main]
-    paths: ['{environment}/{component}/**']
+    paths: ['config/{environment}/**/{component}/**']
   pull_request:
-    paths: ['{environment}/{component}/**']
+    paths: ['config/{environment}/**/{component}/**']
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   plan:
@@ -63,51 +68,212 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
-      - run: terraform init
-      - run: terraform plan -out=tfplan
+      - run: terraform init && terraform plan -out=tfplan
       - uses: actions/upload-artifact@v4
         with:
-          name: tfplan
+          name: tfplan-{component}-{environment}
           path: tfplan
 
   apply:
     needs: plan
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: {approval_environment}
+    environment: {environment}-approval
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
       - uses: actions/download-artifact@v4
+        with:
+          name: tfplan-{component}-{environment}
       - run: terraform apply tfplan
+```
+-->
+<!-- GitLab CI example:
+```yaml
+include:
+  - local: ci/terraform-base.gitlab-ci.yml
+
+variables:
+  TF_ROOT: config/{environment}/{site}/{stack}/{component}
+
+stages: [plan, apply]
+
+plan:{component}:
+  stage: plan
+  extends: .terraform:plan
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+apply:{component}:
+  stage: apply
+  extends: .terraform:apply
+  needs: ["plan:{component}"]
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  environment:
+    name: {environment}
 ```
 -->
 
 ### Stack Pipeline (all components)
 
 {{STACK_PIPELINE}}
+<!-- GitHub Actions multi-stack example:
+```yaml
+jobs:
+  plan-all:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: terragrunt run-all plan -lock-timeout=20m
+        working-directory: config/{environment}
+
+  apply-all:
+    needs: plan-all
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: {environment}-approval
+    steps:
+      - uses: actions/checkout@v4
+      - run: terragrunt run-all apply --terragrunt-non-interactive -lock-timeout=20m
+        working-directory: config/{environment}
+```
+-->
+<!-- GitLab CI multi-stack example:
+```yaml
+plan:stack:
+  script:
+    - cd config/{environment}
+    - terragrunt run-all plan -lock-timeout=20m
+
+apply:stack:
+  script:
+    - cd config/{environment}
+    - terragrunt run-all apply --terragrunt-non-interactive -lock-timeout=20m
+  needs: ["plan:stack"]
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+```
+-->
 
 ### Drift Detection Pipeline
 
 {{DRIFT_PIPELINE}}
+<!-- Azure DevOps example:
+```yaml
+schedules:
+  - cron: '0 6 * * 1-5'
+    displayName: 'Weekday drift check'
+    branches:
+      include: [main]
+    always: true
+```
+-->
+<!-- GitHub Actions example:
+```yaml
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: terragrunt run-all plan -detailed-exitcode -lock-timeout=20m
+        working-directory: config/{environment}
+        continue-on-error: true
+      - name: Notify on drift
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: '{"text":"⚠️ Infrastructure drift detected in {environment}"}'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+```
+-->
+<!-- GitLab CI example:
+```yaml
+drift:{environment}:
+  script:
+    - cd config/{environment}
+    - terragrunt run-all plan -detailed-exitcode -lock-timeout=20m
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+```
+Schedule: Project → CI/CD → Schedules → `0 6 * * 1-5` on `main`.
+-->
+
+### Destroy Pipeline
+
+{{DESTROY_PIPELINE}}
+<!-- GitHub Actions example:
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DESTROY to confirm'
+        required: true
+
+jobs:
+  destroy:
+    if: github.event.inputs.confirm == 'DESTROY'
+    runs-on: ubuntu-latest
+    environment: {environment}-destroy-approval
+    steps:
+      - uses: actions/checkout@v4
+      - run: terragrunt destroy --terragrunt-non-interactive -lock-timeout=20m
+        working-directory: config/{environment}/{site}/{stack}/{component}
+```
+-->
+<!-- GitLab CI example:
+```yaml
+destroy:{component}:
+  script:
+    - cd config/{environment}/{site}/{stack}/{component}
+    - terragrunt destroy --terragrunt-non-interactive -lock-timeout=20m
+  when: manual
+  environment:
+    name: {environment}-destroy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+```
+-->
 
 ## Authentication
 
 {{AUTH_PATTERN}}
-<!-- Example Azure MSI:
+<!-- Azure DevOps MSI:
 - ARM.USE.MSI = true
 - ARM.USE.AZUREAD = true
 - az login --identity
 -->
-<!-- Example AWS OIDC:
+<!-- GitHub Actions — AWS OIDC:
 - uses: aws-actions/configure-aws-credentials@v4
   with:
-    role-to-assume: arn:aws:iam::ACCOUNT:role/terraform
+    role-to-assume: arn:aws:iam::ACCOUNT:role/terraform-plan
+    aws-region: us-east-1
+- Separate roles for plan (read-only) and apply (write)
 -->
-<!-- Example GCP Workload Identity:
-- uses: google-github-actions/auth@v2
+<!-- GitHub Actions — Azure OIDC:
+- uses: azure/login@v2
   with:
-    workload_identity_provider: projects/PROJECT/locations/global/...
+    client-id: ${{ vars.AZURE_CLIENT_ID }}
+    tenant-id: ${{ vars.AZURE_TENANT_ID }}
+    subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+-->
+<!-- GitLab CI — Azure Workload Identity:
+id_tokens:
+  AZURE_TOKEN:
+    aud: api://AzureADTokenExchange
+before_script:
+  - az login --federated-token "$AZURE_TOKEN" --service-principal
+      -u "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID"
 -->
 
 ## Standard Parameters
