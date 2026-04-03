@@ -28,7 +28,7 @@ Explore the target workspace to understand existing patterns and auto-populate a
 
 1. **Scan for Terraform modules**: `file_search("**/main.tf")` or `file_search("**/versions.tf")`
 2. **Scan for orchestration configs**: `file_search("**/terragrunt.hcl")`, `file_search("**/root.hcl")`, `file_search("**/terramate.tm.hcl")`
-3. **Scan for CI/CD pipelines**: `file_search("**/*.yml")` in pipeline directories
+3. **Scan for CI/CD pipelines**: `file_search("**/*.yml")`, `file_search("**/*.yaml")`, and explicit CI/CD paths such as `file_search("**/atlantis.yaml")` in pipeline directories
 4. **Check for existing customizations**: `file_search("**/.github/copilot-instructions.md")`, `file_search("**/CLAUDE.md")`
 
 #### 1.2 Auto-Detection Rules
@@ -39,7 +39,7 @@ For each field below, run the indicated scan and record the result. Assign a con
 |-------------|---------------|---------------|
 | **Q2 — Cloud provider** | `azure` / `aws` / `gcp` / multi | Scan `*.tf` for `provider "azurerm"`, `provider "aws"`, `provider "google"`. Note all providers found. |
 | **Q3 — Module source pattern** | Git URL template | Search `*.tf` and `*.hcl` for `source =` inside `module` blocks; extract the URL pattern (strip ref/version). |
-| **Q4 — Module prefix** | `tf-module-`, `terraform-aws-`, `modules/` | List top-level directories; find directories whose names match `tf-module-*`, `terraform-*`, or `modules/*`. If both directory patterns and `source =` lines are found, prefer the directory names (High confidence) and use the source pattern as a secondary signal (Medium). If they conflict, list both and mark as Medium. |
+| **Q4 — Module prefix** | `tf-module-`, `terraform-aws-`, `modules/` | List top-level directories; find directories whose names match `tf-module-*` or `terraform-*`, and check whether a top-level `modules/` directory exists (optionally inspect its immediate children as a secondary signal). If both directory patterns and `source =` lines are found, prefer the directory names (High confidence) and use the source pattern as a secondary signal (Medium). If they conflict, list both and mark as Medium. |
 | **Q5 — Orchestration tool** | Terragrunt / Terramate / none | Check for `terragrunt.hcl` or `root.hcl` → Terragrunt. Check for `*.tm.hcl` or `terramate.tm.hcl` → Terramate. Check for `Pulumi.yaml` → Pulumi. If none, mark as "plain Terraform". |
 | **Q6 — CI/CD platform** | GitHub Actions / Azure DevOps / GitLab CI / Atlantis | Check for `.github/workflows/*.yml` → GitHub Actions. Check for `azure-pipelines.yml` or `azure-pipelines/` → Azure DevOps. Check for `.gitlab-ci.yml` → GitLab CI. Check for `.atlantis.yaml` or `atlantis.yaml` → Atlantis. |
 | **Q7 — Auth pattern** | Managed Identity / OIDC / service principal / IAM roles | In `*.tf` provider blocks: `use_msi = true` → Managed Identity; `use_oidc = true` → OIDC; `client_secret` variable present → service principal. In pipeline YAML: `aws-actions/configure-aws-credentials` with `role-to-assume` → OIDC; `azure/login` with `creds` → service principal. For multi-cloud workspaces, list all distinct patterns found (one per provider). For single-cloud workspaces, report the one pattern detected. |
@@ -81,7 +81,7 @@ Present the Pre-fill Profile from Phase 1, then collect only what still needs co
 
 #### 2.1 Present Auto-Detected Answers
 
-Show the user the Pre-fill Profile built in Phase 1. Mark Medium confidence values with `(?)` so users know to pay closer attention:
+Show the user the Pre-fill Profile built in Phase 1. Mark Medium confidence values with `(?)` and Low confidence values with `(??)` so users know which need closest attention:
 
 ```
 I scanned the workspace and pre-filled the following answers. Please confirm or correct each value.
@@ -106,7 +106,7 @@ Wait for the user's response and apply any corrections before continuing.
 
 #### 2.2 Ask for Missing Answers
 
-After the user confirms or corrects auto-detected values, ask only for the fields that have **no detected value** plus the two that cannot be auto-detected:
+After the user confirms or corrects auto-detected values, ask only for the fields that have **no detected value**, fields with **Low** confidence, plus the two that cannot be auto-detected:
 
 ```
 A few more questions I couldn't infer from the code:
