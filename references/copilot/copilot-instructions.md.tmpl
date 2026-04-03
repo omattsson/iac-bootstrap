@@ -59,6 +59,70 @@ environments/{env}/main.tf — per-environment root
 modules/ — shared modules
 -->
 
+## Module Maintenance & Backward Compatibility
+
+### Adding optional variables (non-breaking)
+Always provide a default that preserves existing behavior. Use `optional()` for new object attributes:
+
+```hcl
+# New simple variable — default keeps existing behavior
+variable "enable_purge_protection" {
+  type    = bool
+  default = false
+}
+
+# New attribute on existing object — optional() so callers don't have to update
+variable "network_config" {
+  type = object({
+    public_access         = optional(bool, false)
+    allowed_cidrs         = optional(list(string), [])
+    bypass_azure_services = optional(bool, false)  # new — callers unaffected
+  })
+  default = {}
+}
+```
+
+### Deprecating variables
+Keep the old variable, add a `DEPRECATED` description, and resolve both in `locals`:
+
+```hcl
+variable "old_var_name" {
+  type        = string
+  default     = null
+  description = "DEPRECATED: use `new_var_name` instead. Removed in next major version."
+}
+
+variable "new_var_name" {
+  type    = string
+  default = "default-value"
+}
+
+locals {
+  resolved_value = var.old_var_name != null ? var.old_var_name : var.new_var_name
+}
+```
+
+### Renaming resources with `moved` blocks
+Add a `moved` block in the same commit as any resource or `for_each` key rename to prevent destroy/re-create:
+
+```hcl
+moved {
+  from = azurerm_resource_group.old_name
+  to   = azurerm_resource_group.default
+}
+```
+
+### Semantic versioning
+
+| Change | Version bump |
+|--------|-------------|
+| Bug fix, doc update | Patch (`x.y.Z`) |
+| New optional variable, new output | Minor (`x.Y.0`) |
+| Removed/renamed variable, changed output type | Major (`X.0.0`) |
+
+### Major version migration guides
+Publish a `MIGRATION.md` at the module repository root for every major version bump, and include it with the corresponding major-version release/tag. Document: what broke, old vs new usage, and step-by-step upgrade instructions.
+
 ## Key Principles
 
 1. **Minimal intervention** — smallest change that fulfills the requirement
