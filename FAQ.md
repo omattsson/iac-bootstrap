@@ -34,9 +34,9 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
 
 **Solution:**
 - Edit `SKILL.md` (for Copilot) or `.claude/commands/bootstrap.md` (for Claude Code) and add or remove questions in the **Phase 2: Interview** section.
-- To skip a question, remove it from the list. The corresponding placeholder in the templates will fall back to the default value or you can hard-code it in the template.
-- To add a new question, add it to the interview list **and** add a matching `{{NEW_PLACEHOLDER}}` to any `.tmpl` files that need it under `references/copilot/` or `references/claude/`.
-- Never edit `.tmpl` files directly in a production bootstrap — use them as read-only references and modify only the interview procedure.
+- To skip a question, remove it from the list. The corresponding placeholder in generated output will fall back to the template's default value, or you can edit the generated file after bootstrap if needed.
+- If you are **maintaining or forking this bootstrap repo's templates**, adding a new question usually also means adding a matching `{{NEW_PLACEHOLDER}}` to the relevant `.tmpl` files under `references/copilot/` or `references/claude/`.
+- If you are **using this repo to bootstrap a workspace**, treat `.tmpl` files as read-only inputs. In that case, customize the interview procedure, re-run bootstrap, and/or edit the generated output files rather than editing the templates directly.
 
 ---
 
@@ -104,9 +104,9 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
   - `infra-architect` — planning, design decisions, gap analysis
   - `terraform-module-builder` — writing and scaffolding module code
   - `terraform-test-writer` — writing `.tftest.hcl` files and test assertions
-- If two agents have overlapping descriptions, edit the `.agent.md` files under `.github/agents/` and narrow the `description` to the exact trigger phrase.
-- Add a `when:` or `use when:` note at the top of each agent's instructions to clarify to the model when it should take over.
-- For Claude Code, agents are embedded in `CLAUDE.md` — ensure each role section has a distinct header and a clear scope statement so the model can self-select the right context.
+- If two agents have overlapping descriptions, edit the `.agent.md` files under `.github/agents/` and narrow the existing `description` text to the exact scope and trigger phrase.
+- Keep routing guidance inside that `description` field using the same `Use when:` pattern as the agent templates, rather than adding a separate `when:` YAML field or top-of-file note.
+- For Claude Code, agents are embedded in `CLAUDE.md` — ensure each role section has a distinct header and a clear scope statement, including a concise "use when" style description so the model can self-select the right context.
 
 ---
 
