@@ -54,21 +54,21 @@ Before generating any files, scan your workspace to extract the patterns already
 find . -name "main.tf" | sort
 
 # Extract naming patterns from locals.tf files
-grep -rE 'name\s*=' --include="locals.tf" -A 2
+grep -rE 'name\s*=' --include="locals.tf" -A 2 .
 
 # Extract tag patterns
-grep -rE 'tags\s*=' --include="locals.tf" -A 2
+grep -rE 'tags\s*=' --include="locals.tf" -A 2 .
 
 # Find existing variable files
-find . -name "*.variables.tf" | sort
+find . \( -name "variables.tf" -o -name "*.variables.tf" \) | sort
 
 # Check provider versions in use
-grep -r 'required_providers' --include="versions.tf" -A 10
+grep -r 'required_providers' --include="versions.tf" -A 10 .
 ```
 
 Document your findings before proceeding. The bootstrap interview (Phase 2) will ask for these values explicitly.
 
-### Step 2: Run Bootstrap with `--existing` Mindset
+### Step 2: Run Bootstrap with an Existing-Workspace Mindset
 
 When running the bootstrap procedure on an existing workspace, adapt Phase 2 (Interview) answers to reflect **what you already have** rather than what you want:
 
@@ -222,7 +222,7 @@ No — merge it. Your existing file likely contains tribal knowledge that isn't 
 
 **Q: How do we handle modules owned by different teams with different conventions?**
 
-Consider generating separate agent instructions files scoped to each team's directory using `applyTo` (VS Code Copilot) or path-scoped `CLAUDE.md` files (Claude Code supports per-directory `CLAUDE.md`). This lets each team maintain their own conventions without conflicting.
+Keep workspace-wide guidance in `.github/copilot-instructions.md`, and add team-scoped `.github/instructions/<team>.instructions.md` files with `applyTo` patterns for each team's directory (VS Code Copilot). For Claude Code, use path-scoped `CLAUDE.md` files in the relevant directories. This lets each team maintain their own conventions without conflicting.
 
 **Q: What if the gap analysis shows we're missing many best practices?**
 
