@@ -47,48 +47,16 @@ Questions:
 8.  State backend — Azure Blob, S3, GCS, Terraform Cloud
 9.  Naming convention — how resources are named (prefix-type-suffix, etc.)
 10. Tag/label standard — required tags and merge strategy
-11. Test framework — native terraform test, Terratest, or both
+11. Test framework — native terraform test, Terratest, checkov, tflint, OPA/Rego, or a combination
 12. Standard variables — cross-module variables that all modules receive
 13. Target tool(s) — VS Code Copilot, Claude Code, or both
 ```
 
 ### Phase 3: Best Practices Gap Analysis
 
-Before generating files, run the code smell detector and then compare the workspace's current patterns against the [IaC Best Practices](./references/iac-best-practices.md) reference.
+Before generating files, compare the workspace's current patterns against the [IaC Best Practices](./references/iac-best-practices.md) reference.
 
-#### Step 3a: Run the Code Smell Detector
-
-Execute [`tools/detect-smells.sh`](./tools/detect-smells.sh) against the target workspace to get file-level and directory-level findings:
-
-```bash
-bash <iac-bootstrap-repo>/tools/detect-smells.sh <target-workspace>
-```
-
-The detector checks for 8 common anti-patterns and prints each finding in the format:
-
-```
-SMELL  <anti-pattern-id>          <file>:<line>   <description>
-PASS   <anti-pattern-id>          <description>
-```
-
-Anti-patterns detected:
-
-| ID | Anti-Pattern | What It Checks |
-|----|--------------|----------------|
-| `hardcoded-secrets` | Hardcoded secrets / credentials | Credential-like keys assigned bare string literals in `.tf` / `.hcl` |
-| `missing-tests` | Missing tests | Modules with resources but no `.tftest.hcl` or `*_test.go` files |
-| `monolithic-module` | Monolithic modules | Single module directory with ≥ 10 resource blocks |
-| `missing-backend` | Missing state backend | No `backend` or Terraform Cloud block found anywhere |
-| `no-tagging-standard` | No tagging/labeling standard | Resource-containing modules with no `tags` or `labels` attribute |
-| `duplicated-code` | Duplicated code across directories | Identical canonical `.tf` files (variables, locals, versions, main, outputs) in different directories |
-| `missing-provider-version` | Missing provider version constraints | Providers in `required_providers` with `source` but no `version` |
-| `missing-gitignore` | Missing .gitignore for Terraform | No `.gitignore`, or missing entries for `.terraform/`, `*.tfstate`, `*.tfstate.backup` |
-
-Include all `SMELL` findings verbatim in the gap analysis report so the user can see exactly which files and lines need attention.
-
-#### Step 3b: High-Level Gap Analysis
-
-Compare the workspace's overall patterns against the [IaC Best Practices](./references/iac-best-practices.md) reference:
+Evaluate and report on:
 
 | Area | What to Check |
 |------|---------------|
@@ -109,51 +77,7 @@ For each area, classify as:
 - **Missing** — not implemented yet
 - **N/A** — not applicable to this workspace
 
-Present findings as a table (incorporating smell detector output), then ask the user which gaps to address. Incorporate the relevant practices into the generated customization files.
-
-#### Maturity Score Computation
-
-After collecting all gap analysis classifications, compute an overall maturity score using the weighted model below:
-
-| Category | Weight | Adopted | Partial | Missing |
-|----------|--------|---------|---------|---------|
-| Security | 20% | 20 pts | 10 pts | 0 pts |
-| Testing | 15% | 15 pts | 7.5 pts | 0 pts |
-| CI/CD | 15% | 15 pts | 7.5 pts | 0 pts |
-| Module Design | 15% | 15 pts | 7.5 pts | 0 pts |
-| Naming & Tagging | 10% | 10 pts | 5 pts | 0 pts |
-| Variable Design | 5% | 5 pts | 2.5 pts | 0 pts |
-| Orchestration | 5% | 5 pts | 2.5 pts | 0 pts |
-| Code Quality | 5% | 5 pts | 2.5 pts | 0 pts |
-| State Management | 5% | 5 pts | 2.5 pts | 0 pts |
-| Progressive Rollout | 5% | 5 pts | 2.5 pts | 0 pts |
-
-**For N/A categories:** exclude the category from the total and renormalize the remaining weights so they sum to 100%.
-
-**Rounding:** Keep per-category points to 1 decimal place. Round the overall percentage to the nearest integer.
-
-**Gap severity:**
-- **Critical gap** — Any Missing category, or a Partial status in Security, Testing, CI/CD, or Module Design (weight ≥ 15%)
-- **Moderate gap** — Partial status in any other category (weight < 15%)
-
-#### Maturity Report Generation
-
-Generate a maturity assessment report using the template at [./references/maturity-report.md.tmpl](./references/maturity-report.md.tmpl). Replace all `{{PLACEHOLDER}}` values with computed results and workspace-specific findings.
-
-For each **critical gap** entry, include:
-- Gap category as a subheading
-- What was found (specific observation from the workspace)
-- Risk if unaddressed
-- Ordered remediation steps
-- Estimated effort
-
-For each **moderate gap** entry, include the category, what was found, and a brief remediation note.
-
-For **strengths**, list each fully-adopted category with a one-sentence note on what the workspace does well.
-
-For **recommended next actions**, provide 3–5 concrete, prioritized steps drawn from the critical and moderate gaps.
-
-The report content is prepared during Phase 3 but written to disk during Phase 4 (see Generation rules).
+Present findings as a table, then ask the user which gaps to address. Incorporate the relevant practices into the generated customization files.
 
 ### Phase 4: Generate Files
 
@@ -168,12 +92,15 @@ Based on discovery + interview answers, generate customization files using templ
 | `.github/agents/terraform-module-builder.agent.md` | `copilot/agents/terraform-module-builder.agent.md.tmpl` |
 | `.github/agents/terraform-test-writer.agent.md` | `copilot/agents/terraform-test-writer.agent.md.tmpl` |
 | `.github/agents/*-stack-manager.agent.md` | `copilot/agents/orchestration-stack-manager.agent.md.tmpl` |
-| `.github/agents/orchestration-coordinator.agent.md` | `copilot/agents/orchestration-coordinator.agent.md.tmpl` |
 | `.github/skills/create-terraform-module/SKILL.md` | `copilot/skills/create-terraform-module.skill.md.tmpl` |
 | `.github/skills/create-*-stack/SKILL.md` | `copilot/skills/create-orchestration-stack.skill.md.tmpl` |
 | `.github/skills/create-infra-pipeline/SKILL.md` | `copilot/skills/create-infra-pipeline.skill.md.tmpl` |
 | `.github/instructions/terraform-modules.instructions.md` | `copilot/instructions/terraform-modules.instructions.md.tmpl` |
 | `.github/instructions/terraform-tests.instructions.md` | `copilot/instructions/terraform-tests.instructions.md.tmpl` |
+| `.github/instructions/terratest.instructions.md` *(if Terratest used)* | `copilot/instructions/terratest.instructions.md.tmpl` |
+| `.github/instructions/checkov.instructions.md` *(if custom checkov checks)* | `copilot/instructions/checkov.instructions.md.tmpl` |
+| `.github/instructions/tflint.instructions.md` *(if custom tflint rules)* | `copilot/instructions/tflint.instructions.md.tmpl` |
+| `.github/instructions/opa.instructions.md` *(if OPA/Rego policies)* | `copilot/instructions/opa.instructions.md.tmpl` |
 | `.github/instructions/*-configs.instructions.md` | `copilot/instructions/orchestration-configs.instructions.md.tmpl` |
 | `.github/instructions/pipeline-templates.instructions.md` | `copilot/instructions/pipeline-templates.instructions.md.tmpl` |
 
@@ -185,7 +112,6 @@ Based on discovery + interview answers, generate customization files using templ
 | `.claude/commands/create-terraform-module.md` | `claude/commands/create-terraform-module.md.tmpl` |
 | `.claude/commands/create-orchestration-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` |
 | `.claude/commands/create-infra-pipeline.md` | `claude/commands/create-infra-pipeline.md.tmpl` |
-| `.claude/commands/coordinate-module-rollout.md` | `claude/commands/coordinate-module-rollout.md.tmpl` |
 
 #### Generation rules:
 1. Only generate orchestration files if the workspace uses Terragrunt/Terramate/etc.
@@ -195,7 +121,7 @@ Based on discovery + interview answers, generate customization files using templ
 5. Include real naming patterns discovered from the workspace
 6. Skip files that already exist (warn and offer to merge)
 7. If generating for both tools, ensure consistency between Copilot and Claude outputs
-8. Save the maturity report as `maturity-report.md` in the workspace root using the template at `references/maturity-report.md.tmpl`
+8. Generate framework-specific instruction files only for frameworks the workspace actually uses (from interview question 11)
 
 ### Phase 5: Validate
 
