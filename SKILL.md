@@ -111,6 +111,50 @@ For each area, classify as:
 
 Present findings as a table (incorporating smell detector output), then ask the user which gaps to address. Incorporate the relevant practices into the generated customization files.
 
+#### Maturity Score Computation
+
+After collecting all gap analysis classifications, compute an overall maturity score using the weighted model below:
+
+| Category | Weight | Adopted | Partial | Missing |
+|----------|--------|---------|---------|---------|
+| Security | 20% | 20 pts | 10 pts | 0 pts |
+| Testing | 15% | 15 pts | 7.5 pts | 0 pts |
+| CI/CD | 15% | 15 pts | 7.5 pts | 0 pts |
+| Module Design | 15% | 15 pts | 7.5 pts | 0 pts |
+| Naming & Tagging | 10% | 10 pts | 5 pts | 0 pts |
+| Variable Design | 5% | 5 pts | 2.5 pts | 0 pts |
+| Orchestration | 5% | 5 pts | 2.5 pts | 0 pts |
+| Code Quality | 5% | 5 pts | 2.5 pts | 0 pts |
+| State Management | 5% | 5 pts | 2.5 pts | 0 pts |
+| Progressive Rollout | 5% | 5 pts | 2.5 pts | 0 pts |
+
+**For N/A categories:** exclude the category from the total and renormalize the remaining weights so they sum to 100%.
+
+**Rounding:** Keep per-category points to 1 decimal place. Round the overall percentage to the nearest integer.
+
+**Gap severity:**
+- **Critical gap** — Any Missing category, or a Partial status in Security, Testing, CI/CD, or Module Design (weight ≥ 15%)
+- **Moderate gap** — Partial status in any other category (weight < 15%)
+
+#### Maturity Report Generation
+
+Generate a maturity assessment report using the template at [./references/maturity-report.md.tmpl](./references/maturity-report.md.tmpl). Replace all `{{PLACEHOLDER}}` values with computed results and workspace-specific findings.
+
+For each **critical gap** entry, include:
+- Gap category as a subheading
+- What was found (specific observation from the workspace)
+- Risk if unaddressed
+- Ordered remediation steps
+- Estimated effort
+
+For each **moderate gap** entry, include the category, what was found, and a brief remediation note.
+
+For **strengths**, list each fully-adopted category with a one-sentence note on what the workspace does well.
+
+For **recommended next actions**, provide 3–5 concrete, prioritized steps drawn from the critical and moderate gaps.
+
+The report content is prepared during Phase 3 but written to disk during Phase 4 (see Generation rules).
+
 ### Phase 4: Generate Files
 
 Based on discovery + interview answers, generate customization files using templates from this repo. Templates use `{{PLACEHOLDER}}` syntax — replace all placeholders with actual values.
@@ -151,6 +195,7 @@ Based on discovery + interview answers, generate customization files using templ
 5. Include real naming patterns discovered from the workspace
 6. Skip files that already exist (warn and offer to merge)
 7. If generating for both tools, ensure consistency between Copilot and Claude outputs
+8. Save the maturity report as `maturity-report.md` in the workspace root using the template at `references/maturity-report.md.tmpl`
 
 ### Phase 5: Validate
 
