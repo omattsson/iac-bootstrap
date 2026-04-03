@@ -150,7 +150,7 @@ CHECKS=$(( CHECKS + 1 ))
 tf_count=$(find "$ROOT" -name "*.tf" ! -path '*/.terraform/*' 2>/dev/null | wc -l)
 
 if [ "$tf_count" -gt 0 ]; then
-  backend_files=$(grep -rl 'backend[[:space:]]*"' "$ROOT" --include="*.tf" 2>/dev/null || true)
+  backend_files=$(grep -rl '^[[:space:]]*backend[[:space:]]*"' "$ROOT" --include="*.tf" 2>/dev/null | head -1 || true)
   cloud_files=$(grep -rl '^[[:space:]]*cloud[[:space:]]*{' "$ROOT" --include="*.tf" 2>/dev/null || true)
 
   if [ -z "$backend_files" ] && [ -z "$cloud_files" ]; then
@@ -213,9 +213,9 @@ while IFS= read -r file; do
   fi
 
   key="${fname}::${cksum}"
-  prev=$(grep "^${key}	" "$_cksum_tmp" 2>/dev/null | head -1 | cut -f2)
+  prev=$(grep -F "${key}	" "$_cksum_tmp" 2>/dev/null | head -1 | cut -f2)
   if [ -n "$prev" ]; then
-    _smell "duplicated-code" "$file" \
+    _smell "duplicated-code" "$file:?" \
       "Identical to ${prev} — consider a shared module or DRY envcommon pattern"
     _smell_found=1
   else
@@ -330,8 +330,7 @@ if [ "$tf_count" -gt 0 ]; then
   else
     for pattern in '.terraform/' '*.tfstate' '*.tfstate.backup'; do
       if ! grep -qF "$pattern" "$GITIGNORE" 2>/dev/null; then
-        lineno=$(wc -l < "$GITIGNORE" 2>/dev/null || echo "?")
-        _smell "missing-gitignore" "${GITIGNORE}:${lineno}" \
+        _smell "missing-gitignore" "${GITIGNORE}:?" \
           "Missing gitignore entry: '${pattern}'"
         _smell_found=1
       fi
