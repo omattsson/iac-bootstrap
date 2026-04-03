@@ -1,0 +1,120 @@
+---
+description: "Checkov custom policy conventions for {{CLOUD_PROVIDER}} modules. Use when writing, modifying, or reviewing custom checkov checks in Python or YAML that enforce organization-specific security and compliance rules."
+applyTo: "checks/**/*.{py,yaml,yml}"
+---
+
+# Checkov Custom Policy Standards
+
+## When to Use Custom Checks
+Write custom checks when built-in checkov rules don't cover:
+- Organization-specific naming standards
+- Internal tag compliance requirements
+- Custom network hardening rules
+- Proprietary resource configurations
+
+## Python Check Layout
+
+```
+checks/
+  {{COMPANY_SLUG}}_naming.py      ← naming convention enforcement
+  {{COMPANY_SLUG}}_tags.py        ← required tag enforcement
+  {{COMPANY_SLUG}}_network.py     ← network hardening rules
+  tests/
+    test_{{COMPANY_SLUG}}_naming.py
+    test_{{COMPANY_SLUG}}_tags.py
+```
+
+## Python Check Boilerplate
+
+```python
+from checkov.common.models.enums import CheckCategories, CheckResult
+from checkov.terraform.checks.resource.base_resource_check import BaseResourceCheck
+
+
+class Check{{CHECK_CLASS_NAME}}(BaseResourceCheck):
+    def __init__(self):
+        name = "{{CHECK_DESCRIPTION}}"
+        id = "{{CHECK_ID}}"  # Format: CKV_{{COMPANY_SLUG_UPPER}}_NNN
+        supported_resources = ["{{TERRAFORM_RESOURCE_TYPE}}"]
+        categories = [CheckCategories.{{CATEGORY}}]
+        super().__init__(name=name, id=id, categories=categories,
+                         supported_resources=supported_resources)
+
+    def scan_resource_conf(self, conf):
+        # conf is a dict of the resource attributes
+        {{CHECK_LOGIC}}
+        return CheckResult.PASSED
+
+
+check = Check{{CHECK_CLASS_NAME}}()
+```
+<!-- Example check ID: CKV_CONTOSO_001 -->
+<!-- Example categories: GENERAL_SECURITY, NETWORKING, ENCRYPTION, IAM -->
+
+## YAML Check (Lightweight Option)
+
+```yaml
+---
+metadata:
+  name: "{{CHECK_DESCRIPTION}}"
+  id: "{{CHECK_ID}}"
+  category: "GENERAL_SECURITY"
+  severity: "{{SEVERITY}}"  # CRITICAL, HIGH, MEDIUM, LOW, INFO
+scope:
+  provider: terraform
+definition:
+  and:
+    - cond_type: attribute
+      resource_types:
+        - {{TERRAFORM_RESOURCE_TYPE}}
+      attribute: "{{ATTRIBUTE_PATH}}"
+      operator: "{{OPERATOR}}"
+      value: "{{EXPECTED_VALUE}}"
+```
+
+## Check ID Convention
+`CKV_{{COMPANY_SLUG_UPPER}}_NNN` — three-digit sequential number per company namespace.
+Never reuse or reassign IDs; retired checks keep their number.
+
+## Severity Levels
+| Severity | When to Use |
+|----------|-------------|
+| CRITICAL | Exposes data, allows privilege escalation |
+| HIGH | Disables security controls, public access enabled |
+| MEDIUM | Missing best-practice config, weak defaults |
+| LOW | Cosmetic / minor compliance issues |
+| INFO | Informational — no blocking |
+
+## Running Checks
+```bash
+# Run all checks including custom
+checkov -d . --external-checks-dir ./checks
+
+# Run with specific framework
+checkov -d . --framework terraform --external-checks-dir ./checks
+
+# Run only custom checks
+checkov -d . --external-checks-dir ./checks --check CKV_{{COMPANY_SLUG_UPPER}}
+```
+
+## Testing Custom Checks
+
+```python
+import unittest
+from checkov.runner_filter import RunnerFilter
+from checkov.terraform.runner import Runner
+
+
+class TestCheck{{CHECK_CLASS_NAME}}(unittest.TestCase):
+    def test_pass(self):
+        runner = Runner()
+        results = runner.run(root_folder="./test_fixtures/pass",
+                             runner_filter=RunnerFilter(checks=["{{CHECK_ID}}"]))
+        self.assertEqual(len(results.failed_checks), 0)
+
+    def test_fail(self):
+        runner = Runner()
+        results = runner.run(root_folder="./test_fixtures/fail",
+                             runner_filter=RunnerFilter(checks=["{{CHECK_ID}}"]))
+        self.assertGreater(len(results.failed_checks), 0)
+```
