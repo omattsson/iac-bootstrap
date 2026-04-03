@@ -25,10 +25,7 @@ All templates are parameterized and adapted to the target company's conventions.
 Explore the target workspace to understand existing patterns:
 
 1. **Scan for Terraform modules**: `file_search("**/main.tf")` or `file_search("**/versions.tf")`
-2. **Scan for orchestration configs**:
-   - Terragrunt: `file_search("**/terragrunt.hcl")`, `file_search("**/root.hcl")`
-   - Terramate: `file_search("**/terramate.tm.hcl")`, `file_search("**/*.tm.hcl")`, `file_search("**/globals.tm.hcl")`
-   - Pulumi: `file_search("**/Pulumi.yaml")`, `file_search("**/__main__.py")` or `file_search("**/index.ts")`
+2. **Scan for orchestration configs**: `file_search("**/terragrunt.hcl")`, `file_search("**/root.hcl")`, `file_search("**/terramate.tm.hcl")`
 3. **Scan for CI/CD pipelines**: `file_search("**/*.yml")` in pipeline directories
 4. **Check for existing customizations**: `file_search("**/.github/copilot-instructions.md")`, `file_search("**/CLAUDE.md")`
 
@@ -94,13 +91,14 @@ Based on discovery + interview answers, generate customization files using templ
 | `.github/agents/infra-architect.agent.md` | `copilot/agents/infra-architect.agent.md.tmpl` |
 | `.github/agents/terraform-module-builder.agent.md` | `copilot/agents/terraform-module-builder.agent.md.tmpl` |
 | `.github/agents/terraform-test-writer.agent.md` | `copilot/agents/terraform-test-writer.agent.md.tmpl` |
-| `.github/agents/*-stack-manager.agent.md` | `copilot/agents/orchestration-stack-manager.agent.md.tmpl` (generic), `copilot/agents/terramate-stack-manager.agent.md.tmpl` (Terramate), `copilot/agents/pulumi-stack-manager.agent.md.tmpl` (Pulumi) |
+| `.github/agents/*-stack-manager.agent.md` | `copilot/agents/orchestration-stack-manager.agent.md.tmpl` |
+| `.github/agents/orchestration-coordinator.agent.md` | `copilot/agents/orchestration-coordinator.agent.md.tmpl` |
 | `.github/skills/create-terraform-module/SKILL.md` | `copilot/skills/create-terraform-module.skill.md.tmpl` |
-| `.github/skills/create-*-stack/SKILL.md` | `copilot/skills/create-orchestration-stack.skill.md.tmpl` (Terragrunt), `copilot/skills/create-terramate-stack.skill.md.tmpl` (Terramate), `copilot/skills/create-pulumi-stack.skill.md.tmpl` (Pulumi) |
+| `.github/skills/create-*-stack/SKILL.md` | `copilot/skills/create-orchestration-stack.skill.md.tmpl` |
 | `.github/skills/create-infra-pipeline/SKILL.md` | `copilot/skills/create-infra-pipeline.skill.md.tmpl` |
 | `.github/instructions/terraform-modules.instructions.md` | `copilot/instructions/terraform-modules.instructions.md.tmpl` |
 | `.github/instructions/terraform-tests.instructions.md` | `copilot/instructions/terraform-tests.instructions.md.tmpl` |
-| `.github/instructions/*-configs.instructions.md` | `copilot/instructions/orchestration-configs.instructions.md.tmpl` (Terragrunt), `copilot/instructions/terramate-configs.instructions.md.tmpl` (Terramate), `copilot/instructions/pulumi-configs.instructions.md.tmpl` (Pulumi) |
+| `.github/instructions/*-configs.instructions.md` | `copilot/instructions/orchestration-configs.instructions.md.tmpl` |
 | `.github/instructions/pipeline-templates.instructions.md` | `copilot/instructions/pipeline-templates.instructions.md.tmpl` |
 
 #### For Claude Code — use templates from [./references/claude/](./references/claude/):
@@ -109,18 +107,18 @@ Based on discovery + interview answers, generate customization files using templ
 |-------------|----------|
 | `CLAUDE.md` | `claude/CLAUDE.md.tmpl` |
 | `.claude/commands/create-terraform-module.md` | `claude/commands/create-terraform-module.md.tmpl` |
-| `.claude/commands/create-orchestration-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` (Terragrunt), `claude/commands/create-terramate-stack.md.tmpl` (Terramate), `claude/commands/create-pulumi-stack.md.tmpl` (Pulumi) |
+| `.claude/commands/create-orchestration-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` |
 | `.claude/commands/create-infra-pipeline.md` | `claude/commands/create-infra-pipeline.md.tmpl` |
+| `.claude/commands/coordinate-module-rollout.md` | `claude/commands/coordinate-module-rollout.md.tmpl` |
 
 #### Generation rules:
-1. Only generate orchestration files if the workspace uses Terragrunt/Terramate/Pulumi/etc.
-2. Use the tool-specific template when the orchestration tool is Terramate or Pulumi (prefer over the generic `orchestration-stack-manager` template)
-3. Adapt CI/CD templates to the actual platform (GitHub Actions/ADO/GitLab)
-4. Adapt provider references to the actual cloud (azurerm/aws/google)
-5. Use actual module source URLs, not placeholders
-6. Include real naming patterns discovered from the workspace
-7. Skip files that already exist (warn and offer to merge)
-8. If generating for both tools, ensure consistency between Copilot and Claude outputs
+1. Only generate orchestration files if the workspace uses Terragrunt/Terramate/etc.
+2. Adapt CI/CD templates to the actual platform (GitHub Actions/ADO/GitLab)
+3. Adapt provider references to the actual cloud (azurerm/aws/google)
+4. Use actual module source URLs, not placeholders
+5. Include real naming patterns discovered from the workspace
+6. Skip files that already exist (warn and offer to merge)
+7. If generating for both tools, ensure consistency between Copilot and Claude outputs
 
 ### Phase 5: Validate
 
