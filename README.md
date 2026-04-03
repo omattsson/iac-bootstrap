@@ -130,6 +130,7 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 │
 ├── references/
 │   ├── iac-best-practices.md             # Universal IaC patterns (10 categories)
+│   ├── maturity-report.md.tmpl           # Maturity assessment report template
 │   │
 │   ├── copilot/                          # VS Code Copilot output templates
 │   │   ├── copilot-instructions.md.tmpl
