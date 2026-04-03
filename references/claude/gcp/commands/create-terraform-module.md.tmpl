@@ -89,7 +89,12 @@ variable "env_default_labels" {
 ```hcl
 locals {
   {{NAMING_LOCALS}}
-  labels = merge(var.env_default_labels, var.labels)
+  # GCP labels: lowercase, max 63 chars. Use local.safe_labels in resources.
+  safe_labels = {
+    for k, v in merge(var.env_default_labels, var.labels) :
+    lower(substr(regexreplace(k, "[^a-z0-9_-]+", "_"), 0, 63)) =>
+    lower(substr(regexreplace(v, "[^a-z0-9_-]+", "_"), 0, 63))
+  }
 }
 ```
 
@@ -100,7 +105,7 @@ resource "{{PROVIDER_RESOURCE}}" "default" {
   project    = var.project_id
   {{LOCATION_ATTRIBUTE}}
 
-  labels = local.labels
+labels = local.safe_labels
 }
 ```
 
@@ -117,8 +122,8 @@ output "id" {
 }
 
 output "self_link" {
-  value       = {{PROVIDER_RESOURCE}}.default.self_link
-  description = "The self-link URI of the resource."
+  value       = try({{PROVIDER_RESOURCE}}.default.self_link, null)
+  description = "The self-link URI of the resource, when available."
 }
 ```
 

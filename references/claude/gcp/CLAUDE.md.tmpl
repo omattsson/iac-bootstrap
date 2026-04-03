@@ -64,8 +64,8 @@ Note: GCP label keys/values must be lowercase, max 63 chars.
 - Single resources use identifier `"default"` (e.g., `google_storage_bucket.default`)
 - Map-driven resources use `for_each` with descriptive keys
 - Boolean toggles use `count`
-- Labels: `merge(var.env_default_labels, var.labels)` — always
-- GCP labels must be lowercase — validate and sanitize inputs
+- Labels: `local.safe_labels` — always use the sanitized label map
+- GCP labels must be lowercase, max 63 chars — sanitize with `regexreplace()` (see locals.tf pattern)
 
 **Naming pattern:**
 ```hcl
