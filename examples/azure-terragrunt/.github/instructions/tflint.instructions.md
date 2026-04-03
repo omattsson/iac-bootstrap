@@ -1,6 +1,6 @@
 ---
 description: "tflint custom rule conventions for Contoso Azure modules. Use when writing, modifying, or reviewing custom tflint rules or .tflint.hcl configurations that enforce Contoso Terraform coding standards."
-applyTo: "{rules/**/*.go,**/.tflint.hcl}"
+applyTo: "rules/**/*.go,**/.tflint.hcl"
 ---
 
 # tflint Custom Rule Standards

@@ -152,8 +152,22 @@ resource "azurerm_key_vault_access_policy" "default" {
 
 ## 4. Testing
 
-### Plan-Only Tests
-Never create real resources in tests. Use `command = plan` with mock providers:
+### Test Framework Selection
+
+Choose the right tool for each testing concern:
+
+| Framework | Best For | Speed | Needs Cloud Creds | Example File |
+|-----------|----------|-------|-------------------|--------------|
+| **Native `.tftest.hcl`** | Unit assertions on plan output: naming, tags, conditionals, outputs | Fast (seconds) | No — mock providers | `tests/naming.tftest.hcl` |
+| **Terratest (Go)** | Integration: real resource creation, networking, end-to-end smoke tests | Slow (minutes) | Yes | `tests/integration/module_test.go` |
+| **checkov** | Security/compliance scanning; organization-specific resource attribute policies | Fast | No — static analysis | `checks/contoso_tags.py` |
+| **tflint** | Structural linting: naming conventions, banned resources, missing args | Fast | No — static analysis | `rules/contoso_naming.go` |
+| **OPA/Rego** | Plan-time policy-as-code evaluated against `terraform show -json` | Fast | No | `policies/contoso/tags.rego` |
+
+**Default choice:** native `.tftest.hcl` for all module-level test coverage. Add other frameworks only when they address gaps that plan-only tests cannot cover.
+
+### Plan-Only Tests (Native `.tftest.hcl`)
+Never create real resources in module unit tests. Use `command = plan` with mock providers:
 ```hcl
 mock_provider "azurerm" {}
 
@@ -168,7 +182,7 @@ run "creates_resource_with_correct_name" {
 
 **Why:** Tests run in seconds, cost nothing, need no cloud credentials, and can run in any CI environment.
 
-### Test Organization
+### Test Organization (Native Tests)
 One file per concern — not one monolithic test file:
 - `naming.tftest.hcl` — name construction, truncation, overrides
 - `tags.tftest.hcl` — tag merging, conflict resolution, empty maps
@@ -197,6 +211,74 @@ variables {
   # Don't forget common.variables.tf vars!
 }
 ```
+
+### Terratest (Go) Integration Tests
+Use for scenarios that require actual resource creation:
+```go
+func TestKeyVault(t *testing.T) {
+    t.Parallel()
+    opts := &terraform.Options{
+        TerraformDir: "../../",
+        Vars: map[string]interface{}{
+            "prefix":              "test-auto",
+            "location":            "westeurope",
+            "resource_group_name": os.Getenv("TF_VAR_resource_group_name"),
+        },
+    }
+    defer terraform.Destroy(t, opts)
+    terraform.InitAndApply(t, opts)
+    assert.NotEmpty(t, terraform.Output(t, opts, "name"))
+}
+```
+- Always `defer terraform.Destroy` before `InitAndApply`
+- Never hardcode cloud credentials — use environment variables
+- Tag all test resources with `managed_by = "terratest"` for cleanup identification
+- Run integration tests in a dedicated CI stage, not on every PR
+
+### Checkov Custom Policies
+Encode organization-specific compliance rules as reusable checkov checks:
+```python
+class CheckRequiredTags(BaseResourceCheck):
+    def __init__(self):
+        name = "Ensure resource has required tags"
+        id = "CKV_CONTOSO_001"
+        supported_resources = ["azurerm_key_vault"]
+        categories = [CheckCategories.GENERAL_SECURITY]
+        super().__init__(name=name, id=id, categories=categories,
+                         supported_resources=supported_resources)
+
+    def scan_resource_conf(self, conf):
+        tags = conf.get("tags", [{}])[0]
+        if "environment" not in tags:
+            return CheckResult.FAILED
+        return CheckResult.PASSED
+```
+- Check IDs: `CKV_{COMPANY_SLUG}_{NNN}` — never reuse or reassign
+- Run alongside plan: `checkov -d . --external-checks-dir ./checks`
+
+### tflint Custom Rules
+Enforce workspace-specific coding standards at lint time:
+- Use `ERROR` severity for naming violations and banned resources
+- Use `WARNING` for non-standard patterns
+- Run with: `tflint --init && tflint --recursive`
+
+### OPA/Rego Policies
+Evaluate `terraform show -json` plan output for governance:
+```rego
+package contoso.tags
+
+import rego.v1
+
+violations contains msg if {
+    some resource in input.resource_changes
+    resource.change.actions[_] in {"create", "update"}
+    not resource.change.after.tags["environment"]
+    msg := sprintf("Resource %s is missing required tag 'environment'", [resource.address])
+}
+```
+- One package per policy area: `naming`, `tags`, `network`, `iam`
+- Always expose violations as a **set named `violations`**
+- Gate CI approval: `opa eval --fail-defined "data.contoso.tags.violations"`
 
 ---
 

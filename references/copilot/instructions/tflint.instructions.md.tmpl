@@ -100,7 +100,7 @@ tflint --chdir=./modules/{{MODULE_NAME}}
 ## Rule Test Boilerplate
 
 ```go
-package rules
+package rules_test
 
 import (
     "testing"
@@ -129,7 +129,7 @@ resource "{{TERRAFORM_RESOURCE_TYPE}}" "default" {
     {{INVALID_CONFIG}}
 }`,
             expected: []helper.Issue{
-                {Rule: New{{RULE_STRUCT_NAME}}(), Message: "{{EXPECTED_ERROR_MESSAGE}}"},
+                {Rule: &{{RULE_STRUCT_NAME}}{}, Message: "{{EXPECTED_ERROR_MESSAGE}}"},
             },
         },
     }

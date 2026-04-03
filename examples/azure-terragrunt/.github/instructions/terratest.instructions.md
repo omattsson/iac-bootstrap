@@ -1,6 +1,6 @@
 ---
 description: "Terratest (Go) integration test conventions for Azure modules. Use when writing, modifying, or reviewing Go-based integration tests that deploy real Azure resources to validate module behavior end-to-end."
-applyTo: "tests/integration/**/*_test.go"
+applyTo: "**/*_test.go"
 ---
 
 # Terratest Integration Test Standards

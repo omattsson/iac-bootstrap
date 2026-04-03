@@ -1,6 +1,6 @@
 ---
 description: "OPA/Rego policy-as-code conventions for Contoso Azure infrastructure. Use when writing, modifying, or reviewing Rego policies that evaluate Terraform plan JSON for Contoso compliance and governance."
-applyTo: "policies/**/*.rego"
+applyTo: "policies/**/*.rego,policies/**/*_test.rego"
 ---
 
 # OPA/Rego Policy Standards
@@ -35,10 +35,12 @@ package contoso.tags
 
 import rego.v1
 
+required_tags := {"environment", "product", "managed_by"}
+
 violations contains msg if {
     some resource in input.resource_changes
     resource.change.actions[_] in {"create", "update"}
-    tag := data.required_tags[_]
+    some tag in required_tags
     not resource.change.after.tags[tag]
     msg := sprintf("Resource %s is missing required tag '%s'", [resource.address, tag])
 }
@@ -62,7 +64,7 @@ opa eval \
 ## Policy Test Boilerplate
 
 ```rego
-package contoso.tags
+package contoso.tags_test
 
 import rego.v1
 
@@ -127,7 +129,7 @@ opa test policies/contoso/ -v --run tags
         --input tfplan.json \
         --data policies/ \
         --fail-defined \
-        "data.contoso.tags.violations"
+        "data.contoso.main.violations"
 ```
 
 ## Package Conventions

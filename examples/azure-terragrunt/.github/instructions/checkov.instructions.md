@@ -1,6 +1,6 @@
 ---
 description: "Checkov custom policy conventions for Contoso Azure modules. Use when writing, modifying, or reviewing custom checkov checks in Python or YAML that enforce Contoso-specific security and compliance rules."
-applyTo: "checks/**/*"
+applyTo: "checks/**/*.py,checks/**/*.yaml,checks/**/*.yml"
 ---
 
 # Checkov Custom Policy Standards

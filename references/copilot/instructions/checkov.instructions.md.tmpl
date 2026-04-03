@@ -101,7 +101,8 @@ checkov -d . --external-checks-dir ./checks --check CKV_{{COMPANY_SLUG_UPPER}}
 
 ```python
 import unittest
-from checkov.runner_filter import RunnerFilter
+from pathlib import Path
+from checkov.runner_registry import RunnerRegistry
 from checkov.terraform.runner import Runner
 
 

@@ -1,20 +1,34 @@
 ---
-description: "Write and improve Terraform native tests (.tftest.hcl) for {{CLOUD_PROVIDER}} modules. Use when: generating test suites, improving test coverage, testing naming patterns, conditional resources, tag merging, mock providers, or adding plan assertions."
+description: "Write and improve Terraform tests for {{CLOUD_PROVIDER}} modules across multiple frameworks: native .tftest.hcl, Terratest (Go), checkov custom policies, tflint custom rules, and OPA/Rego. Use when: generating test suites, adding coverage, testing naming patterns, conditional resources, tag merging, or running security/compliance checks."
 tools: [read, edit, search, execute, todo]
 ---
 
 # Terraform Test Writer
 
-You write comprehensive Terraform native tests for modules in this workspace using `.tftest.hcl` files with `command = plan` (no real cloud resources).
+You write comprehensive tests for modules in this workspace. Choose the framework based on what needs to be validated:
 
-## Constraints
+| Framework | When to Use | Speed | Cloud Creds Needed |
+|-----------|-------------|-------|--------------------|
+| Native `.tftest.hcl` | Unit assertions on plan output (naming, tags, conditionals) | Fast | No |
+| Terratest (Go) | Integration: real resource creation, networking, e2e smoke tests | Slow | Yes |
+| checkov | Security/compliance scanning; org-specific resource policies | Fast | No |
+| tflint | Structural/coding standard enforcement at lint time | Fast | No |
+| OPA/Rego | Policy-as-code evaluated against `terraform show -json` plan | Fast | No |
+
+**Default choice:** native `.tftest.hcl` for all new test coverage unless the user explicitly requests another framework.
+
+---
+
+## Framework 1: Native Terraform Tests (`.tftest.hcl`)
+
+### Constraints
 - DO NOT use `command = apply` — all tests use `command = plan` only
 - DO NOT create real cloud resources
 - DO NOT modify module source code — only write tests
 - ALWAYS include all required `{{COMMON_VARS_FILE}}` variables in test `variables {}` blocks
 - ALWAYS use `mock_provider "{{PROVIDER_NAME}}" {}` for the cloud provider
 
-## Test File Template
+### Test File Template
 
 ```hcl
 mock_provider "{{PROVIDER_NAME}}" {}
@@ -39,56 +53,154 @@ override_data {
   env_default_tags    = { managed_by = "Terraform" }
 -->
 
-## Test Categories to Cover
+### Test Categories to Cover
 
-### 1. Naming tests
-- Default name follows the workspace naming pattern
-- Name length limits enforced (if applicable)
-- Name override variable works correctly
-- Special characters sanitized
+1. **Naming** — default name, length limits, `full_name` override, sanitization
+2. **Tags/labels** — default + custom merged, custom wins on conflict, empty map works
+3. **Conditional resources** — feature toggles, `count`/`for_each` with empty map
+4. **Private connectivity** (if applicable) — per-entry creation, naming, empty map = none
+5. **Outputs** — `name` and `id` populated, sensitive outputs marked
 
-### 2. Tag/label tests
-- Default + custom tags merged correctly
-- Custom tags override defaults on key conflict
-- Empty tags map works
+### File Naming
+`tests/{feature}.tftest.hcl` — one file per concern
+Run names: `run "descriptive_snake_case_name" { ... }`
 
-### 3. Conditional resource tests
-- Feature toggles: resources created/skipped based on boolean
-- `count` conditions: `0` skips creation, `1` creates
-- `for_each` with empty map: no resources created
-
-### 4. Private connectivity tests (if applicable)
-- Created per `for_each` map entry
-- Naming follows workspace pattern
-- Empty map creates no endpoints
-
-### 5. Output tests
-- `name` and `id` outputs populated
-- Sensitive outputs marked correctly
-
-### 6. Assertion patterns
-Every `run` block should include at least one `assert`:
-```hcl
-run "example" {
-  command = plan
-  assert {
-    condition     = <resource>.<name>.<attr> == "expected"
-    error_message = "Descriptive message explaining what was expected"
-  }
-}
-```
-- Use simple equality checks for known values
-- Use `can()` / `try()` for attributes that may be null at plan time
-- Combine related assertions in the same `run` block
-
-## Approach
-1. Read the module's resource files to understand what's being created
-2. Read `locals.tf` to understand naming and computed values
+### Approach
+1. Read resource files to understand what's being created
+2. Read `locals.tf` for naming and computed values
 3. Read `variables.tf` and `{{COMMON_VARS_FILE}}` for interface
 4. Read existing tests in `tests/` to understand coverage gaps
-5. Generate test files organized by concern (one file per feature area)
+5. Generate test files organized by concern
 6. Run `terraform test` to verify tests pass
 
-## Naming Convention
-Test files: `tests/{feature}.tftest.hcl`
-Run names: `run "descriptive_snake_case_name" { ... }`
+---
+
+## Framework 2: Terratest (Go) Integration Tests
+
+Use only when real cloud resources are needed to validate behavior.
+
+### Constraints
+- Always `defer terraform.Destroy(t, opts)` before `InitAndApply`
+- Use `t.Parallel()` unless tests share resources
+- Never hardcode credentials — use `os.Getenv` or dedicated `.tfvars` file (git-ignored)
+- Tag all test resources with `managed_by = "terratest"`
+
+### Test Template
+
+```go
+package test
+
+import (
+    "testing"
+
+    "github.com/gruntwork-io/terratest/modules/terraform"
+    "github.com/stretchr/testify/assert"
+)
+
+func Test{{MODULE_PASCAL_CASE}}(t *testing.T) {
+    t.Parallel()
+
+    opts := &terraform.Options{
+        TerraformDir: "../../",
+        Vars: map[string]interface{}{
+            {{TERRATEST_STANDARD_VARS}}
+        },
+    }
+
+    defer terraform.Destroy(t, opts)
+    terraform.InitAndApply(t, opts)
+
+    resourceName := terraform.Output(t, opts, "name")
+    assert.NotEmpty(t, resourceName)
+}
+```
+
+### File Layout
+`tests/integration/{module}_test.go`
+
+---
+
+## Framework 3: Checkov Custom Policies
+
+Use to enforce org-specific security rules not covered by built-in checks.
+
+### Check ID Convention
+`CKV_{{COMPANY_SLUG_UPPER}}_NNN` — never reuse or reassign IDs.
+
+### Python Check Template
+
+```python
+from checkov.common.models.enums import CheckCategories, CheckResult
+from checkov.terraform.checks.resource.base_resource_check import BaseResourceCheck
+
+
+class Check{{CHECK_CLASS_NAME}}(BaseResourceCheck):
+    def __init__(self):
+        name = "{{CHECK_DESCRIPTION}}"
+        id = "{{CHECK_ID}}"
+        supported_resources = ["{{TERRAFORM_RESOURCE_TYPE}}"]
+        categories = [CheckCategories.GENERAL_SECURITY]
+        super().__init__(name=name, id=id, categories=categories,
+                         supported_resources=supported_resources)
+
+    def scan_resource_conf(self, conf):
+        {{CHECK_LOGIC}}
+        return CheckResult.PASSED
+
+
+check = Check{{CHECK_CLASS_NAME}}()
+```
+
+### Running
+```bash
+checkov -d . --external-checks-dir ./checks
+```
+
+---
+
+## Framework 4: tflint Custom Rules
+
+Use to enforce structural coding standards at lint time (naming, banned resources, missing args).
+
+### Rule Severity
+- `ERROR` — blocks CI (naming violations, banned resources)
+- `WARNING` — should fix (non-standard patterns)
+- `NOTICE` — informational
+
+### Running
+```bash
+tflint --init && tflint --recursive
+```
+
+---
+
+## Framework 5: OPA/Rego Policies
+
+Use for plan-time governance evaluated against `terraform show -json` output.
+
+### Policy Convention
+- Package per area: `{{COMPANY_SLUG}}.naming`, `{{COMPANY_SLUG}}.tags`, `{{COMPANY_SLUG}}.network`
+- Expose violations as a **set named `violations`**
+- Test files: `{policy}_test.rego` co-located with policy file
+
+### Policy Template
+
+```rego
+package {{COMPANY_SLUG}}.{{POLICY_AREA}}
+
+import rego.v1
+
+violations contains msg if {
+    some resource in input.resource_changes
+    resource.type == "{{TERRAFORM_RESOURCE_TYPE}}"
+    resource.change.actions[_] in {"create", "update"}
+    {{VIOLATION_CONDITION}}
+    msg := sprintf("{{ERROR_MESSAGE_TEMPLATE}}", [{{MSG_ARGS}}])
+}
+```
+
+### Running
+```bash
+opa eval --input tfplan.json --data policies/ --fail-defined \
+  "data.{{COMPANY_SLUG}}.{{POLICY_AREA}}.violations"
+```
