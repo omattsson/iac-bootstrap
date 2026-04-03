@@ -240,15 +240,19 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{STANDARD_PARAMETERS}}` | (multi-line) | Pipeline parameter definitions |
 | `{{PIPELINE_CONVENTIONS}}` | (multi-line) | Pipeline naming/structure conventions |
 
-## Agent Value: Before & After Comparison
+## Validating Generated Output
 
-See [docs/agent-value-comparison.md](docs/agent-value-comparison.md) for side-by-side walkthroughs of common IaC tasks — with and without agent customizations. Covers:
+After bootstrapping a workspace, run the placeholder validator to confirm every `{{PLACEHOLDER}}` token has been replaced:
 
-- **Adding a new Terraform module** — 16 manual steps → 3 agent-assisted steps (−81%)
-- **Adding a new environment stack** — 14 steps → 4 steps (−71%)
-- **Debugging a failing Terraform plan** — 9 steps → 4 steps (−56%)
+```bash
+# Validate the current workspace (run from the bootstrapped workspace root)
+bash <path-to-iac-bootstrap>/scripts/validate.sh
 
-Suitable for team presentations, onboarding docs, or justifying AI tooling investment to leadership.
+# Or pass the workspace path explicitly
+bash <path-to-iac-bootstrap>/scripts/validate.sh ~/my-iac-workspace
+```
+
+The script scans `.github/`, `.claude/`, and `CLAUDE.md` for any remaining `{{TOKEN}}` tokens (uppercase letters, digits, and underscores) across `.md`, `.yml`, `.yaml`, `.json`, `.hcl`, and `.tf` files. It prints one `file:line: {{TOKEN}}` line per finding, exits `0` when no placeholders are found and `1` when any remain — suitable for use in CI pipelines.
 
 ## Contributing
 
