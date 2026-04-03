@@ -62,7 +62,7 @@ If your change affects the bootstrap flow, update `SKILL.md` accordingly. The pr
 Before submitting your pull request, verify the following:
 
 - [ ] **No leftover placeholders** — all `{{PLACEHOLDER}}` values in examples are replaced with real values
-- [ ] **Templates are read-only** — you have not modified existing `.tmpl` files unless that is the purpose of your PR
+- [ ] **Template changes are intentional** — you only modified `.tmpl` files in `references/` when those template changes are part of your PR
 - [ ] **New placeholders documented** — any new `{{PLACEHOLDER}}` is listed in the README's Template Placeholders section
 - [ ] **Examples updated** — if you changed templates, the corresponding example output reflects the change
 - [ ] **README updated** — repository structure, placeholder tables, or quick-start instructions are updated if affected
