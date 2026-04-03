@@ -54,10 +54,10 @@ Before generating any files, scan your workspace to extract the patterns already
 find . -name "main.tf" | sort
 
 # Extract naming patterns from locals.tf files
-grep -rE 'name\s*=' --include="locals.tf" -A 2 .
+grep -rE 'name[[:space:]]*=' --include="locals.tf" -A 2 .
 
 # Extract tag patterns
-grep -rE 'tags\s*=' --include="locals.tf" -A 2 .
+grep -rE 'tags[[:space:]]*=' --include="locals.tf" -A 2 .
 
 # Find existing variable files
 find . \( -name "variables.tf" -o -name "*.variables.tf" \) | sort
