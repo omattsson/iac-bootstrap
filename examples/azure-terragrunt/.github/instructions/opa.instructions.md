@@ -1,6 +1,6 @@
 ---
 description: "OPA/Rego policy-as-code conventions for Contoso Azure infrastructure. Use when writing, modifying, or reviewing Rego policies that evaluate Terraform plan JSON for Contoso compliance and governance."
-applyTo: "policies/**/*.rego,policies/**/*_test.rego"
+applyTo: "policies/**/*.rego"
 ---
 
 # OPA/Rego Policy Standards
@@ -62,7 +62,7 @@ opa eval \
 ## Policy Test Boilerplate
 
 ```rego
-package contoso.tags_test
+package contoso.tags
 
 import rego.v1
 

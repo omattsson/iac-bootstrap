@@ -120,7 +120,10 @@ def check_yaml_frontmatter() -> list[str]:
 def check_examples_no_placeholders() -> list[str]:
     """Ensure no {{...}} tokens remain in generated example files."""
     errors: list[str] = []
-    example_files = list(EXAMPLES_DIR.rglob("*.md"))
+    extensions = ("*.md", "*.yml", "*.yaml", "*.json", "*.hcl", "*.tf")
+    example_files: list[Path] = []
+    for ext in extensions:
+        example_files.extend(EXAMPLES_DIR.rglob(ext))
     if not example_files:
         errors.append("ERROR: No .md files found under examples/ directory.")
         return errors
@@ -177,7 +180,10 @@ def main() -> int:
     ]
 
     for label, fn in checks:
-        errs = fn()
+        try:
+            errs = fn()
+        except Exception as exc:
+            errs = [f"ERROR: {label} raised an unexpected exception: {exc}"]
         all_errors.append((label, errs))
 
     exit_code = 0
