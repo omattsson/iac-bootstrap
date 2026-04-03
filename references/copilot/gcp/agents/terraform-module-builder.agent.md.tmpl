@@ -101,7 +101,7 @@ resource "google_compute_forwarding_rule" "psc" {
   load_balancing_scheme = ""
   target                = each.value.target
   network               = each.value.subnet_id
-  labels                = local.labels
+  labels                = local.safe_labels
 }
 -->
 

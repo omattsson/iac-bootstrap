@@ -1,0 +1,64 @@
+# Workspace Instructions — {{COMPANY_NAME}} Infrastructure Automation
+
+## Workspace Overview
+
+This workspace contains infrastructure-as-code for {{COMPANY_NAME}}'s GCP platform.
+
+| Category | Repos/Dirs | Purpose |
+|----------|------------|---------|
+| **Terraform Modules** | `{{MODULE_PREFIX}}-*` | Reusable GCP resource modules |
+| **Orchestration** | `{{ORCHESTRATION_DIR}}/` | {{ORCHESTRATION_TOOL}} config for all environments |
+| **Pipelines** | `{{PIPELINE_DIR}}/` | {{CI_CD_PLATFORM}} pipeline templates |
+
+## Module Source Convention
+
+{{MODULE_SOURCE_PATTERN}}
+<!-- Example: git::https://github.com/{{ORG}}/{{MODULE_PREFIX}}-{name}?ref={tag} -->
+
+Version tags managed in {{VERSION_TAG_LOCATION}}.
+
+## Standard Variable Set (Cross-Module)
+
+These variables appear across all modules:
+{{STANDARD_VARIABLES}}
+<!-- Example:
+- `prefix` — Resource name prefix
+- `project_id` — GCP project ID
+- `region` — GCP region (e.g., `europe-west1`)
+- `labels` — Resource labels (map(string))
+- `env_default_labels` — Default labels from orchestration layer
+-->
+
+## Naming Convention
+
+{{NAMING_PATTERN}}
+<!-- Example: {prefix}-{resource_abbreviation}-{suffix} -->
+
+## Labeling Standard
+
+{{TAG_STRATEGY}}
+<!-- Example:
+local.labels = merge(var.env_default_labels, var.labels)
+Always merge defaults with resource-specific. Resource-specific wins on conflicts.
+Required labels: environment, product, managed_by = "terraform"
+Note: GCP label keys/values must be lowercase, max 63 chars, alphanumeric + dashes + underscores.
+-->
+
+## Environment Structure
+
+{{ENVIRONMENT_HIERARCHY}}
+<!-- Example for Terragrunt:
+config/{environment}/{region}/{stack}/{component}/terragrunt.hcl
+- project.hcl → GCP project ID, module versions
+- region.hcl → GCP region
+- stack.hcl → Stack name, prefix
+- _envcommon/*.hcl → Shared module configs
+-->
+
+## Key Principles
+
+1. **Minimal intervention** — smallest change that fulfills the requirement
+2. **DRY** — common config extracted, variables flow from hierarchy
+3. **No hardcoded secrets** — use Secret Manager, Workload Identity, or service accounts
+4. **Plan-only tests** — Terraform native tests use `command = plan` with mock providers
+5. **Pre-commit hooks** — `terraform_fmt`, `tflint`, validation

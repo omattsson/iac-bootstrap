@@ -1,0 +1,62 @@
+# Workspace Instructions — {{COMPANY_NAME}} Infrastructure Automation
+
+## Workspace Overview
+
+This workspace contains infrastructure-as-code for {{COMPANY_NAME}}'s AWS platform.
+
+| Category | Repos/Dirs | Purpose |
+|----------|------------|---------|
+| **Terraform Modules** | `{{MODULE_PREFIX}}-*` | Reusable AWS resource modules |
+| **Orchestration** | `{{ORCHESTRATION_DIR}}/` | {{ORCHESTRATION_TOOL}} config for all environments |
+| **Pipelines** | `{{PIPELINE_DIR}}/` | {{CI_CD_PLATFORM}} pipeline templates |
+
+## Module Source Convention
+
+{{MODULE_SOURCE_PATTERN}}
+<!-- Example: git::https://github.com/{{ORG}}/{{MODULE_PREFIX}}-{name}?ref={tag} -->
+
+Version tags managed in {{VERSION_TAG_LOCATION}}.
+
+## Standard Variable Set (Cross-Module)
+
+These variables appear across all modules:
+{{STANDARD_VARIABLES}}
+<!-- Example:
+- `prefix` — Resource name prefix
+- `region` — AWS region (e.g., `us-east-1`)
+- `tags` — Resource tags (map(string))
+- `env_default_tags` — Default tags from orchestration layer
+-->
+
+## Naming Convention
+
+{{NAMING_PATTERN}}
+<!-- Example: {prefix}-{resource_abbreviation}-{suffix} -->
+
+## Tagging Standard
+
+{{TAG_STRATEGY}}
+<!-- Example:
+local.tags = merge(var.env_default_tags, var.tags)
+Always merge defaults with resource-specific. Resource-specific wins on conflicts.
+Required tags: environment, product, managed_by = "Terraform"
+-->
+
+## Environment Structure
+
+{{ENVIRONMENT_HIERARCHY}}
+<!-- Example for Terragrunt:
+config/{environment}/{region}/{stack}/{component}/terragrunt.hcl
+- account.hcl → AWS account ID, module versions
+- region.hcl → AWS region
+- stack.hcl → Stack name, prefix
+- _envcommon/*.hcl → Shared module configs
+-->
+
+## Key Principles
+
+1. **Minimal intervention** — smallest change that fulfills the requirement
+2. **DRY** — common config extracted, variables flow from hierarchy
+3. **No hardcoded secrets** — use SSM Parameter Store, Secrets Manager, or OIDC
+4. **Plan-only tests** — Terraform native tests use `command = plan` with mock providers
+5. **Pre-commit hooks** — `terraform_fmt`, `tflint`, validation
