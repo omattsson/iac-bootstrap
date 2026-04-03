@@ -77,18 +77,18 @@ _smell_found=0
 #   - Lines that are Terraform comments (#)
 #   - Variable/description declarations
 #   - Values that are interpolations (${...}) or variable references (var.)
-_SECRET_RE='(password|passwd|secret|api_key|access_key|private_key|token|auth_key|connection_string|client_secret)\s*=\s*"[^"][^"]*"'
+_SECRET_RE='(password|passwd|secret|api_key|access_key|private_key|token|auth_key|connection_string|client_secret)[[:space:]]*=[[:space:]]*"[^"][^"]*"'
 
 while IFS= read -r file; do
   while IFS=: read -r lineno content; do
     # Skip pure variable/output/description declarations and interpolated values
-    echo "$content" | grep -qiP '^\s*(variable|output)\s+"' && continue
-    echo "$content" | grep -qP '"\s*\$\{' && continue
-    echo "$content" | grep -qP '"\s*(var\.|local\.|data\.)' && continue
-    echo "$content" | grep -qP 'description\s*=' && continue
+    echo "$content" | grep -qiE '^[[:space:]]*(variable|output)[[:space:]]+"' && continue
+    echo "$content" | grep -qE '"[[:space:]]*\$\{' && continue
+    echo "$content" | grep -qE '"[[:space:]]*(var\.|local\.|data\.)' && continue
+    echo "$content" | grep -qE 'description[[:space:]]*=' && continue
     _smell "hardcoded-secrets" "${file}:${lineno}" "Possible hardcoded credential in assignment"
     _smell_found=1
-  done < <(grep -inP "$_SECRET_RE" "$file" 2>/dev/null | grep -v '^\s*#' || true)
+  done < <(grep -inE "$_SECRET_RE" "$file" 2>/dev/null | grep -v '^[[:space:]]*#' || true)
 done < <(_tf_files; _hcl_files)
 
 [ "$_smell_found" -eq 0 ] && _pass "hardcoded-secrets" "No hardcoded secrets detected in .tf / .hcl files"
@@ -100,23 +100,24 @@ _title "2. Missing tests"
 CHECKS=$(( CHECKS + 1 ))
 _smell_found=0
 
-test_count=$(find "$ROOT" \( -name "*.tftest.hcl" -o -name "*_test.go" \) \
-  ! -path '*/.terraform/*' 2>/dev/null | wc -l)
+while IFS= read -r mdir; do
+  res_count=$(grep -rc '^resource ' "$mdir" --include="*.tf" 2>/dev/null \
+    | awk -F: '{s+=$2} END {print s+0}')
+  [ "$res_count" -eq 0 ] && continue
 
-if [ "$test_count" -eq 0 ]; then
-  while IFS= read -r mdir; do
-    res_count=$(grep -rc '^resource ' "$mdir" --include="*.tf" 2>/dev/null \
-      | awk -F: '{s+=$2} END {print s+0}')
-    if [ "$res_count" -gt 0 ]; then
-      _smell "missing-tests" "${mdir}/" \
-        "Module has ${res_count} resource(s) but no .tftest.hcl or *_test.go found"
-      _smell_found=1
-    fi
-  done < <(_module_dirs)
-fi
+  # Check for test files in this module directory and its subdirectories
+  module_test_count=$(find "$mdir" \( -name "*.tftest.hcl" -o -name "*_test.go" \) \
+    ! -path '*/.terraform/*' 2>/dev/null | wc -l)
+
+  if [ "$module_test_count" -eq 0 ]; then
+    _smell "missing-tests" "${mdir}/" \
+      "Module has ${res_count} resource(s) but no .tftest.hcl or *_test.go found"
+    _smell_found=1
+  fi
+done < <(_module_dirs)
 
 [ "$_smell_found" -eq 0 ] && \
-  _pass "missing-tests" "Test files found (${test_count} .tftest.hcl / *_test.go)"
+  _pass "missing-tests" "All resource-containing modules have test files"
 
 # =============================================================================
 # 3. Monolithic modules (too many resources in one module)
@@ -195,7 +196,8 @@ _smell_found=0
 
 # Check for .tf files with identical content appearing in two or more directories.
 # Focus on files that are commonly copy-pasted between environment directories.
-declare -A _checksums
+_cksum_tmp=$(mktemp)
+trap 'rm -f "$_cksum_tmp"' EXIT
 
 while IFS= read -r file; do
   fname=$(basename "$file")
@@ -210,13 +212,13 @@ while IFS= read -r file; do
   fi
 
   key="${fname}::${cksum}"
-  if [[ -v "_checksums[$key]" ]]; then
-    prev="${_checksums[$key]}"
+  prev=$(grep "^${key}	" "$_cksum_tmp" 2>/dev/null | head -1 | cut -f2)
+  if [ -n "$prev" ]; then
     _smell "duplicated-code" "$file" \
       "Identical to ${prev} — consider a shared module or DRY envcommon pattern"
     _smell_found=1
   else
-    _checksums["$key"]="$file"
+    printf '%s\t%s\n' "$key" "$file" >> "$_cksum_tmp"
   fi
 done < <(_tf_files | sort)
 
