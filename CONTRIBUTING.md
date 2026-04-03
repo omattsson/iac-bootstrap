@@ -36,6 +36,32 @@ All templates use `{{PLACEHOLDER}}` syntax. Follow these rules when adding new p
 - Multi-line placeholders (HCL blocks, YAML blocks, diagrams) should be documented with their expected format
 - Document every new placeholder in the **Template Placeholders** section of `README.md`
 
+#### Adding Cloud-Specific Template Variants
+
+Cloud-specific templates override the base (Azure) templates for AWS and GCP. They live in subdirectories:
+
+- `references/copilot/aws/` and `references/copilot/gcp/` for Copilot templates
+- `references/claude/aws/` and `references/claude/gcp/` for Claude templates
+
+**When to create a cloud variant:**
+
+- The template contains cloud-specific resource types, data sources, or provider patterns
+- The template references cloud-specific naming conventions or constraints (e.g., GCP label restrictions)
+- The template includes cloud-specific authentication, state backend, or networking patterns
+
+**When NOT to create a cloud variant:**
+
+- The template is cloud-agnostic (e.g., orchestration configs, CI/CD pipeline structure, best practices)
+- The template uses only `{{PLACEHOLDER}}` tokens that are resolved to cloud-appropriate values by the context builder
+
+**How to add a cloud variant:**
+
+1. Create the variant file at the same relative path under the cloud subdirectory (e.g., `copilot/aws/agents/terraform-module-builder.agent.md.tmpl`)
+2. Copy the file into `cli/bootstrap_iac/templates/` at the corresponding path
+3. The generator automatically checks for cloud variants before falling back to base templates
+4. Update the template selection table in `SKILL.md` Phase 4
+5. Add any new cloud-specific placeholders to the README placeholder tables
+
 ### Adding a New Example
 
 Examples live in `examples/` and show the fully rendered output for a specific cloud + orchestration combination.

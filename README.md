@@ -125,62 +125,99 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 │   │   ├── interview.py                  # Interactive prompts + context builder
 │   │   ├── generator.py                  # Template engine + file generation
 │   │   ├── validator.py                  # Unreplaced placeholder checker
-│   │   └── templates/                    # Bundled template copies
+│   │   └── templates/                    # Bundled template copies (incl. aws/, gcp/ variants)
 │   └── tests/                            # CLI unit tests
 │
 ├── references/
 │   ├── iac-best-practices.md             # Universal IaC patterns (10 categories)
 │   ├── maturity-report.md.tmpl           # Maturity assessment report template
 │   │
-│   ├── copilot/                          # VS Code Copilot output templates
+│   ├── copilot/                          # VS Code Copilot output templates (Azure base)
 │   │   ├── copilot-instructions.md.tmpl
 │   │   ├── agents/
-│   │   │   ├── infra-architect.agent.md.tmpl
-│   │   │   ├── terraform-module-builder.agent.md.tmpl
-│   │   │   ├── terraform-test-writer.agent.md.tmpl
-│   │   │   └── orchestration-stack-manager.agent.md.tmpl
 │   │   ├── skills/
-│   │   │   ├── create-terraform-module.skill.md.tmpl
-│   │   │   ├── create-orchestration-stack.skill.md.tmpl
-│   │   │   └── create-infra-pipeline.skill.md.tmpl
-│   │   └── instructions/
-│   │       ├── iac-best-practices.instructions.md.tmpl
-│   │       ├── terraform-modules.instructions.md.tmpl
-│   │       ├── terraform-tests.instructions.md.tmpl
-│   │       ├── orchestration-configs.instructions.md.tmpl
-│   │       └── pipeline-templates.instructions.md.tmpl
+│   │   ├── instructions/
+│   │   ├── aws/                          # AWS-specific overrides
+│   │   │   ├── copilot-instructions.md.tmpl
+│   │   │   ├── agents/terraform-module-builder.agent.md.tmpl
+│   │   │   ├── skills/create-terraform-module.skill.md.tmpl
+│   │   │   └── instructions/
+│   │   │       ├── terraform-modules.instructions.md.tmpl
+│   │   │       └── terraform-tests.instructions.md.tmpl
+│   │   └── gcp/                          # GCP-specific overrides
+│   │       ├── copilot-instructions.md.tmpl
+│   │       ├── agents/terraform-module-builder.agent.md.tmpl
+│   │       ├── skills/create-terraform-module.skill.md.tmpl
+│   │       └── instructions/
+│   │           ├── terraform-modules.instructions.md.tmpl
+│   │           └── terraform-tests.instructions.md.tmpl
 │   │
-│   └── claude/                           # Claude Code output templates
-│       ├── CLAUDE.md.tmpl                # Combined instructions + rules
-│       └── commands/
-│           ├── create-terraform-module.md.tmpl
-│           ├── create-orchestration-stack.md.tmpl
-│           └── create-infra-pipeline.md.tmpl
+│   └── claude/                           # Claude Code output templates (Azure base)
+│       ├── CLAUDE.md.tmpl
+│       ├── commands/
+│       ├── aws/                          # AWS-specific overrides
+│       │   ├── CLAUDE.md.tmpl
+│       │   └── commands/create-terraform-module.md.tmpl
+│       └── gcp/                          # GCP-specific overrides
+│           ├── CLAUDE.md.tmpl
+│           └── commands/create-terraform-module.md.tmpl
 │
 └── examples/
-    └── azure-terragrunt/                 # Complete example for Azure + Terragrunt
-        ├── .github/                      # Copilot output
-        │   ├── copilot-instructions.md
-        │   ├── agents/
-        │   │   ├── infra-architect.agent.md
-        │   │   ├── terraform-module-builder.agent.md
-        │   │   ├── terraform-test-writer.agent.md
-        │   │   └── terragrunt-stack-manager.agent.md
-        │   ├── skills/
-        │   │   ├── create-terraform-module/SKILL.md
-        │   │   ├── create-terragrunt-stack/SKILL.md
-        │   │   └── create-infra-pipeline/SKILL.md
-        │   └── instructions/
-        │       ├── terraform-modules.instructions.md
-        │       ├── terraform-tests.instructions.md
-        │       ├── terragrunt-configs.instructions.md
-        │       └── pipeline-templates.instructions.md
-        ├── CLAUDE.md                     # Claude Code output
-        └── .claude/commands/
-            ├── create-terraform-module.md
-            ├── create-terragrunt-stack.md
-            └── create-infra-pipeline.md
+    ├── azure-terragrunt/                 # Complete example for Azure + Terragrunt
+    ├── aws-terraform/                    # Complete example for AWS + Terraform
+    └── gcp-github-actions/               # Example for GCP + GitHub Actions
 ```
+
+## Cloud-Specific Templates
+
+Templates support **Azure** (default), **AWS**, and **GCP**. The base templates in `copilot/` and `claude/` are Azure-oriented. For AWS and GCP, cloud-specific overrides live in subdirectories (`aws/`, `gcp/`) and are used automatically when the cloud provider is set.
+
+### How variant selection works
+
+1. The generator checks for a cloud-specific template (e.g., `copilot/aws/copilot-instructions.md.tmpl`).
+2. If the cloud variant exists, it is used instead of the base template.
+3. If no cloud variant exists, the base template is used with cloud-appropriate placeholder values.
+
+Azure always uses the base templates directly (no `azure/` subdirectory).
+
+### Which files have cloud-specific variants
+
+| Output File | Azure | AWS | GCP |
+|-------------|:-----:|:---:|:---:|
+| `copilot-instructions.md` | base | `aws/` | `gcp/` |
+| `agents/terraform-module-builder.agent.md` | base | `aws/` | `gcp/` |
+| `skills/create-terraform-module/SKILL.md` | base | `aws/` | `gcp/` |
+| `instructions/terraform-modules.instructions.md` | base | `aws/` | `gcp/` |
+| `instructions/terraform-tests.instructions.md` | base | `aws/` | `gcp/` |
+| `CLAUDE.md` | base | `aws/` | `gcp/` |
+| `commands/create-terraform-module.md` | base | `aws/` | `gcp/` |
+| All other files (agents, orchestration, pipelines, etc.) | base | base | base |
+
+### Choosing a cloud provider
+
+**CLI:**
+
+```bash
+bootstrap-iac --cloud aws    # Uses AWS template variants
+bootstrap-iac --cloud gcp    # Uses GCP template variants
+bootstrap-iac --cloud azure  # Uses base templates (default)
+```
+
+**Copilot / Claude Code:** Specify the cloud during the interview phase. The bootstrap procedure (`SKILL.md`) detects the provider from existing `.tf` files or asks you to confirm.
+
+### Key differences between cloud variants
+
+| Aspect | Azure | AWS | GCP |
+|--------|-------|-----|-----|
+| **Provider** | `azurerm` | `aws` | `google` |
+| **Region variable** | `location` | `region` | `region` / `location` |
+| **Account/project** | subscription (from data) | account ID (from data) | `project_id` (variable) |
+| **Tags/labels** | `tags` | `tags` | `labels` (lowercase, max 63 chars) |
+| **State backend** | Azure Blob Storage | S3 + DynamoDB | GCS |
+| **Auth pattern** | Managed Identity / OIDC | IAM Roles via OIDC | Workload Identity Federation |
+| **Private connectivity** | Private Endpoints | VPC Endpoints | Private Service Connect |
+| **Data sources** | `azurerm_client_config` | `aws_caller_identity`, `aws_region` | `google_project`, `google_client_config` |
+| **Output attributes** | `name`, `id` | `name`, `id`, `arn` | `name`, `id`, `self_link` |
 
 ## Best Practices Reference
 
@@ -274,6 +311,47 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{DRIFT_PIPELINE}}` | (YAML block) | Drift detection pipeline template |
 | `{{STANDARD_PARAMETERS}}` | (multi-line) | Pipeline parameter definitions |
 | `{{PIPELINE_CONVENTIONS}}` | (multi-line) | Pipeline naming/structure conventions |
+
+### AWS-specific placeholders
+
+These placeholders are used in AWS template variants or resolve to AWS-specific values:
+
+| Placeholder | Example | Description |
+|-------------|---------|-------------|
+| `{{PROVIDER_NAME}}` | `aws` | AWS Terraform provider name |
+| `{{PROVIDER_RESOURCE_EXAMPLE}}` | `aws_s3_bucket.default` | Example AWS resource reference |
+| `{{LOCATION_ATTRIBUTE}}` | *(omit)* | AWS resources use region from provider config |
+| `{{RESOURCE_GROUP_ATTRIBUTE}}` | *(omit)* | AWS has no resource groups |
+| `{{TAG_MERGE_PATTERN}}` | `merge(var.env_default_tags, var.tags)` | AWS tag merge expression |
+| `{{DATA_SOURCE_OVERRIDE}}` | `override_data { target = data.aws_caller_identity.current ... }` | AWS mock data sources in tests |
+| `{{TEST_STANDARD_VARIABLES}}` | `prefix = "test-auto"`, `region = "us-east-1"` | AWS standard test variables |
+| `{{AUTH_REQUIREMENTS}}` | OIDC via `aws-actions/configure-aws-credentials@v4` | AWS auth in CI/CD |
+| `{{AWS_ACCOUNT_ID}}` | `123456789012` | Target AWS account ID |
+| `{{AWS_DEFAULT_REGION}}` | `us-east-1` | Default AWS region |
+| `{{STATE_BUCKET}}` | `my-terraform-state` | S3 bucket name for Terraform state |
+| `{{STATE_BUCKET_REGION}}` | `us-east-1` | Region of the S3 state bucket |
+| `{{LOCK_TABLE}}` | `terraform-locks` | DynamoDB table name for state locking |
+| `{{TERRAFORM_ROLE_NAME}}` | `TerraformOIDCRole` | IAM role name for Terraform OIDC auth |
+
+### GCP-specific placeholders
+
+These placeholders are used in GCP template variants or resolve to GCP-specific values:
+
+| Placeholder | Example | Description |
+|-------------|---------|-------------|
+| `{{PROVIDER_NAME}}` | `google` | GCP Terraform provider name |
+| `{{PROVIDER_RESOURCE_EXAMPLE}}` | `google_storage_bucket.default` | Example GCP resource reference |
+| `{{LOCATION_ATTRIBUTE}}` | `location = var.region` | GCP resource location attribute |
+| `{{RESOURCE_GROUP_ATTRIBUTE}}` | `project = var.project_id` | GCP project attribute |
+| `{{TAG_MERGE_PATTERN}}` | `merge(var.env_default_labels, var.labels)` | GCP label merge (uses `labels`, not `tags`) |
+| `{{DATA_SOURCE_OVERRIDE}}` | `override_data { target = data.google_project.current ... }` | GCP mock data sources in tests |
+| `{{TEST_STANDARD_VARIABLES}}` | `prefix = "test-auto"`, `project_id = "test-project-123"` | GCP standard test variables |
+| `{{AUTH_REQUIREMENTS}}` | Workload Identity Federation via `google-github-actions/auth@v2` | GCP auth in CI/CD |
+| `{{GCP_PROJECT_ID}}` | `my-project-prod` | Target GCP project ID |
+| `{{GCP_PROJECT_NUMBER}}` | `123456789` | GCP project number |
+| `{{STATE_BUCKET}}` | `my-terraform-state` | GCS bucket name for Terraform state |
+| `{{WIF_POOL}}` | `github-pool` | Workload Identity Federation pool name |
+| `{{WIF_PROVIDER}}` | `github-provider` | Workload Identity Federation provider name |
 
 ## Migration Guide
 
