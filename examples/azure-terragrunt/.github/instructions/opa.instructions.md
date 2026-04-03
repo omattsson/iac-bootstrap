@@ -35,12 +35,10 @@ package contoso.tags
 
 import rego.v1
 
-required_tags := {"environment", "product", "managed_by"}
-
 violations contains msg if {
     some resource in input.resource_changes
     resource.change.actions[_] in {"create", "update"}
-    some tag in required_tags
+    tag := data.required_tags[_]
     not resource.change.after.tags[tag]
     msg := sprintf("Resource %s is missing required tag '%s'", [resource.address, tag])
 }
@@ -129,7 +127,7 @@ opa test policies/contoso/ -v --run tags
         --input tfplan.json \
         --data policies/ \
         --fail-defined \
-        "data.contoso.main.violations"
+        "data.contoso.tags.violations"
 ```
 
 ## Package Conventions

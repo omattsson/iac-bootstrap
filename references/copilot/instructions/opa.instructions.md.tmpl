@@ -129,7 +129,7 @@ opa test policies/{{COMPANY_SLUG}}/ -v --run {{POLICY_AREA}}
       --input tfplan.json \
       --data policies/ \
       --fail-defined \
-      "data.{{COMPANY_SLUG}}.main.violations"
+      "data.{{COMPANY_SLUG}}.{{POLICY_AREA}}.violations"
 ```
 
 ## Conventions
