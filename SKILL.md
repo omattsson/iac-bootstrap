@@ -47,7 +47,7 @@ Questions:
 8.  State backend — Azure Blob, S3, GCS, Terraform Cloud
 9.  Naming convention — how resources are named (prefix-type-suffix, etc.)
 10. Tag/label standard — required tags and merge strategy
-11. Test framework — native terraform test, Terratest, checkov, tflint, OPA/Rego, or a combination
+11. Test framework — native terraform test, Terratest, or both
 12. Standard variables — cross-module variables that all modules receive
 13. Target tool(s) — VS Code Copilot, Claude Code, or both
 ```
@@ -85,45 +85,82 @@ Based on discovery + interview answers, generate customization files using templ
 
 #### For VS Code Copilot — use templates from [./references/copilot/](./references/copilot/):
 
-| Output File | Template |
-|-------------|----------|
-| `.github/copilot-instructions.md` | `copilot/copilot-instructions.md.tmpl` |
-| `.github/agents/infra-architect.agent.md` | `copilot/agents/infra-architect.agent.md.tmpl` |
-| `.github/agents/terraform-module-builder.agent.md` | `copilot/agents/terraform-module-builder.agent.md.tmpl` |
-| `.github/agents/terraform-test-writer.agent.md` | `copilot/agents/terraform-test-writer.agent.md.tmpl` |
-| `.github/agents/*-stack-manager.agent.md` | `copilot/agents/orchestration-stack-manager.agent.md.tmpl` |
-| `.github/agents/orchestration-coordinator.agent.md` | `copilot/agents/orchestration-coordinator.agent.md.tmpl` |
-| `.github/skills/create-terraform-module/SKILL.md` | `copilot/skills/create-terraform-module.skill.md.tmpl` |
-| `.github/skills/create-*-stack/SKILL.md` | `copilot/skills/create-orchestration-stack.skill.md.tmpl` |
-| `.github/skills/create-infra-pipeline/SKILL.md` | `copilot/skills/create-infra-pipeline.skill.md.tmpl` |
-| `.github/instructions/terraform-modules.instructions.md` | `copilot/instructions/terraform-modules.instructions.md.tmpl` |
-| `.github/instructions/terraform-tests.instructions.md` | `copilot/instructions/terraform-tests.instructions.md.tmpl` |
-| `.github/instructions/terratest.instructions.md` *(if Terratest used)* | `copilot/instructions/terratest.instructions.md.tmpl` |
-| `.github/instructions/checkov.instructions.md` *(if custom checkov checks)* | `copilot/instructions/checkov.instructions.md.tmpl` |
-| `.github/instructions/tflint.instructions.md` *(if custom tflint rules)* | `copilot/instructions/tflint.instructions.md.tmpl` |
-| `.github/instructions/opa.instructions.md` *(if OPA/Rego policies)* | `copilot/instructions/opa.instructions.md.tmpl` |
-| `.github/instructions/*-configs.instructions.md` | `copilot/instructions/orchestration-configs.instructions.md.tmpl` |
-| `.github/instructions/pipeline-templates.instructions.md` | `copilot/instructions/pipeline-templates.instructions.md.tmpl` |
+Select the cloud-specific subdirectory first, then fall back to the base template for files not overridden:
+
+| Cloud | Subdirectory |
+|-------|-------------|
+| **Azure** | `copilot/` (base templates) |
+| **AWS** | `copilot/aws/` for overridden files, `copilot/` for the rest |
+| **GCP** | `copilot/gcp/` for overridden files, `copilot/` for the rest |
+
+| Output File | Azure Template | AWS Template | GCP Template |
+|-------------|---------------|--------------|--------------|
+| `.github/copilot-instructions.md` | `copilot/copilot-instructions.md.tmpl` | `copilot/aws/copilot-instructions.md.tmpl` | `copilot/gcp/copilot-instructions.md.tmpl` |
+| `.github/agents/infra-architect.agent.md` | `copilot/agents/infra-architect.agent.md.tmpl` | ← same | ← same |
+| `.github/agents/terraform-module-builder.agent.md` | `copilot/agents/terraform-module-builder.agent.md.tmpl` | `copilot/aws/agents/terraform-module-builder.agent.md.tmpl` | `copilot/gcp/agents/terraform-module-builder.agent.md.tmpl` |
+| `.github/agents/terraform-test-writer.agent.md` | `copilot/agents/terraform-test-writer.agent.md.tmpl` | ← same | ← same |
+| `.github/agents/*-stack-manager.agent.md` | `copilot/agents/orchestration-stack-manager.agent.md.tmpl` | ← same | ← same |
+| `.github/skills/create-terraform-module/SKILL.md` | `copilot/skills/create-terraform-module.skill.md.tmpl` | `copilot/aws/skills/create-terraform-module.skill.md.tmpl` | `copilot/gcp/skills/create-terraform-module.skill.md.tmpl` |
+| `.github/skills/create-*-stack/SKILL.md` | `copilot/skills/create-orchestration-stack.skill.md.tmpl` | ← same | ← same |
+| `.github/skills/create-infra-pipeline/SKILL.md` | `copilot/skills/create-infra-pipeline.skill.md.tmpl` | ← same | ← same |
+| `.github/instructions/terraform-modules.instructions.md` | `copilot/instructions/terraform-modules.instructions.md.tmpl` | `copilot/aws/instructions/terraform-modules.instructions.md.tmpl` | `copilot/gcp/instructions/terraform-modules.instructions.md.tmpl` |
+| `.github/instructions/terraform-tests.instructions.md` | `copilot/instructions/terraform-tests.instructions.md.tmpl` | `copilot/aws/instructions/terraform-tests.instructions.md.tmpl` | `copilot/gcp/instructions/terraform-tests.instructions.md.tmpl` |
+| `.github/instructions/*-configs.instructions.md` | `copilot/instructions/orchestration-configs.instructions.md.tmpl` | ← same | ← same |
+| `.github/instructions/pipeline-templates.instructions.md` | `copilot/instructions/pipeline-templates.instructions.md.tmpl` | ← same | ← same |
 
 #### For Claude Code — use templates from [./references/claude/](./references/claude/):
 
-| Output File | Template |
-|-------------|----------|
-| `CLAUDE.md` | `claude/CLAUDE.md.tmpl` |
-| `.claude/commands/create-terraform-module.md` | `claude/commands/create-terraform-module.md.tmpl` |
-| `.claude/commands/create-orchestration-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` |
-| `.claude/commands/create-infra-pipeline.md` | `claude/commands/create-infra-pipeline.md.tmpl` |
-| `.claude/commands/coordinate-module-rollout.md` | `claude/commands/coordinate-module-rollout.md.tmpl` |
+| Output File | Azure Template | AWS Template | GCP Template |
+|-------------|---------------|--------------|--------------|
+| `CLAUDE.md` | `claude/CLAUDE.md.tmpl` | `claude/aws/CLAUDE.md.tmpl` | `claude/gcp/CLAUDE.md.tmpl` |
+| `.claude/commands/create-terraform-module.md` | `claude/commands/create-terraform-module.md.tmpl` | `claude/aws/commands/create-terraform-module.md.tmpl` | `claude/gcp/commands/create-terraform-module.md.tmpl` |
+| `.claude/commands/create-orchestration-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` | ← same | ← same |
+| `.claude/commands/create-infra-pipeline.md` | `claude/commands/create-infra-pipeline.md.tmpl` | ← same | ← same |
+
+#### Cloud-Specific Placeholder Reference
+
+When filling templates for non-Azure clouds, use these pre-resolved values:
+
+**AWS placeholders:**
+
+| Placeholder | AWS Value |
+|-------------|-----------|
+| `{{CLOUD_PROVIDER}}` | `AWS` |
+| `{{PROVIDER_NAME}}` | `aws` |
+| `{{PROVIDER_VERSION_CONSTRAINTS}}` | `aws = { source = "hashicorp/aws", version = ">=5.0,<6.0" }` |
+| `{{PROVIDER_RESOURCE_EXAMPLE}}` | `aws_s3_bucket.default` |
+| `{{LOCATION_ATTRIBUTE}}` | (omit — AWS resources use region from provider config) |
+| `{{RESOURCE_GROUP_ATTRIBUTE}}` | (omit — AWS has no resource groups) |
+| `{{DATA_SOURCE_OVERRIDE}}` | `override_data { target = data.aws_caller_identity.current, values = { account_id = "123456789012", arn = "arn:aws:iam::123456789012:root", user_id = "123456789012" } }` |
+| `{{TEST_STANDARD_VARIABLES}}` | `prefix = "test-auto"`, `region = "us-east-1"`, `tags = {}`, `env_default_tags = { managed_by = "Terraform" }` |
+| `{{TAG_MERGE_PATTERN}}` | `merge(var.env_default_tags, var.tags)` |
+| `{{AUTH_REQUIREMENTS}}` | OIDC via `aws-actions/configure-aws-credentials@v4` — no static credentials |
+| `{{RESOURCE_IDENTIFIER}}` | `default` |
+
+**GCP placeholders:**
+
+| Placeholder | GCP Value |
+|-------------|-----------|
+| `{{CLOUD_PROVIDER}}` | `GCP` |
+| `{{PROVIDER_NAME}}` | `google` |
+| `{{PROVIDER_VERSION_CONSTRAINTS}}` | `google = { source = "hashicorp/google", version = ">=5.0,<6.0" }` |
+| `{{PROVIDER_RESOURCE_EXAMPLE}}` | `google_storage_bucket.default` |
+| `{{LOCATION_ATTRIBUTE}}` | `location = var.region` (or `location = var.zone` for zonal resources) |
+| `{{RESOURCE_GROUP_ATTRIBUTE}}` | `project = var.project_id` |
+| `{{DATA_SOURCE_OVERRIDE}}` | `override_data { target = data.google_project.current, values = { project_id = "test-project-123", number = 123456789, name = "test-project" } }` |
+| `{{TEST_STANDARD_VARIABLES}}` | `prefix = "test-auto"`, `project_id = "test-project-123"`, `region = "europe-west1"`, `labels = {}`, `env_default_labels = { managed_by = "terraform" }` |
+| `{{TAG_MERGE_PATTERN}}` | `merge(var.env_default_labels, var.labels)` (note: GCP uses `labels`, not `tags`) |
+| `{{AUTH_REQUIREMENTS}}` | Workload Identity Federation via `google-github-actions/auth@v2` — no service account keys |
+| `{{RESOURCE_IDENTIFIER}}` | `default` |
 
 #### Generation rules:
 1. Only generate orchestration files if the workspace uses Terragrunt/Terramate/etc.
 2. Adapt CI/CD templates to the actual platform (GitHub Actions/ADO/GitLab)
-3. Adapt provider references to the actual cloud (azurerm/aws/google)
+3. Use the cloud-specific template subdirectory (`aws/`, `gcp/`) for cloud-specific files; use base templates for shared files
 4. Use actual module source URLs, not placeholders
 5. Include real naming patterns discovered from the workspace
 6. Skip files that already exist (warn and offer to merge)
 7. If generating for both tools, ensure consistency between Copilot and Claude outputs
-8. Generate framework-specific instruction files only for frameworks the workspace actually uses (from interview question 11)
 
 ### Phase 5: Validate
 
