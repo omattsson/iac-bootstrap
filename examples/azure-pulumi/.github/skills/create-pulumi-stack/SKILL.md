@@ -60,7 +60,7 @@ default_tags = {
 
 kv = KeyVaultComponent("keyvault", {
     "resource_group_name": rg,
-    "location": cfg.require("azure-native:location"),
+    "location": pulumi.Config("azure-native").require("location"),
     "tenant_id": tenant_id,
     "default_tags": default_tags,
 })

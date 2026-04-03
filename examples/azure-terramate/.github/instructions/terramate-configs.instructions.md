@@ -85,7 +85,7 @@ Version tags from root `globals.tm.hcl` → `module_versions`. Never hardcode ve
 ## Cross-Stack Dependencies
 - Declare ordering with `after = [...]` in `stack.tm.hcl`
 - Reference outputs via `terraform_remote_state` data source in the consuming stack's `.tf` file
-- Always provide a `default` value in `terraform_remote_state` for plan-time safety
+- Always provide a `defaults` map in `terraform_remote_state` for plan-time safety
 
 ## generate_hcl Rules
 - Generated files are named `_generated_*.tf` and committed to the repo

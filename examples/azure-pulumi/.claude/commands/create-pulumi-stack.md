@@ -34,7 +34,7 @@ default_tags = {"environment": env, "managed_by": "Pulumi", "product": "{product
 
 resource = {Name}Component("{name}", {
     "resource_group_name": cfg.require("resourceGroupName"),
-    "location": cfg.require("azure-native:location"),
+    "location": pulumi.Config("azure-native").require("location"),
     "tenant_id": cfg.require("tenantId"),
     "default_tags": default_tags,
 })
