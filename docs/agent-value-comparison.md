@@ -38,7 +38,7 @@ A developer needs to add a new Azure Key Vault Terraform module that follows all
 | # | Step | Notes |
 |---|------|-------|
 | 1 | Ask agent: *"Create a Key Vault module following our conventions"* | Agent reads `CLAUDE.md` / `.github/copilot-instructions.md` for all conventions |
-| 2 | Review generated files — all 7 standard files scaffolded correctly | Naming, tagging, PEs, diagnostics, and tests all included |
+| 2 | Review generated files — standard module structure scaffolded correctly | Naming, tagging, PEs, diagnostics, and tests all included |
 | 3 | Push to PR | Agent output is already fmt-clean and doc-ready |
 
 **Total: 3 steps · 5–10 minutes · consistent output every time**
@@ -89,7 +89,7 @@ A team needs to promote a service from `staging` to `prod` — creating all Terr
 | 1 | Ask agent: *"Create a prod stack mirroring staging. Use `prevent_destroy` on Key Vault and storage. Pin module versions to the tags that passed staging."* | Agent reads the Terragrunt stack-manager skill and workspace hierarchy |
 | 2 | Review generated configs — directory tree, all deps, version pins, `prevent_destroy` all present | Agent applies the DRY hierarchy pattern from workspace instructions |
 | 3 | Run `terragrunt run-all plan` to validate | Typically passes on first run |
-| 4 | Push to PR | CI pipeline stage auto-generated |
+| 4 | Push to PR | Ready for CI pipeline to validate |
 
 **Total: 4 steps · 10–15 minutes · deterministic output**
 
