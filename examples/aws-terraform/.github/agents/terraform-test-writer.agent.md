@@ -32,7 +32,7 @@ variables {
   prefix           = "test-auto"
   region           = "us-east-1"
   tags             = {}
-  env_default_tags = { ManagedBy = "Terraform" }
+  env_default_tags = { ManagedBy = "Terraform", Environment = "dev", Product = "test" }
 }
 ```
 
