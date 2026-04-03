@@ -15,6 +15,16 @@ set -euo pipefail
 
 TARGET="${1:-.}"
 
+if [[ ! -e "$TARGET" ]]; then
+  echo "ERROR: Target path does not exist: $TARGET" >&2
+  exit 1
+fi
+
+if [[ ! -d "$TARGET" ]]; then
+  echo "ERROR: Target path is not a directory: $TARGET" >&2
+  exit 1
+fi
+
 # Paths to scan, relative to TARGET
 SCAN_PATHS=(".github" ".claude" "CLAUDE.md")
 
@@ -31,10 +41,10 @@ for path in "${SCAN_PATHS[@]}"; do
     lineno="${rest%%:*}"
     content="${rest#*:}"
 
-    # Extract every {{PLACEHOLDER}} token from the line (uppercase letters and underscores only)
-    tokens=$(grep -oE '\{\{[A-Z_][A-Z0-9_]*\}\}' <<< "$content" | sort -u | tr '\n' ' ')
-
-    printf '%s:%s: %s\n' "$file" "$lineno" "$tokens"
+    # Extract every {{PLACEHOLDER}} token from the line (starts with an uppercase letter or underscore, followed by uppercase letters, digits, or underscores)
+    while IFS= read -r token; do
+      printf '%s:%s: %s\n' "$file" "$lineno" "$token"
+    done < <(grep -oE '\{\{[A-Z_][A-Z0-9_]*\}\}' <<< "$content" | sort -u)
     found=1
   done < <(grep -rHn --include="*.md" --include="*.yml" --include="*.yaml" \
                      --include="*.json" --include="*.hcl" --include="*.tf" \

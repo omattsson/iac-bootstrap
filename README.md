@@ -252,7 +252,7 @@ bash <path-to-iac-bootstrap>/scripts/validate.sh
 bash <path-to-iac-bootstrap>/scripts/validate.sh ~/my-iac-workspace
 ```
 
-The script scans `.github/`, `.claude/`, and `CLAUDE.md` for any remaining `{{TOKEN}}` tokens (uppercase letters, digits, and underscores) across `.md`, `.yml`, `.yaml`, `.json`, `.hcl`, and `.tf` files. It prints each finding in `file:line: {{TOKEN}}` format, exits `0` when no placeholders are found and `1` when any remain — suitable for use in CI pipelines.
+The script scans `.github/`, `.claude/`, and `CLAUDE.md` for any remaining `{{TOKEN}}` tokens (uppercase letters, digits, and underscores) across `.md`, `.yml`, `.yaml`, `.json`, `.hcl`, and `.tf` files. It prints one `file:line: {{TOKEN}}` line per finding, exits `0` when no placeholders are found and `1` when any remain — suitable for use in CI pipelines.
 
 ## Contributing
 
