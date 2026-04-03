@@ -86,7 +86,7 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
 **Solution:**
 1. Pull the latest `iac-bootstrap` changes:
    ```bash
-   cd ~/git/iac-bootstrap && git pull
+   cd /path/to/iac-bootstrap && git pull
    ```
 2. Re-run the bootstrap procedure against your workspace. The agent will detect existing files and offer to merge or overwrite them (Phase 4, Generation Rule 6).
 3. If you only need to update specific files, copy the relevant `.tmpl` file, manually replace all `{{PLACEHOLDER}}` values with your workspace's values, and overwrite the existing output file.
@@ -131,13 +131,10 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
 **Symptom:** The interview phase asks many questions and the overall bootstrap takes a long time, especially for a simple workspace.
 
 **Solution:**
-- Use the `--non-interactive` flag (CLI mode) to skip the interview and rely on auto-detected values:
-  ```bash
-  bootstrap-iac --cloud azure --output-dir . --non-interactive
-  ```
-- Pre-answer questions by passing a config file or environment variables if supported by your version of the tool.
-- For a minimal bootstrap (instructions only, no agents or skills), tell the agent: *"Generate only the workspace instructions file, skip agents and skills."*
+- For a minimal bootstrap (instructions only, no agents or skills), tell the agent explicitly: *"Generate only the workspace instructions file, skip agents and skills."*
+- To skip the interview entirely, provide all required values up front in your prompt: *"Bootstrap this workspace. Company: Acme Corp. Cloud: Azure. Module prefix: tf-module. Orchestration: Terragrunt. CI/CD: GitHub Actions."*
 - If the discovery phase is slow due to a large repo, point the agent at a specific subdirectory: *"Only scan modules under `infra/modules/`."*
+- Focus the bootstrap on a single target tool — if you only need Claude Code output, say *"Generate Claude Code files only."* — to halve the number of files generated and reviewed.
 
 ---
 
