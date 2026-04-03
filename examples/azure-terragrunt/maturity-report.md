@@ -8,7 +8,7 @@
 
 ## Overall Score
 
-> **78% aligned with IaC best practices** (77.5 pts rounded)  
+> **78% aligned with IaC best practices**  
 > 2 critical gap(s) · 2 moderate gap(s) · 6 strength(s)
 
 | Rating | Score Range | Interpretation |
@@ -36,7 +36,7 @@
 | 8 | Code Quality | 5% | ⚠️ Partial | 2.5/5 |
 | 9 | State Management | 5% | ✅ Adopted | 5/5 |
 | 10 | Progressive Rollout | 5% | ⚠️ Partial | 2.5/5 |
-| | **Total** | **100%** | | **77.5/100** |
+| | **Total** | **100%** | | **78/100** |
 
 **Status key:** ✅ Adopted · ⚠️ Partial · ❌ Missing · — N/A
 
@@ -47,7 +47,7 @@
 ## Critical Gaps
 
 > Critical gaps carry significant risk or the highest remediation value. Address these first.
-> **Definition:** Any Missing category, or a Partial status in Security, Testing, CI/CD, or Module Design (weight ≥ 15%).
+> **Definition:** Any Missing category, or a Partial status in Security, Testing, or CI/CD (weight ≥ 15%).
 
 ### Security — Partial ⚠️
 
@@ -86,7 +86,7 @@
 ## Moderate Gaps
 
 > Moderate gaps are worth addressing after critical items are resolved.
-> **Definition:** Partial status in categories with weight < 15%.
+> **Definition:** Partial or Missing status in categories with weight < 15%.
 
 ### Code Quality — Partial ⚠️
 

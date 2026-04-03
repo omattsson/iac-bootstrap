@@ -43,9 +43,18 @@ terraform {
 }
 ```
 
-## State Backend
-- Do not define a `backend` block in reusable modules.
-- Configure remote state backends such as S3 only in the root module or orchestration layer.
+## State Backend (S3)
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "{{STATE_BUCKET}}"
+    key            = "{{STATE_KEY_PREFIX}}/${local.component}/terraform.tfstate"
+    region         = "{{STATE_BUCKET_REGION}}"
+    dynamodb_table = "{{LOCK_TABLE}}"
+    encrypt        = true
+  }
+}
+```
 
 ## No hardcoded secrets, account IDs, or credentials in module code.
 Use `data.aws_caller_identity.current.account_id` to retrieve the account ID at runtime.

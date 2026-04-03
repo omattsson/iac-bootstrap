@@ -75,7 +75,7 @@ variable "region" {
 variable "labels" {
   type        = map(string)
   default     = {}
-  description = "Additional resource labels. Merged with env_default_labels (these win on conflict)."
+  description = "Additional resource labels (take precedence over env_default_labels on conflict)."
 }
 
 variable "env_default_labels" {
@@ -89,12 +89,7 @@ variable "env_default_labels" {
 ```hcl
 locals {
   {{NAMING_LOCALS}}
-  # GCP labels: lowercase, max 63 chars. Use local.safe_labels in resources.
-  safe_labels = {
-    for k, v in merge(var.env_default_labels, var.labels) :
-    lower(substr(regexreplace(k, "[^a-z0-9_-]+", "_"), 0, 63)) =>
-    lower(substr(regexreplace(v, "[^a-z0-9_-]+", "_"), 0, 63))
-  }
+  labels = merge(var.env_default_labels, var.labels)
 }
 ```
 
@@ -105,7 +100,7 @@ resource "{{PROVIDER_RESOURCE}}" "default" {
   project    = var.project_id
   {{LOCATION_ATTRIBUTE}}
 
-labels = local.safe_labels
+  labels = local.labels
 }
 ```
 
@@ -122,8 +117,8 @@ output "id" {
 }
 
 output "self_link" {
-  value       = try({{PROVIDER_RESOURCE}}.default.self_link, null)
-  description = "The self-link URI of the resource, when available."
+  value       = {{PROVIDER_RESOURCE}}.default.self_link
+  description = "The self-link URI of the resource."
 }
 ```
 

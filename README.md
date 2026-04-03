@@ -20,9 +20,55 @@ The bootstrap process scans your IaC workspace, interviews you about conventions
 
 ## Quick Start
 
-### VS Code Copilot
+### Option A — CLI tool (fastest)
 
-**Option A — User-level skill (available in all workspaces):**
+Install and run the `bootstrap-iac` command directly in your IaC workspace:
+
+```bash
+# Clone the repo
+git clone https://github.com/omattsson/iac-bootstrap.git ~/git/iac-bootstrap
+
+# Install the CLI
+pip install ~/git/iac-bootstrap/cli
+
+# Run in your IaC workspace (interactive mode)
+cd ~/my-iac-workspace
+bootstrap-iac
+```
+
+The tool scans your workspace, pre-fills defaults, prompts for ~10 answers,
+and writes all customisation files. See [cli/README.md](cli/README.md) for the
+full CLI reference.
+
+**Non-interactive / CI usage:**
+
+```bash
+bootstrap-iac \
+  --company  "Acme Corp" \
+  --cloud    azure \
+  --module-prefix tf-module \
+  --orchestration terragrunt \
+  --ci-cd    github-actions \
+  --org      acme \
+  --target   both \
+  --non-interactive
+```
+
+**Preview without writing:**
+
+```bash
+bootstrap-iac --dry-run
+```
+
+**Validate generated output:**
+
+```bash
+bootstrap-iac --validate
+```
+
+### Option B — VS Code Copilot
+
+**User-level skill (available in all workspaces):**
 
 ```bash
 # Clone the repo (replace with your fork URL)
@@ -36,11 +82,11 @@ Then in any IaC workspace, ask Copilot:
 
 > Use the bootstrap-infra-workspace skill to set up AI agent customizations for this workspace.
 
-**Option B — One-time use with `@workspace`:**
+**One-time use with `@workspace`:**
 
 Open this repo alongside your IaC workspace in VS Code, then ask Copilot to follow the procedure in `SKILL.md` against your IaC workspace.
 
-### Claude Code
+### Option C — Claude Code
 
 ```bash
 # Clone the repo (replace with your fork URL)
@@ -70,8 +116,21 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 ├── .claude/commands/
 │   └── bootstrap.md                      # Bootstrap as a Claude Code slash command
 │
+├── cli/                                  # bootstrap-iac CLI tool (pip-installable)
+│   ├── pyproject.toml                    # Package metadata and entry points
+│   ├── README.md                         # CLI usage reference
+│   ├── bootstrap_iac/                    # Python package
+│   │   ├── cli.py                        # Click CLI entry point
+│   │   ├── discovery.py                  # Workspace auto-detection
+│   │   ├── interview.py                  # Interactive prompts + context builder
+│   │   ├── generator.py                  # Template engine + file generation
+│   │   ├── validator.py                  # Unreplaced placeholder checker
+│   │   └── templates/                    # Bundled template copies
+│   └── tests/                            # CLI unit tests
+│
 ├── references/
 │   ├── iac-best-practices.md             # Universal IaC patterns (10 categories)
+│   ├── maturity-report.md.tmpl           # Maturity assessment report template
 │   │
 │   ├── copilot/                          # VS Code Copilot output templates
 │   │   ├── copilot-instructions.md.tmpl

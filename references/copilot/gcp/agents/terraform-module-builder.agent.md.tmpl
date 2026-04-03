@@ -62,14 +62,10 @@ locals {
 ### Labels
 ```hcl
 locals {
-  safe_labels = {
-    for k, v in merge(var.env_default_labels, var.labels) :
-    lower(substr(regexreplace(k, "[^a-z0-9_-]+", "_"), 0, 63)) =>
-    lower(substr(regexreplace(v, "[^a-z0-9_-]+", "_"), 0, 63))
-  }
+  labels = merge(var.env_default_labels, var.labels)
 }
 ```
-Use `local.safe_labels` in all resources. GCP labels must be lowercase; sanitization prevents apply errors from mixed-case or invalid characters.
+Note: GCP labels must be lowercase. All keys and values are automatically lowercased by GCP, but validate to avoid apply errors.
 
 ### Data sources
 ```hcl
@@ -101,7 +97,7 @@ resource "google_compute_forwarding_rule" "psc" {
   load_balancing_scheme = ""
   target                = each.value.target
   network               = each.value.subnet_id
-  labels                = local.safe_labels
+  labels                = local.labels
 }
 -->
 

@@ -172,8 +172,8 @@ _CICD_CHOICES = click.Choice(
 @click.option(
     "--validate",
     "validate_path",
-    is_flag=False,
-    flag_value="__workspace__",
+    metavar="PATH",
+    is_eager=True,
     default=None,
     help=(
         "Check files in PATH (or --workspace if omitted) for unreplaced "
@@ -213,7 +213,7 @@ def main(
     # --validate mode                                                      #
     # ------------------------------------------------------------------ #
     if validate_path is not None:
-        scan_path = Path(workspace_dir) if validate_path == "__workspace__" else Path(validate_path)
+        scan_path = Path(validate_path) if validate_path else Path(workspace_dir)
         click.echo(f"  Scanning {scan_path} for unreplaced placeholders …\n")
         if scan_path.is_file():
             found = validate_file(scan_path)
