@@ -20,7 +20,7 @@ Templates live in `references/copilot/` (VS Code Copilot) and `references/claude
 
 #### File Conventions
 
-- Template files use the `.tmpl` extension appended to the target filename (e.g., `CLAUDE.md.tmpl`, `copilot-instructions.md.tmpl`).
+- Template files use the `.tmpl` extension (e.g., `CLAUDE.md.tmpl`, `copilot-instructions.md.tmpl`). The mapping from template to output path is not always a simple suffix strip — for example, skill templates produce `.github/skills/<name>/SKILL.md`.
 - Copilot agent templates: `references/copilot/agents/<name>.agent.md.tmpl`
 - Copilot skill templates: `references/copilot/skills/<name>.skill.md.tmpl`
 - Copilot instruction templates: `references/copilot/instructions/<name>.instructions.md.tmpl`
