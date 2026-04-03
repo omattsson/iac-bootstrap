@@ -3,7 +3,13 @@
 import pytest
 from pathlib import Path
 
-from bootstrap_iac.generator import resolve_placeholders, generate_files, get_templates_dir
+from bootstrap_iac.generator import (
+    resolve_placeholders,
+    generate_files,
+    get_templates_dir,
+    _cloud_override_path,
+    _resolve_template_path,
+)
 from bootstrap_iac.interview import build_context
 
 
@@ -334,3 +340,91 @@ def test_get_templates_dir_returns_directory():
     assert tdir.is_dir()
     # Should contain at least the copilot templates
     assert (tdir / "copilot").is_dir() or (tdir / "copilot/copilot-instructions.md.tmpl").exists()
+
+
+# ---------------------------------------------------------------------------
+# Cloud-specific template resolution
+# ---------------------------------------------------------------------------
+
+
+def test_cloud_override_path_copilot():
+    result = _cloud_override_path("copilot/agents/terraform-module-builder.agent.md.tmpl", "aws")
+    assert result == "copilot/aws/agents/terraform-module-builder.agent.md.tmpl"
+
+
+def test_cloud_override_path_claude():
+    result = _cloud_override_path("claude/CLAUDE.md.tmpl", "gcp")
+    assert result == "claude/gcp/CLAUDE.md.tmpl"
+
+
+def test_cloud_override_path_no_slash():
+    result = _cloud_override_path("standalone.tmpl", "aws")
+    assert result == ""
+
+
+def test_resolve_template_path_prefers_override(tmp_path):
+    """When a cloud-specific override exists, it should be used."""
+    base_tmpl = tmp_path / "copilot" / "copilot-instructions.md.tmpl"
+    base_tmpl.parent.mkdir(parents=True)
+    base_tmpl.write_text("base content")
+
+    override_tmpl = tmp_path / "copilot" / "aws" / "copilot-instructions.md.tmpl"
+    override_tmpl.parent.mkdir(parents=True)
+    override_tmpl.write_text("aws-specific content")
+
+    resolved = _resolve_template_path(tmp_path, "copilot/copilot-instructions.md.tmpl", "AWS")
+    assert resolved == override_tmpl
+
+
+def test_resolve_template_path_falls_back_to_base(tmp_path):
+    """When no cloud-specific override exists, the base template is used."""
+    base_tmpl = tmp_path / "copilot" / "agents" / "infra-architect.agent.md.tmpl"
+    base_tmpl.parent.mkdir(parents=True)
+    base_tmpl.write_text("base content")
+
+    resolved = _resolve_template_path(tmp_path, "copilot/agents/infra-architect.agent.md.tmpl", "AWS")
+    assert resolved == base_tmpl
+
+
+def test_resolve_template_path_azure_uses_base(tmp_path):
+    """Azure always uses base templates (they are Azure-default)."""
+    base_tmpl = tmp_path / "copilot" / "copilot-instructions.md.tmpl"
+    base_tmpl.parent.mkdir(parents=True)
+    base_tmpl.write_text("azure/base content")
+
+    resolved = _resolve_template_path(tmp_path, "copilot/copilot-instructions.md.tmpl", "Azure")
+    assert resolved == base_tmpl
+
+
+def test_generate_files_aws_uses_override_templates(tmp_path):
+    """AWS generation should use cloud-specific templates where available."""
+    answers = {
+        "COMPANY_NAME": "AwsCo",
+        "CLOUD_PROVIDER": "AWS",
+        "MODULE_PREFIX": "terraform-aws",
+        "ORCHESTRATION_TOOL": "None",
+        "ORCHESTRATION_DIR": ".",
+        "CI_CD_PLATFORM": "GitHub Actions",
+        "AUTH_PATTERN": "IAM Roles via OIDC",
+        "STATE_BACKEND": "S3",
+        "NAMING_PATTERN": "{prefix}-{type}",
+        "TAG_STRATEGY": "merge(var.default_tags, var.tags)",
+        "STANDARD_VARIABLES": "- prefix\n- region",
+        "TARGET": "copilot",
+        "ORG": "awsco",
+    }
+    ctx = build_context(answers)
+    results = generate_files(ctx, tmp_path, target="copilot")
+
+    written = [r for r in results if not r.skipped]
+    assert len(written) > 0
+
+    # The copilot-instructions.md should exist and contain AwsCo
+    copilot_instr = tmp_path / ".github" / "copilot-instructions.md"
+    assert copilot_instr.exists()
+    content = copilot_instr.read_text()
+    assert "AwsCo" in content
+
+    # Check that at least one result used an AWS-specific template path
+    aws_tmpl_used = any("aws" in str(r.template_path) for r in written)
+    assert aws_tmpl_used, "Expected at least one AWS-specific template to be used"

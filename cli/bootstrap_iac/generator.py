@@ -89,6 +89,21 @@ class OutputSpec:
     skip_when_no_orchestration: bool = False
 
 
+def _cloud_override_path(base_rel: str, cloud: str) -> str:
+    """Return the cloud-specific override path for a base template.
+
+    For ``copilot/agents/foo.agent.md.tmpl`` and cloud ``aws``, returns
+    ``copilot/aws/agents/foo.agent.md.tmpl``.  For ``claude/CLAUDE.md.tmpl``
+    and cloud ``gcp``, returns ``claude/gcp/CLAUDE.md.tmpl``.
+    """
+    # Split on the first '/' to get the tool prefix ("copilot" or "claude")
+    parts = base_rel.split("/", 1)
+    if len(parts) != 2:
+        return ""
+    tool_prefix, rest = parts
+    return f"{tool_prefix}/{cloud}/{rest}"
+
+
 def _build_output_specs(context: dict) -> list[OutputSpec]:
     """Return the list of files to generate based on *context*."""
     orch_lower = context.get("ORCHESTRATION_TOOL_LOWER", "terraform")
@@ -200,6 +215,25 @@ def _build_output_specs(context: dict) -> list[OutputSpec]:
     return specs
 
 
+def _resolve_template_path(
+    templates_dir: Path, base_rel: str, cloud: str
+) -> Path:
+    """Return the best template path, preferring cloud-specific overrides.
+
+    For AWS and GCP, look for cloud-specific templates first (e.g.
+    ``copilot/aws/agents/foo.agent.md.tmpl``).  Fall back to the base
+    template (e.g. ``copilot/agents/foo.agent.md.tmpl``) when no override
+    exists.  Azure uses the base templates directly (they are Azure-default).
+    """
+    if cloud.lower() in ("aws", "gcp"):
+        override = _cloud_override_path(base_rel, cloud.lower())
+        if override:
+            override_path = templates_dir / override
+            if override_path.exists():
+                return override_path
+    return templates_dir / base_rel
+
+
 # ---------------------------------------------------------------------------
 # Generated-file result type
 # ---------------------------------------------------------------------------
@@ -255,13 +289,14 @@ def generate_files(
     """
     tdir = templates_dir or get_templates_dir()
     specs = _build_output_specs(context)
+    cloud = context.get("CLOUD_PROVIDER", "Azure")
     results: list[GeneratedFile] = []
 
     for spec in specs:
         if target not in ("both",) and spec.target != target:
             continue
 
-        tmpl_path = tdir / spec.template_rel
+        tmpl_path = _resolve_template_path(tdir, spec.template_rel, cloud)
         if not tmpl_path.exists():
             continue
 
