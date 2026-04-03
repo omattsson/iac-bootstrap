@@ -1,0 +1,101 @@
+# Coordinate Module Rollout
+
+Plan and guide a cross-repo module change across the full chain: **module code → version tag → orchestration config → pipeline**.
+
+## Usage
+Provide the module name and new tag as the argument: `$ARGUMENTS`
+
+If no argument is given, ask:
+- Which module is changing? (e.g., `{{MODULE_PREFIX}}-key-vault`)
+- What is the new version tag?
+- Is this a breaking change, an additive change, or non-breaking?
+
+## Workflow
+
+### Step 1 — Discover downstream consumers
+
+Search orchestration configs for all references to the module source:
+
+```
+{{MODULE_PREFIX}}-{name}
+```
+
+For each match, record:
+- Environment
+- Stack / component path
+- Current pinned version in {{VERSION_TAG_LOCATION}}
+
+### Step 2 — Classify the change
+
+| Classification | Definition | Consumer action |
+|----------------|-----------|-----------------|
+| **Non-breaking** | No output/variable removals or renames | Bump tag only |
+| **Additive** | New optional variables or outputs added | Bump tag; consumers may opt in |
+| **Breaking** | Removed/renamed outputs or required variables | Consumers must update before bumping |
+
+### Step 3 — Plan version bumps
+
+For each consumer environment, update {{VERSION_TAG_LOCATION}}:
+
+```hcl
+{{VERSION_TAG_EXAMPLE}}
+```
+
+Roll out progressively: **dev → staging → prod**.
+
+### Step 4 — Validate each environment before proceeding
+
+After each version bump:
+
+```bash
+{{VALIDATE_COMMAND}}
+{{PLAN_COMMAND}}
+```
+
+Review plan output for unexpected changes before moving to the next environment.
+
+### Step 5 — Identify and trigger pipelines
+
+List pipelines that deploy the affected stacks:
+
+```
+{{PIPELINE_DIR}}/
+```
+
+Trigger in dependency order (upstream stacks first). Insert approval gates between environments.
+
+## Rollout Plan Template
+
+```
+## Rollout Plan: {module} {old_tag} → {new_tag}
+
+### Consumers
+| Environment | Stack | Component | Config File | Current Tag |
+|-------------|-------|-----------|-------------|-------------|
+
+### Pre-conditions
+- [ ] {Any breaking change migration required in consumers}
+
+### Steps
+1. Tag module repo: `git tag {new_tag} && git push origin {new_tag}`
+2. Update {{VERSION_TAG_LOCATION}} in dev environment
+3. Run: {{PLAN_COMMAND}} — review output
+4. Trigger dev pipeline — await green
+5. Repeat steps 2–4 for staging
+6. Repeat steps 2–4 for prod
+
+### Rollback
+- Revert {{VERSION_TAG_LOCATION}} to `{old_tag}`
+- Re-run plan + apply on affected environments
+```
+
+## Checklist
+
+- [ ] All consumers identified
+- [ ] Change classified (non-breaking / additive / breaking)
+- [ ] Breaking changes communicated to consumer owners
+- [ ] Version bumped in dev — plan reviewed
+- [ ] Version bumped in staging — plan reviewed
+- [ ] Version bumped in prod — plan reviewed
+- [ ] Pipeline triggers confirmed in correct order
+- [ ] Rollback procedure documented
