@@ -78,8 +78,9 @@ S3 + DynamoDB backend for all environments. Separate state bucket per environmen
 
 **Naming pattern:**
 ```hcl
-local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-s3-${local.name_suffix}", 0, 63)
+local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-{abbr}-${local.name_suffix}", 0, {max_length})
 ```
+<!-- Examples: S3 bucket uses 'acme-s3-mysuffix' (max 63), Lambda uses 'acme-lambda-mysuffix' (max 64) -->
 
 **Provider versions:**
 ```hcl

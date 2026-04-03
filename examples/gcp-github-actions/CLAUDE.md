@@ -79,8 +79,10 @@ GCS backend for all environments. Separate state bucket per environment.
 
 **Naming pattern:**
 ```hcl
-local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-gcs-${local.name_suffix}", 0, 63)
+local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-{abbr}-${local.name_suffix}", 0, {max_length})
 ```
+<!-- Examples: GCS bucket uses 'acme-gcs-mysuffix' (max 63), Cloud Run uses 'acme-run-mysuffix' (max 49).
+     Note: GCS buckets use `location` not `region`; Cloud Run and Cloud SQL use `region`. -->
 
 **Provider versions:**
 ```hcl

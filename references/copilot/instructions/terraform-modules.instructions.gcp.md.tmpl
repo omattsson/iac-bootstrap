@@ -29,6 +29,13 @@ applyTo: "{{MODULE_PREFIX}}-*/**/*.tf"
 - `network` — VPC network name (where applicable)
 - `subnetwork` — subnetwork name (where applicable)
 
+## Region vs Location
+GCP resources use either `region` or `location` depending on the resource type:
+- **`region`** — compute resources (Cloud SQL, Cloud Run, GKE, Memorystore)
+- **`location`** — storage/multi-region resources (GCS buckets, Artifact Registry)
+- **`zone`** — single-zone compute resources (Compute Engine instances)
+Check the provider documentation for each resource type.
+
 ## Naming Pattern
 ```hcl
 {{NAMING_PATTERN_HCL}}

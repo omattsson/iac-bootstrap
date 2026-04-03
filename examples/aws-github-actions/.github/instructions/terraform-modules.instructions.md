@@ -30,8 +30,9 @@ applyTo: "terraform-aws-*/**/*.tf"
 
 ## Naming Pattern
 ```hcl
-local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-s3-${local.name_suffix}", 0, 63)
+local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-{abbr}-${local.name_suffix}", 0, {max_length})
 ```
+<!-- Examples: S3 bucket uses 's3' (max 63), Lambda uses 'lambda' (max 64) -->
 
 ## Variable Conventions
 - Use `optional(type, default)` syntax (Terraform 1.3+) for object attributes

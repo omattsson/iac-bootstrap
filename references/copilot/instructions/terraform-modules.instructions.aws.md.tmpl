@@ -46,6 +46,8 @@ applyTo: "{{MODULE_PREFIX}}-*/**/*.tf"
 
 ## IAM & Security
 - Use IAM roles for identity-based access — never access keys or hardcoded credentials
+- VPC endpoints for private connectivity (e.g., `aws_vpc_endpoint_service_configuration`):
+  <!-- {{PRIVATE_ENDPOINT_PATTERN}} — example: vpc_endpoint_ids = [aws_vpc_endpoint.default.id] -->
 - `{{PRIVATE_ENDPOINT_PATTERN}}` — use VPC endpoints for private connectivity
 - Enable encryption at rest (`kms_key_id` or `server_side_encryption_configuration`) by default
 - `block_public_access` enabled on S3 buckets by default
