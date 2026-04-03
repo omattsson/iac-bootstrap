@@ -54,9 +54,41 @@ Questions:
 
 ### Phase 3: Best Practices Gap Analysis
 
-Before generating files, compare the workspace's current patterns against the [IaC Best Practices](./references/iac-best-practices.md) reference.
+Before generating files, run the code smell detector and then compare the workspace's current patterns against the [IaC Best Practices](./references/iac-best-practices.md) reference.
 
-Evaluate and report on:
+#### Step 3a: Run the Code Smell Detector
+
+Execute [`tools/detect-smells.sh`](./tools/detect-smells.sh) against the target workspace to get file-level, line-level findings:
+
+```bash
+bash <iac-bootstrap-repo>/tools/detect-smells.sh <target-workspace>
+```
+
+The detector checks for 8 common anti-patterns and prints each finding in the format:
+
+```
+SMELL  <anti-pattern-id>          <file>:<line>   <description>
+PASS   <anti-pattern-id>          <description>
+```
+
+Anti-patterns detected:
+
+| ID | Anti-Pattern | What It Checks |
+|----|--------------|----------------|
+| `hardcoded-secrets` | Hardcoded secrets / credentials | Credential-like keys assigned bare string literals in `.tf` / `.hcl` |
+| `missing-tests` | Missing tests | Modules with resources but no `.tftest.hcl` or `*_test.go` files |
+| `monolithic-module` | Monolithic modules | Single module directory with ≥ 10 resource blocks |
+| `missing-backend` | Missing state backend | No `backend` or Terraform Cloud block found anywhere |
+| `no-tagging-standard` | No tagging/labeling standard | Resource-containing modules with no `tags` or `labels` attribute |
+| `duplicated-code` | Duplicated code across directories | Identical canonical `.tf` files (variables, locals, versions, main, outputs) in different directories |
+| `missing-provider-version` | Missing provider version constraints | Providers in `required_providers` with `source` but no `version` |
+| `missing-gitignore` | Missing .gitignore for Terraform | No `.gitignore`, or missing entries for `.terraform/`, `*.tfstate`, `*.tfstate.backup` |
+
+Include all `SMELL` findings verbatim in the gap analysis report so the user can see exactly which files and lines need attention.
+
+#### Step 3b: High-Level Gap Analysis
+
+Compare the workspace's overall patterns against the [IaC Best Practices](./references/iac-best-practices.md) reference:
 
 | Area | What to Check |
 |------|---------------|
@@ -77,7 +109,7 @@ For each area, classify as:
 - **Missing** — not implemented yet
 - **N/A** — not applicable to this workspace
 
-Present findings as a table, then ask the user which gaps to address. Incorporate the relevant practices into the generated customization files.
+Present findings as a table (incorporating smell detector output), then ask the user which gaps to address. Incorporate the relevant practices into the generated customization files.
 
 ### Phase 4: Generate Files
 

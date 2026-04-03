@@ -12,7 +12,6 @@
 #
 # Output format (one line per finding):
 #   SMELL  <anti-pattern-id>  <file>:<line>  <description>
-#   SMELL  <anti-pattern-id>  <dir>/         <description>   (directory-scoped)
 #   PASS   <anti-pattern-id>  <description>
 #
 # Exit codes:
@@ -55,7 +54,7 @@ _hcl_files() {
 
 # Enumerate unique directories that contain at least one .tf file
 _module_dirs() {
-  find "$ROOT" -name "*.tf" ! -path '*/.terraform/*' -exec dirname {} \; 2>/dev/null | sort -u
+  _tf_files | xargs -r -I{} dirname {} 2>/dev/null | sort -u
 }
 
 # =============================================================================
@@ -78,18 +77,18 @@ _smell_found=0
 #   - Lines that are Terraform comments (#)
 #   - Variable/description declarations
 #   - Values that are interpolations (${...}) or variable references (var.)
-_SECRET_RE='(password|passwd|secret|api_key|access_key|private_key|token|auth_key|connection_string|client_secret)[[:space:]]*=[[:space:]]*"[^"][^"]*"'
+_SECRET_RE='(password|passwd|secret|api_key|access_key|private_key|token|auth_key|connection_string|client_secret)\s*=\s*"[^"][^"]*"'
 
 while IFS= read -r file; do
   while IFS=: read -r lineno content; do
     # Skip pure variable/output/description declarations and interpolated values
-    echo "$content" | grep -qiE '^[[:space:]]*(variable|output)[[:space:]]+"' && continue
-    echo "$content" | grep -qE '"[[:space:]]*\$\{' && continue
-    echo "$content" | grep -qE '"[[:space:]]*(var\.|local\.|data\.)' && continue
-    echo "$content" | grep -qE 'description[[:space:]]*=' && continue
+    echo "$content" | grep -qiP '^\s*(variable|output)\s+"' && continue
+    echo "$content" | grep -qP '"\s*\$\{' && continue
+    echo "$content" | grep -qP '"\s*(var\.|local\.|data\.)' && continue
+    echo "$content" | grep -qP 'description\s*=' && continue
     _smell "hardcoded-secrets" "${file}:${lineno}" "Possible hardcoded credential in assignment"
     _smell_found=1
-  done < <(grep -inE "$_SECRET_RE" "$file" 2>/dev/null | grep -vE '^[[:space:]]*(#|//)' || true)
+  done < <(grep -inP "$_SECRET_RE" "$file" 2>/dev/null | grep -v '^\s*#' || true)
 done < <(_tf_files; _hcl_files)
 
 [ "$_smell_found" -eq 0 ] && _pass "hardcoded-secrets" "No hardcoded secrets detected in .tf / .hcl files"
@@ -101,24 +100,23 @@ _title "2. Missing tests"
 CHECKS=$(( CHECKS + 1 ))
 _smell_found=0
 
-while IFS= read -r mdir; do
-  res_count=$(grep -Erc '^[[:space:]]*resource[[:space:]]+"' "$mdir" --include="*.tf" 2>/dev/null \
-    | awk -F: '{s+=$2} END {print s+0}')
-  [ "$res_count" -eq 0 ] && continue
+test_count=$(find "$ROOT" \( -name "*.tftest.hcl" -o -name "*_test.go" \) \
+  ! -path '*/.terraform/*' 2>/dev/null | wc -l)
 
-  # Check for test files in this module directory and its subdirectories
-  module_test_count=$(find "$mdir" \( -name "*.tftest.hcl" -o -name "*_test.go" \) \
-    ! -path '*/.terraform/*' 2>/dev/null | wc -l)
-
-  if [ "$module_test_count" -eq 0 ]; then
-    _smell "missing-tests" "${mdir}/" \
-      "Module has ${res_count} resource(s) but no .tftest.hcl or *_test.go found"
-    _smell_found=1
-  fi
-done < <(_module_dirs)
+if [ "$test_count" -eq 0 ]; then
+  while IFS= read -r mdir; do
+    res_count=$(grep -rc '^resource ' "$mdir" --include="*.tf" 2>/dev/null \
+      | awk -F: '{s+=$2} END {print s+0}')
+    if [ "$res_count" -gt 0 ]; then
+      _smell "missing-tests" "${mdir}/" \
+        "Module has ${res_count} resource(s) but no .tftest.hcl or *_test.go found"
+      _smell_found=1
+    fi
+  done < <(_module_dirs)
+fi
 
 [ "$_smell_found" -eq 0 ] && \
-  _pass "missing-tests" "All resource-containing modules have test files"
+  _pass "missing-tests" "Test files found (${test_count} .tftest.hcl / *_test.go)"
 
 # =============================================================================
 # 3. Monolithic modules (too many resources in one module)
@@ -129,7 +127,7 @@ _smell_found=0
 RESOURCE_THRESHOLD=10
 
 while IFS= read -r mdir; do
-  count=$(grep -Erc '^[[:space:]]*resource[[:space:]]+"' "$mdir" --include="*.tf" 2>/dev/null \
+  count=$(grep -rc '^resource ' "$mdir" --include="*.tf" 2>/dev/null \
     | awk -F: '{s+=$2} END {print s+0}')
   if [ "$count" -ge "$RESOURCE_THRESHOLD" ]; then
     _smell "monolithic-module" "${mdir}/" \
@@ -150,8 +148,8 @@ CHECKS=$(( CHECKS + 1 ))
 tf_count=$(find "$ROOT" -name "*.tf" ! -path '*/.terraform/*' 2>/dev/null | wc -l)
 
 if [ "$tf_count" -gt 0 ]; then
-  backend_files=$(grep -rl 'backend[[:space:]]*"' "$ROOT" --include="*.tf" 2>/dev/null || true)
-  cloud_files=$(grep -rl '^[[:space:]]*cloud[[:space:]]*{' "$ROOT" --include="*.tf" 2>/dev/null || true)
+  backend_files=$(grep -rl 'backend\s*"' "$ROOT" --include="*.tf" 2>/dev/null || true)
+  cloud_files=$(grep -rl '^\s*cloud\s*{' "$ROOT" --include="*.tf" 2>/dev/null || true)
 
   if [ -z "$backend_files" ] && [ -z "$cloud_files" ]; then
     _smell "missing-backend" "${ROOT}/" \
@@ -171,12 +169,12 @@ CHECKS=$(( CHECKS + 1 ))
 _smell_found=0
 
 while IFS= read -r mdir; do
-  res_count=$(grep -Erc '^[[:space:]]*resource[[:space:]]+"' "$mdir" --include="*.tf" 2>/dev/null \
+  res_count=$(grep -rc '^resource ' "$mdir" --include="*.tf" 2>/dev/null \
     | awk -F: '{s+=$2} END {print s+0}')
   [ "$res_count" -eq 0 ] && continue
 
-  tag_count=$(grep -r -E '(^|[^[:alnum:]_])(tags|labels)([^[:alnum:]_]|$)' "$mdir" --include="*.tf" 2>/dev/null \
-    | grep -v -E '^[[:space:]]*(#|//)' | wc -l)
+  tag_count=$(grep -r '\btags\b\|\blabels\b' "$mdir" --include="*.tf" 2>/dev/null \
+    | grep -v '^\s*#' | wc -l)
 
   if [ "$tag_count" -eq 0 ]; then
     _smell "no-tagging-standard" "${mdir}/" \
@@ -197,8 +195,7 @@ _smell_found=0
 
 # Check for .tf files with identical content appearing in two or more directories.
 # Focus on files that are commonly copy-pasted between environment directories.
-_cksum_tmp=$(mktemp)
-trap 'rm -f "$_cksum_tmp"' EXIT
+declare -A _checksums
 
 while IFS= read -r file; do
   fname=$(basename "$file")
@@ -213,13 +210,13 @@ while IFS= read -r file; do
   fi
 
   key="${fname}::${cksum}"
-  prev=$(grep "^${key}	" "$_cksum_tmp" 2>/dev/null | head -1 | cut -f2)
-  if [ -n "$prev" ]; then
+  if [[ -v "_checksums[$key]" ]]; then
+    prev="${_checksums[$key]}"
     _smell "duplicated-code" "$file" \
       "Identical to ${prev} — consider a shared module or DRY envcommon pattern"
     _smell_found=1
   else
-    printf '%s\t%s\n' "$key" "$file" >> "$_cksum_tmp"
+    _checksums["$key"]="$file"
   fi
 done < <(_tf_files | sort)
 
@@ -274,30 +271,28 @@ while i < len(content):
             break
     i += 1
 
-block_start = brace_start + 1
-block = content[block_start:i]
-block_start_line = content.count('\n', 0, block_start) + 1
+block = content[brace_start+1:i]
 
 # Each provider entry: name = { source = "..." [version = "..."] }
 for pm in re.finditer(r'(\w+)\s*=\s*\{([^}]*)\}', block, re.DOTALL):
     pname = pm.group(1)
     pbody = pm.group(2)
     if re.search(r'\bsource\s*=', pbody) and not re.search(r'\bversion\s*=', pbody):
-        provider_line = block_start_line + block.count('\n', 0, pm.start(1))
-        print(f"{pname}:{provider_line}")
+        print(pname)
 PYEOF
         )
         if [ -n "$missing_providers" ]; then
-          while IFS=: read -r provider lineno; do
+          while IFS= read -r provider; do
+            lineno=$(grep -Fn "$provider" "$file" 2>/dev/null | head -1 | cut -d: -f1)
             _smell "missing-provider-version" "${file}:${lineno:-?}" \
               "Provider '${provider}' has source but no version constraint in required_providers"
             _smell_found=1
           done <<< "$missing_providers"
         fi
       else
-        # Fallback: use awk with brace-depth tracking to count source/version inside required_providers
-        sources=$(awk 'BEGIN{d=0;f=0;c=0} /required_providers/{f=1} f && /{/{d++} f && d>=2 && /source[[:space:]]*=/{c++} f && /}/{d--; if(d==0) f=0} END{print c+0}' "$file")
-        versions=$(awk 'BEGIN{d=0;f=0;c=0} /required_providers/{f=1} f && /{/{d++} f && d>=2 && /version[[:space:]]*=/{c++} f && /}/{d--; if(d==0) f=0} END{print c+0}' "$file")
+        # Fallback: compare count of source = vs version = lines inside required_providers
+        sources=$(awk '/required_providers/{f=1} f && /source\s*=/{c++} /^\s*\}\s*$/ && f{f=0} END{print c+0}' "$file")
+        versions=$(awk '/required_providers/{f=1} f && /version\s*=/{c++} /^\s*\}\s*$/ && f{f=0} END{print c+0}' "$file")
         if [ "$sources" -gt "$versions" ]; then
           _smell "missing-provider-version" "$file:?" \
             "Some providers in required_providers appear to be missing a version constraint"

@@ -20,55 +20,9 @@ The bootstrap process scans your IaC workspace, interviews you about conventions
 
 ## Quick Start
 
-### Option A — CLI tool (fastest)
+### VS Code Copilot
 
-Install and run the `bootstrap-iac` command directly in your IaC workspace:
-
-```bash
-# Clone the repo
-git clone https://github.com/omattsson/iac-bootstrap.git ~/git/iac-bootstrap
-
-# Install the CLI
-pip install ~/git/iac-bootstrap/cli
-
-# Run in your IaC workspace (interactive mode)
-cd ~/my-iac-workspace
-bootstrap-iac
-```
-
-The tool scans your workspace, pre-fills defaults, prompts for a handful of answers,
-and writes all customisation files. See [cli/README.md](cli/README.md) for the
-full CLI reference.
-
-**Non-interactive / CI usage:**
-
-```bash
-bootstrap-iac \
-  --company  "Acme Corp" \
-  --cloud    azure \
-  --module-prefix tf-module \
-  --orchestration terragrunt \
-  --ci-cd    github-actions \
-  --org      acme \
-  --target   both \
-  --non-interactive
-```
-
-**Preview without writing:**
-
-```bash
-bootstrap-iac --dry-run
-```
-
-**Validate generated output:**
-
-```bash
-bootstrap-iac --validate
-```
-
-### Option B — VS Code Copilot
-
-**User-level skill (available in all workspaces):**
+**Option A — User-level skill (available in all workspaces):**
 
 ```bash
 # Clone the repo (replace with your fork URL)
@@ -82,11 +36,11 @@ Then in any IaC workspace, ask Copilot:
 
 > Use the bootstrap-infra-workspace skill to set up AI agent customizations for this workspace.
 
-**One-time use with `@workspace`:**
+**Option B — One-time use with `@workspace`:**
 
 Open this repo alongside your IaC workspace in VS Code, then ask Copilot to follow the procedure in `SKILL.md` against your IaC workspace.
 
-### Option C — Claude Code
+### Claude Code
 
 ```bash
 # Clone the repo (replace with your fork URL)
@@ -113,17 +67,8 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 ├── .claude/commands/
 │   └── bootstrap.md                      # Bootstrap as a Claude Code slash command
 │
-├── cli/                                  # bootstrap-iac CLI tool (pip-installable)
-│   ├── pyproject.toml                    # Package metadata and entry points
-│   ├── README.md                         # CLI usage reference
-│   ├── bootstrap_iac/                    # Python package
-│   │   ├── cli.py                        # Click CLI entry point
-│   │   ├── discovery.py                  # Workspace auto-detection
-│   │   ├── interview.py                  # Interactive prompts + context builder
-│   │   ├── generator.py                  # Template engine + file generation
-│   │   ├── validator.py                  # Unreplaced placeholder checker
-│   │   └── templates/                    # Bundled template copies
-│   └── tests/                            # CLI unit tests
+├── tools/
+│   └── detect-smells.sh                  # IaC code smell detector (8 anti-pattern checks)
 │
 ├── references/
 │   ├── iac-best-practices.md             # Universal IaC patterns (10 categories)
@@ -154,51 +99,52 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 │           └── create-infra-pipeline.md.tmpl
 │
 └── examples/
-    ├── azure-terragrunt/                 # Complete example for Azure + Terragrunt
-    │   ├── .github/                      # Copilot output
-    │   │   ├── copilot-instructions.md
-    │   │   ├── agents/
-    │   │   │   ├── infra-architect.agent.md
-    │   │   │   ├── terraform-module-builder.agent.md
-    │   │   │   ├── terraform-test-writer.agent.md
-    │   │   │   └── terragrunt-stack-manager.agent.md
-    │   │   ├── skills/
-    │   │   │   ├── create-terraform-module/SKILL.md
-    │   │   │   ├── create-terragrunt-stack/SKILL.md
-    │   │   │   └── create-infra-pipeline/SKILL.md
-    │   │   └── instructions/
-    │   │       ├── terraform-modules.instructions.md
-    │   │       ├── terraform-tests.instructions.md
-    │   │       ├── terragrunt-configs.instructions.md
-    │   │       └── pipeline-templates.instructions.md
-    │   ├── CLAUDE.md                     # Claude Code output
-    │   └── .claude/commands/
-    │       ├── create-terraform-module.md
-    │       ├── create-terragrunt-stack.md
-    │       └── create-infra-pipeline.md
-    └── aws-terraform/                    # Complete example for AWS + Terraform (no Terragrunt)
+    └── azure-terragrunt/                 # Complete example for Azure + Terragrunt
         ├── .github/                      # Copilot output
         │   ├── copilot-instructions.md
         │   ├── agents/
         │   │   ├── infra-architect.agent.md
         │   │   ├── terraform-module-builder.agent.md
         │   │   ├── terraform-test-writer.agent.md
-        │   │   └── terraform-stack-manager.agent.md
+        │   │   └── terragrunt-stack-manager.agent.md
         │   ├── skills/
         │   │   ├── create-terraform-module/SKILL.md
-        │   │   ├── create-terraform-stack/SKILL.md
+        │   │   ├── create-terragrunt-stack/SKILL.md
         │   │   └── create-infra-pipeline/SKILL.md
         │   └── instructions/
         │       ├── terraform-modules.instructions.md
         │       ├── terraform-tests.instructions.md
-        │       ├── terraform-stacks.instructions.md
+        │       ├── terragrunt-configs.instructions.md
         │       └── pipeline-templates.instructions.md
         ├── CLAUDE.md                     # Claude Code output
         └── .claude/commands/
             ├── create-terraform-module.md
-            ├── create-terraform-stack.md
+            ├── create-terragrunt-stack.md
             └── create-infra-pipeline.md
 ```
+
+## Code Smell Detector
+
+[`tools/detect-smells.sh`](tools/detect-smells.sh) scans a Terraform workspace for common anti-patterns and prints each finding with the exact file path and line number.
+
+```bash
+bash tools/detect-smells.sh /path/to/your-iac-workspace
+```
+
+**8 checks, each reporting `SMELL` or `PASS`:**
+
+| ID | Anti-Pattern |
+|----|--------------|
+| `hardcoded-secrets` | Credential-like keys assigned bare string literals in `.tf` / `.hcl` |
+| `missing-tests` | Modules with resources but no `.tftest.hcl` or `*_test.go` |
+| `monolithic-module` | Single module directory with ≥ 10 resource blocks |
+| `missing-backend` | No `backend` or Terraform Cloud block anywhere |
+| `no-tagging-standard` | Resource-containing modules with no `tags` or `labels` usage |
+| `duplicated-code` | Identical canonical `.tf` files in different directories |
+| `missing-provider-version` | Providers in `required_providers` without a `version` constraint |
+| `missing-gitignore` | Missing `.gitignore` or missing `.terraform/` / `*.tfstate` entries |
+
+The bootstrap procedure runs this detector automatically during Phase 3 (Gap Analysis) so findings appear alongside the high-level best-practices report.
 
 ## Best Practices Reference
 
