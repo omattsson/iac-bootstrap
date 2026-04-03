@@ -22,21 +22,112 @@ All templates are parameterized and adapted to the target company's conventions.
 
 ### Phase 1: Discovery
 
-Explore the target workspace to understand existing patterns:
+Explore the target workspace to understand existing patterns and auto-populate as many interview answers as possible. Run all scans before proceeding to Phase 2.
+
+#### 1.1 Structural Scans
 
 1. **Scan for Terraform modules**: `file_search("**/main.tf")` or `file_search("**/versions.tf")`
 2. **Scan for orchestration configs**: `file_search("**/terragrunt.hcl")`, `file_search("**/root.hcl")`, `file_search("**/terramate.tm.hcl")`
-3. **Scan for CI/CD pipelines**: `file_search("**/*.yml")` in pipeline directories
+3. **Scan for CI/CD pipelines**: `file_search("**/*.yml")`, `file_search("**/*.yaml")`, and explicit CI/CD paths such as `file_search("**/atlantis.yaml")` in pipeline directories
 4. **Check for existing customizations**: `file_search("**/.github/copilot-instructions.md")`, `file_search("**/CLAUDE.md")`
 
-Build a profile of the workspace by reading representative files.
+#### 1.2 Auto-Detection Rules
+
+For each field below, run the indicated scan and record the result. Assign a confidence level — **High** (unambiguous pattern found), **Medium** (pattern found but could be interpreted differently), or **Low** (weak signal, needs confirmation).
+
+| Interview Q | What to Detect | How to Detect |
+|-------------|---------------|---------------|
+| **Q2 — Cloud provider** | `azure` / `aws` / `gcp` / multi | Scan `*.tf` for `provider "azurerm"`, `provider "aws"`, `provider "google"`. Note all providers found. |
+| **Q3 — Module source pattern** | Git URL template | Search `*.tf` and `*.hcl` for `source =` inside `module` blocks; extract the URL pattern (strip ref/version). |
+| **Q4 — Module prefix** | `tf-module-`, `terraform-aws-`, `modules/` | List top-level directories; find directories whose names match `tf-module-*` or `terraform-*`, and check whether a top-level `modules/` directory exists (optionally inspect its immediate children as a secondary signal). If both directory patterns and `source =` lines are found, prefer the directory names (High confidence) and use the source pattern as a secondary signal (Medium). If they conflict, list both and mark as Medium. |
+| **Q5 — Orchestration tool** | Terragrunt / Terramate / none | Check for `terragrunt.hcl` or `root.hcl` → Terragrunt. Check for `*.tm.hcl` or `terramate.tm.hcl` → Terramate. Check for `Pulumi.yaml` → Pulumi. If none, mark as "plain Terraform". |
+| **Q6 — CI/CD platform** | GitHub Actions / Azure DevOps / GitLab CI / Atlantis | Check for `.github/workflows/*.yml` or `.github/workflows/*.yaml` → GitHub Actions. Check for `azure-pipelines.yml` or `azure-pipelines/` → Azure DevOps. Check for `.gitlab-ci.yml` → GitLab CI. Check for `.atlantis.yaml` or `atlantis.yaml` → Atlantis. |
+| **Q7 — Auth pattern** | Managed Identity / OIDC / service principal / IAM roles | In `*.tf` provider blocks: `use_msi = true` → Managed Identity; `use_oidc = true` → OIDC; `client_secret` variable present → service principal. In pipeline YAML: `aws-actions/configure-aws-credentials` with `role-to-assume` → OIDC; `azure/login` with `creds` → service principal. For multi-cloud workspaces, list all distinct patterns found (one per provider). For single-cloud workspaces, report the one pattern detected. |
+| **Q8 — State backend** | Azure Blob / S3 / GCS / Terraform Cloud | Scan `*.tf` for `backend "azurerm"` → Azure Blob; `backend "s3"` → S3; `backend "gcs"` → GCS; `backend "remote"` or `cloud {}` block → Terraform Cloud. |
+| **Q9 — Naming convention** | Pattern like `prefix-type-suffix` | Read `locals.tf` files from 2–3 modules (prefer root-level modules with the most resources). Extract the `name =` expression in the `locals` block. If all modules share the same pattern → High confidence. If most share a pattern with one outlier → report the majority pattern at Medium confidence. If patterns are inconsistent across modules → list the variants and mark as Low confidence. |
+| **Q10 — Tag/label standard** | Required tags and merge expression | Read `locals.tf` for tag merge expressions. Read `common.variables.tf` for `env_default_tags` or similar. Note any hardcoded required tag keys (e.g., `managed_by`, `environment`). |
+| **Q11 — Test framework** | native tftest / Terratest / both | Check for `*.tftest.hcl` files → native Terraform test. Check for `*_test.go` files → Terratest. |
+| **Q12 — Standard variables** | List of cross-module variable names | Read any file named `common.variables.tf` or `common_variables.tf`. List variable names. If absent, collect variables that appear in all (or most) scanned `variables.tf` files. |
+
+> **Tip:** Read at least 2–3 representative files for each signal. Prefer root-level modules (those with the most resources) over deeply nested or helper modules, which are more likely to be outliers.
+
+#### 1.3 Build the Pre-fill Profile
+
+After scanning, compile a **Pre-fill Profile** in this exact format:
+
+```
+WORKSPACE PRE-FILL PROFILE
+─────────────────────────────────────────────────────────
+Q2  Cloud provider      : <value>          [High/Medium/Low]
+Q3  Module source       : <value>          [High/Medium/Low]
+Q4  Module prefix       : <value>          [High/Medium/Low]
+Q5  Orchestration tool  : <value>          [High/Medium/Low]
+Q6  CI/CD platform      : <value>          [High/Medium/Low]
+Q7  Auth pattern        : <value>          [High/Medium/Low]
+Q8  State backend       : <value>          [High/Medium/Low]
+Q9  Naming convention   : <value>          [High/Medium/Low]
+Q10 Tag standard        : <value>          [High/Medium/Low]
+Q11 Test framework      : <value>          [High/Medium/Low]
+Q12 Standard variables  : <value>          [High/Medium/Low]
+─────────────────────────────────────────────────────────
+Still needed (no signal found): Q1 (company name), Q13 (target tool), [any others with no signal]
+```
+
+Carry this profile into Phase 2 as the starting point for the interview.
 
 ### Phase 2: Interview
 
-Gather what can't be inferred from code:
+Present the Pre-fill Profile from Phase 1, then collect only what still needs confirmation or input.
+
+#### 2.1 Present Auto-Detected Answers
+
+Show the user the Pre-fill Profile built in Phase 1. Mark Medium confidence values with `(?)` and Low confidence values with `(??)` so users know which need closest attention:
 
 ```
-Questions:
+I scanned the workspace and pre-filled the following answers. Please confirm or correct each value.
+Values marked with (?) are Medium confidence — double-check these especially.
+Values marked with (??) are Low confidence — please verify or provide the correct value.
+
+  Q2  Cloud provider      : <detected value>        [High]
+  Q3  Module source       : <detected value>    (?) [Medium]
+  Q4  Module prefix       : <detected value>        [High]
+  Q5  Orchestration tool  : <detected value>        [High]
+  Q6  CI/CD platform      : <detected value>        [High]
+  Q7  Auth pattern        : <detected value>    (?) [Medium]
+  Q8  State backend       : <detected value>        [High]
+  Q9  Naming convention   : <detected value>    (?) [Medium]
+  Q10 Tag standard        : <detected value>        [High]
+  Q11 Test framework      : <detected value>        [High]
+  Q12 Standard variables  : <detected value>        [High]
+
+Are any of these wrong? Type corrections, or say "all good" to continue.
+```
+
+Wait for the user's response and apply any corrections before continuing.
+
+#### 2.2 Ask for Missing Answers
+
+After the user confirms or corrects auto-detected values, ask only for the fields that have **no detected value**, fields with **Low** confidence, plus the two that cannot be auto-detected:
+
+```
+A few more questions I couldn't infer from the code:
+
+1.  Company/org name — used in descriptions and comments
+    → e.g., "Acme Corp", "Contoso", "MyStartup"
+
+13. Target tool(s) — VS Code Copilot, Claude Code, or both
+    → "Copilot", "Claude", or "both"
+
+[Include any other questions that returned no signal in Phase 1]
+```
+
+> **Rule:** Never ask a question whose answer was already detected with **High** confidence. For **Medium** confidence answers, include them in the confirmation table (2.1) rather than asking again. Only explicitly prompt for **Low** confidence and undetected fields.
+
+#### 2.3 Full Question Reference
+
+The complete list of 13 interview questions (for reference when no workspace exists or all signals are absent):
+
+```
 1.  Company/org name — used in descriptions and comments
 2.  Cloud provider(s) — Azure, AWS, GCP, or multi-cloud
 3.  Module source pattern — Git URL pattern for module sourcing
