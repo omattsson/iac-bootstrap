@@ -26,7 +26,7 @@ cd ~/my-iac-workspace
 bootstrap-iac
 ```
 
-The tool scans the workspace, pre-fills sensible defaults, and asks a handful of
+The tool scans the workspace, pre-fills sensible defaults, and asks ~10
 questions before generating all customisation files.
 
 ### Non-interactive / CI mode

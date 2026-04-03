@@ -7,6 +7,8 @@ all ``{{PLACEHOLDER}}`` tokens in the templates.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 import click
@@ -448,11 +450,7 @@ def build_context(answers: dict) -> dict:
         ),
     )
     ctx.setdefault("PROVIDER_RESOURCE_EXAMPLE", cloud_defs["provider_resource_example"])
-    # PROVIDER_RESOURCE is just the resource type (without .default)
-    ctx.setdefault(
-        "PROVIDER_RESOURCE",
-        cloud_defs["provider_resource_example"].rsplit(".", 1)[0],
-    )
+    ctx.setdefault("PROVIDER_RESOURCE", cloud_defs["provider_resource_example"])
     ctx.setdefault("LOCATION_ATTRIBUTE", cloud_defs["location_attribute"])
     ctx.setdefault("RESOURCE_GROUP_ATTRIBUTE", cloud_defs["resource_group_attribute"])
     ctx.setdefault("PRIVATE_ENDPOINT_PATTERN", cloud_defs["private_endpoint_pattern"])
@@ -511,7 +509,7 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("STANDARD_PARAMETERS_LIST", cicd_defs["standard_parameters"])
     ctx.setdefault(
         "PIPELINE_TEMPLATES_REPO",
-        "pipeline-templates",
+        f"github.com/{org}/pipeline-templates",
     )
 
     # ---- Auth derived values ----
@@ -552,28 +550,24 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("RESOURCE_IDENTIFIER", "default")
     ctx.setdefault("COMMON_VARS_FILE", "common.variables.tf")
-    _data_source_targets = {
-        "azurerm": "data.azurerm_subscription.current",
-        "aws": "data.aws_caller_identity.current",
-        "google": "data.google_client_config.current",
-    }
-    _ds_target = _data_source_targets.get(ctx.get("PROVIDER_NAME", "azurerm"), "data.azurerm_subscription.current")
     ctx.setdefault(
         "DATA_SOURCE_OVERRIDE",
         (
             'override_data {\n'
-            f'  target = {_ds_target}\n'
+            '  target = data.{provider}_{resource}.current\n'
             '  values = {\n'
             '    id = "/subscriptions/00000000-0000-0000-0000-000000000000"\n'
             '  }\n'
             '}'
-        ),
+        ).replace("{provider}", ctx.get("PROVIDER_NAME", "azurerm")),
     )
     ctx.setdefault(
         "TEST_STANDARD_VARIABLES",
         (
+            "variables {\n"
             '  prefix   = "test-auto"\n'
-            '  location = "westeurope"'
+            '  location = "westeurope"\n'
+            "}"
         ),
     )
     ctx.setdefault("EXPECTED_NAME_PATTERN", "test-auto-{resource_abbreviation}-mysuffix")
@@ -581,13 +575,12 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("VARIABLE_GOTCHAS", "Use `optional(type, default)` for object attributes (Terraform 1.3+)")
 
     # ---- Pipeline code snippets (minimal defaults) ----
-    orch_dir = ctx.get("ORCHESTRATION_DIR", "infrastructure-config")
     ctx.setdefault(
         "SINGLE_COMPONENT_PIPELINE",
-        _single_component_pipeline(cicd, org, module_prefix, orch_dir),
+        _single_component_pipeline(cicd, org, module_prefix),
     )
-    ctx.setdefault("STACK_PIPELINE", _stack_pipeline(cicd, orch, orch_dir))
-    ctx.setdefault("DRIFT_PIPELINE", _drift_pipeline(cicd, orch, orch_dir))
+    ctx.setdefault("STACK_PIPELINE", _stack_pipeline(cicd, orch))
+    ctx.setdefault("DRIFT_PIPELINE", _drift_pipeline(cicd, orch))
 
     # ---- Environment hierarchy ----
     ctx.setdefault(
@@ -607,7 +600,7 @@ def build_context(answers: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _single_component_pipeline(cicd: str, org: str, module_prefix: str, orch_dir: str = "infrastructure-config") -> str:
+def _single_component_pipeline(cicd: str, org: str, module_prefix: str) -> str:
     if "GitHub" in cicd:
         return (
             "name: plan-apply-{component}\n"
@@ -615,28 +608,28 @@ def _single_component_pipeline(cicd: str, org: str, module_prefix: str, orch_dir
             "  push:\n"
             "    branches: [main]\n"
             "    paths:\n"
-            f"      - '{orch_dir}/**/{{component}}/**'\n"
+            "      - 'infrastructure-config/**/{component}/**'\n"
             "  pull_request:\n"
             "    paths:\n"
-            f"      - '{orch_dir}/**/{{component}}/**'\n\n"
+            "      - 'infrastructure-config/**/{component}/**'\n\n"
             "jobs:\n"
             "  plan:\n"
             "    uses: {org}/pipeline-templates/.github/workflows/tf-plan.yml@main\n"
             "    with:\n"
-            f"      working_directory: {orch_dir}/dev/platform/{{component}}\n"
+            "      working_directory: infrastructure-config/dev/platform/{component}\n"
             "    permissions:\n"
             "      id-token: write\n"
             "      contents: read\n"
             "  apply:\n"
             "    needs: plan\n"
             "    if: github.ref == 'refs/heads/main'\n"
-            "    environment: production\n"
             "    uses: {org}/pipeline-templates/.github/workflows/tf-apply.yml@main\n"
             "    with:\n"
-            f"      working_directory: {orch_dir}/dev/platform/{{component}}\n"
+            "      working_directory: infrastructure-config/dev/platform/{component}\n"
             "    permissions:\n"
             "      id-token: write\n"
             "      contents: read\n"
+            "      environment: production\n"
         ).replace("{org}", org)
     if "Azure DevOps" in cicd:
         return (
@@ -645,19 +638,19 @@ def _single_component_pipeline(cicd: str, org: str, module_prefix: str, orch_dir
             "  jobs:\n"
             "  - template: templates/tf-plan.yml\n"
             "    parameters:\n"
-            f"      workingDirectory: {orch_dir}/dev/platform/{{component}}\n"
+            "      workingDirectory: infrastructure-config/dev/platform/{component}\n"
             "- stage: Apply\n"
             "  dependsOn: Plan\n"
             "  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))\n"
             "  jobs:\n"
             "  - template: templates/tf-apply.yml\n"
             "    parameters:\n"
-            f"      workingDirectory: {orch_dir}/dev/platform/{{component}}\n"
+            "      workingDirectory: infrastructure-config/dev/platform/{component}\n"
         )
     return "# Define your plan → apply pipeline stages here"
 
 
-def _stack_pipeline(cicd: str, orch: str, orch_dir: str = "infrastructure-config") -> str:
+def _stack_pipeline(cicd: str, orch: str) -> str:
     tool = _ORCHESTRATION_DEFAULTS.get(orch, _ORCHESTRATION_DEFAULTS["None"])["tool_lower"]
     if "GitHub" in cicd:
         return (
@@ -666,14 +659,14 @@ def _stack_pipeline(cicd: str, orch: str, orch_dir: str = "infrastructure-config
             "  push:\n"
             "    branches: [main]\n"
             "    paths:\n"
-            f"      - '{orch_dir}/**'\n\n"
+            "      - 'infrastructure-config/**'\n\n"
             "jobs:\n"
             "  plan:\n"
             "    runs-on: ubuntu-latest\n"
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
             f"      - run: {tool} run-all plan\n"
-            f"        working-directory: {orch_dir}/dev/platform\n"
+            "        working-directory: infrastructure-config/dev/platform\n"
             "  apply:\n"
             "    needs: plan\n"
             "    if: github.ref == 'refs/heads/main'\n"
@@ -682,12 +675,12 @@ def _stack_pipeline(cicd: str, orch: str, orch_dir: str = "infrastructure-config
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
             f"      - run: {tool} run-all apply --auto-approve\n"
-            f"        working-directory: {orch_dir}/dev/platform\n"
+            "        working-directory: infrastructure-config/dev/platform\n"
         )
     return "# Define your stack-level plan → apply pipeline here"
 
 
-def _drift_pipeline(cicd: str, orch: str, orch_dir: str = "infrastructure-config") -> str:
+def _drift_pipeline(cicd: str, orch: str) -> str:
     tool = _ORCHESTRATION_DEFAULTS.get(orch, _ORCHESTRATION_DEFAULTS["None"])["tool_lower"]
     if "GitHub" in cicd:
         return (
@@ -701,7 +694,7 @@ def _drift_pipeline(cicd: str, orch: str, orch_dir: str = "infrastructure-config
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
             f"      - run: {tool} run-all plan --detailed-exitcode\n"
-            f"        working-directory: {orch_dir}\n"
+            "        working-directory: infrastructure-config\n"
             "        continue-on-error: true\n"
             "      - name: Notify on drift\n"
             "        if: failure()\n"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -138,7 +139,7 @@ def _detect_ci_cd(workspace: Path) -> tuple[Optional[str], Optional[str]]:
         return "GitLab CI", "."
     for yml_file in workspace.glob("**/pipelines/**/*.yml"):
         rel = str(yml_file.parent.relative_to(workspace))
-        return "Azure DevOps", rel
+        return "Unknown", rel
     return None, None
 
 
