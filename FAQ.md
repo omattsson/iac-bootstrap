@@ -34,9 +34,9 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
 
 **Solution:**
 - Edit `SKILL.md` (for Copilot) or `.claude/commands/bootstrap.md` (for Claude Code) and add or remove questions in the **Phase 2: Interview** section.
-- To skip a question, remove it from the list. The corresponding placeholder in generated output will fall back to the template's default value, or you can edit the generated file after bootstrap if needed.
-- If you are **maintaining or forking this bootstrap repo's templates**, adding a new question usually also means adding a matching `{{NEW_PLACEHOLDER}}` to the relevant `.tmpl` files under `references/copilot/` or `references/claude/`.
-- If you are **using this repo to bootstrap a workspace**, treat `.tmpl` files as read-only inputs. In that case, customize the interview procedure, re-run bootstrap, and/or edit the generated output files rather than editing the templates directly.
+- To skip a question, remove it from the list. The corresponding placeholder in the templates will fall back to the default value or you can hard-code it in the template.
+- To add a new question, add it to the interview list **and** add a matching `{{NEW_PLACEHOLDER}}` to any `.tmpl` files that need it under `references/copilot/` or `references/claude/`.
+- Never edit `.tmpl` files directly in a production bootstrap — use them as read-only references and modify only the interview procedure.
 
 ---
 
@@ -86,7 +86,7 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
 **Solution:**
 1. Pull the latest `iac-bootstrap` changes:
    ```bash
-   cd /path/to/iac-bootstrap && git pull
+   cd ~/git/iac-bootstrap && git pull
    ```
 2. Re-run the bootstrap procedure against your workspace. The agent will detect existing files and offer to merge or overwrite them (Phase 4, Generation Rule 6).
 3. If you only need to update specific files, copy the relevant `.tmpl` file, manually replace all `{{PLACEHOLDER}}` values with your workspace's values, and overwrite the existing output file.
@@ -104,9 +104,9 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
   - `infra-architect` — planning, design decisions, gap analysis
   - `terraform-module-builder` — writing and scaffolding module code
   - `terraform-test-writer` — writing `.tftest.hcl` files and test assertions
-- If two agents have overlapping descriptions, edit the `.agent.md` files under `.github/agents/` and narrow the existing `description` text to the exact scope and trigger phrase.
-- Keep routing guidance inside that `description` field using the same `Use when:` pattern as the agent templates, rather than adding a separate `when:` YAML field or top-of-file note.
-- For Claude Code, agents are embedded in `CLAUDE.md` — ensure each role section has a distinct header and a clear scope statement, including a concise "use when" style description so the model can self-select the right context.
+- If two agents have overlapping descriptions, edit the `.agent.md` files under `.github/agents/` and narrow the `description` to the exact trigger phrase.
+- Add a `when:` or `use when:` note at the top of each agent's instructions to clarify to the model when it should take over.
+- For Claude Code, agents are embedded in `CLAUDE.md` — ensure each role section has a distinct header and a clear scope statement so the model can self-select the right context.
 
 ---
 
@@ -131,10 +131,13 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
 **Symptom:** The interview phase asks many questions and the overall bootstrap takes a long time, especially for a simple workspace.
 
 **Solution:**
-- For a minimal bootstrap (instructions only, no agents or skills), tell the agent explicitly: *"Generate only the workspace instructions file, skip agents and skills."*
-- To skip the interview entirely, provide all required values up front in your prompt: *"Bootstrap this workspace. Company: Acme Corp. Cloud: Azure. Module prefix: tf-module. Orchestration: Terragrunt. CI/CD: GitHub Actions."*
+- Use the `--non-interactive` flag (CLI mode) to skip the interview and rely on auto-detected values:
+  ```bash
+  bootstrap-iac --cloud azure --output-dir . --non-interactive
+  ```
+- Pre-answer questions by passing a config file or environment variables if supported by your version of the tool.
+- For a minimal bootstrap (instructions only, no agents or skills), tell the agent: *"Generate only the workspace instructions file, skip agents and skills."*
 - If the discovery phase is slow due to a large repo, point the agent at a specific subdirectory: *"Only scan modules under `infra/modules/`."*
-- Focus the bootstrap on a single target tool — if you only need Claude Code output, say *"Generate Claude Code files only."* — to halve the number of files generated and reviewed.
 
 ---
 

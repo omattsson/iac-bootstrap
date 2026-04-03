@@ -67,12 +67,8 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 ├── .claude/commands/
 │   └── bootstrap.md                      # Bootstrap as a Claude Code slash command
 │
-├── tools/
-│   └── detect-smells.sh                  # IaC code smell detector (8 anti-pattern checks)
-│
 ├── references/
 │   ├── iac-best-practices.md             # Universal IaC patterns (10 categories)
-│   ├── maturity-report.md.tmpl           # Maturity assessment report template
 │   │
 │   ├── copilot/                          # VS Code Copilot output templates
 │   │   ├── copilot-instructions.md.tmpl
@@ -123,29 +119,6 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
             ├── create-terragrunt-stack.md
             └── create-infra-pipeline.md
 ```
-
-## Code Smell Detector
-
-[`tools/detect-smells.sh`](tools/detect-smells.sh) scans a Terraform workspace for common anti-patterns and prints each finding with a relevant location (file or module directory), including a line number when available.
-
-```bash
-bash tools/detect-smells.sh /path/to/your-iac-workspace
-```
-
-**8 checks, each reporting `SMELL` or `PASS`:**
-
-| ID | Anti-Pattern |
-|----|--------------|
-| `hardcoded-secrets` | Credential-like keys assigned bare string literals in `.tf` / `.hcl` |
-| `missing-tests` | Modules with resources but no `.tftest.hcl` or `*_test.go` |
-| `monolithic-module` | Single module directory with ≥ 10 resource blocks |
-| `missing-backend` | No `backend` or Terraform Cloud block anywhere |
-| `no-tagging-standard` | Resource-containing modules with no `tags` or `labels` usage |
-| `duplicated-code` | Identical canonical `.tf` files in different directories |
-| `missing-provider-version` | Providers in `required_providers` without a `version` constraint |
-| `missing-gitignore` | Missing `.gitignore` or missing `.terraform/` / `*.tfstate` entries |
-
-The bootstrap procedure runs this detector automatically during Phase 3 (Gap Analysis) so findings appear alongside the high-level best-practices report.
 
 ## Best Practices Reference
 
@@ -240,19 +213,16 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{STANDARD_PARAMETERS}}` | (multi-line) | Pipeline parameter definitions |
 | `{{PIPELINE_CONVENTIONS}}` | (multi-line) | Pipeline naming/structure conventions |
 
-## Validating Generated Output
+## Troubleshooting
 
-After bootstrapping a workspace, run the placeholder validator to confirm every `{{PLACEHOLDER}}` token has been replaced:
+See the [FAQ](FAQ.md) for solutions to common setup and usage issues, including:
 
-```bash
-# Validate the current workspace (run from the bootstrapped workspace root)
-bash <path-to-iac-bootstrap>/scripts/validate.sh
-
-# Or pass the workspace path explicitly
-bash <path-to-iac-bootstrap>/scripts/validate.sh ~/my-iac-workspace
-```
-
-The script scans `.github/`, `.claude/`, and `CLAUDE.md` for any remaining `{{TOKEN}}` tokens (uppercase letters, digits, and underscores) across `.md`, `.yml`, `.yaml`, `.json`, `.hcl`, and `.tf` files. It prints one `file:line: {{TOKEN}}` line per finding, exits `0` when no placeholders are found and `1` when any remain — suitable for use in CI pipelines.
+- Agent doesn't find my modules / wrong module picked
+- Placeholder values don't look right after generation
+- Skills not showing up in Copilot
+- Claude Code ignoring `CLAUDE.md` rules
+- How to update generated files after template changes
+- [and more…](FAQ.md)
 
 ## Contributing
 
