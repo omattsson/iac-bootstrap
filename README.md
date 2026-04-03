@@ -96,27 +96,49 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 │           └── create-infra-pipeline.md.tmpl
 │
 └── examples/
-    └── azure-terragrunt/                 # Complete example for Azure + Terragrunt
+    ├── azure-terragrunt/                 # Complete example for Azure + Terragrunt
+    │   ├── .github/                      # Copilot output
+    │   │   ├── copilot-instructions.md
+    │   │   ├── agents/
+    │   │   │   ├── infra-architect.agent.md
+    │   │   │   ├── terraform-module-builder.agent.md
+    │   │   │   ├── terraform-test-writer.agent.md
+    │   │   │   └── terragrunt-stack-manager.agent.md
+    │   │   ├── skills/
+    │   │   │   ├── create-terraform-module/SKILL.md
+    │   │   │   ├── create-terragrunt-stack/SKILL.md
+    │   │   │   └── create-infra-pipeline/SKILL.md
+    │   │   └── instructions/
+    │   │       ├── terraform-modules.instructions.md
+    │   │       ├── terraform-tests.instructions.md
+    │   │       ├── terragrunt-configs.instructions.md
+    │   │       └── pipeline-templates.instructions.md
+    │   ├── CLAUDE.md                     # Claude Code output
+    │   └── .claude/commands/
+    │       ├── create-terraform-module.md
+    │       ├── create-terragrunt-stack.md
+    │       └── create-infra-pipeline.md
+    └── aws-terraform/                    # Complete example for AWS + Terraform (no Terragrunt)
         ├── .github/                      # Copilot output
         │   ├── copilot-instructions.md
         │   ├── agents/
         │   │   ├── infra-architect.agent.md
         │   │   ├── terraform-module-builder.agent.md
         │   │   ├── terraform-test-writer.agent.md
-        │   │   └── terragrunt-stack-manager.agent.md
+        │   │   └── terraform-stack-manager.agent.md
         │   ├── skills/
         │   │   ├── create-terraform-module/SKILL.md
-        │   │   ├── create-terragrunt-stack/SKILL.md
+        │   │   ├── create-terraform-stack/SKILL.md
         │   │   └── create-infra-pipeline/SKILL.md
         │   └── instructions/
         │       ├── terraform-modules.instructions.md
         │       ├── terraform-tests.instructions.md
-        │       ├── terragrunt-configs.instructions.md
+        │       ├── terraform-stacks.instructions.md
         │       └── pipeline-templates.instructions.md
         ├── CLAUDE.md                     # Claude Code output
         └── .claude/commands/
             ├── create-terraform-module.md
-            ├── create-terragrunt-stack.md
+            ├── create-terraform-stack.md
             └── create-infra-pipeline.md
 ```
 

@@ -1,0 +1,148 @@
+---
+description: "tflint custom rule conventions for {{CLOUD_PROVIDER}} modules. Use when writing, modifying, or reviewing custom tflint rules that enforce workspace-specific Terraform coding standards."
+applyTo: "rules/**/*.go,**/.tflint.hcl"
+---
+
+# tflint Custom Rule Standards
+
+## When to Write Custom Rules
+Write custom tflint rules when built-in rules don't enforce:
+- Workspace-specific naming conventions
+- Mandatory variable patterns (e.g., always include `common.variables.tf`)
+- Deprecated resource type bans
+- Organization-specific resource argument requirements
+
+For simple value checks, prefer checkov YAML policies. Use tflint Go rules for structural/AST-level checks.
+
+## Plugin Layout
+
+```
+tflint-ruleset-{{COMPANY_SLUG}}/
+  rules/
+    {{COMPANY_SLUG}}_naming_convention.go
+    {{COMPANY_SLUG}}_naming_convention_test.go
+    {{COMPANY_SLUG}}_required_tags.go
+    {{COMPANY_SLUG}}_required_tags_test.go
+  main.go
+  go.mod
+  go.sum
+```
+
+## Rule Boilerplate
+
+```go
+package rules
+
+import (
+    "github.com/terraform-linters/tflint-plugin-sdk/hclext"
+    "github.com/terraform-linters/tflint-plugin-sdk/tflint"
+)
+
+type {{RULE_STRUCT_NAME}} struct {
+    tflint.DefaultRule
+}
+
+func New{{RULE_STRUCT_NAME}}() *{{RULE_STRUCT_NAME}} {
+    return &{{RULE_STRUCT_NAME}}{}
+}
+
+func (r *{{RULE_STRUCT_NAME}}) Name() string {
+    return "{{COMPANY_SLUG}}_{{rule_name}}"
+}
+
+func (r *{{RULE_STRUCT_NAME}}) Enabled() bool { return true }
+
+func (r *{{RULE_STRUCT_NAME}}) Severity() tflint.Severity {
+    return tflint.{{SEVERITY}}  // ERROR, WARNING, NOTICE
+}
+
+func (r *{{RULE_STRUCT_NAME}}) Link() string {
+    return "{{DOCS_URL}}/rules/{{COMPANY_SLUG}}_{{rule_name}}"
+}
+
+func (r *{{RULE_STRUCT_NAME}}) Check(runner tflint.Runner) error {
+    {{CHECK_LOGIC}}
+    return nil
+}
+```
+
+## Enabling Rules in `.tflint.hcl`
+
+```hcl
+plugin "{{COMPANY_SLUG}}" {
+  enabled = true
+  version = "{{TFLINT_PLUGIN_VERSION}}"
+  source  = "{{TFLINT_PLUGIN_SOURCE}}"
+}
+
+rule "{{COMPANY_SLUG}}_{{rule_name}}" {
+  enabled = true
+}
+```
+
+## Severity Guidelines
+| Level | When to Use |
+|-------|-------------|
+| `ERROR` | Blocks CI — naming violations, banned resources |
+| `WARNING` | Should fix — non-standard patterns, missing recommended args |
+| `NOTICE` | Informational — stylistic suggestions |
+
+## Running tflint
+```bash
+# Install plugins and run
+tflint --init
+tflint --recursive
+
+# Run on a single module directory
+tflint --chdir=./modules/{{MODULE_NAME}}
+```
+
+## Rule Test Boilerplate
+
+```go
+package rules
+
+import (
+    "testing"
+
+    "github.com/terraform-linters/tflint-plugin-sdk/helper"
+)
+
+func TestCheck{{RULE_STRUCT_NAME}}(t *testing.T) {
+    tests := []struct {
+        name     string
+        config   string
+        expected []helper.Issue
+    }{
+        {
+            name: "valid — no issues",
+            config: `
+resource "{{TERRAFORM_RESOURCE_TYPE}}" "default" {
+    {{VALID_CONFIG}}
+}`,
+            expected: []helper.Issue{},
+        },
+        {
+            name: "invalid — rule violation",
+            config: `
+resource "{{TERRAFORM_RESOURCE_TYPE}}" "default" {
+    {{INVALID_CONFIG}}
+}`,
+            expected: []helper.Issue{
+                {Rule: New{{RULE_STRUCT_NAME}}(), Message: "{{EXPECTED_ERROR_MESSAGE}}"},
+            },
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            runner := helper.TestRunner()
+            runner.AddContent("main.tf", tt.config)
+            if err := New{{RULE_STRUCT_NAME}}().Check(runner); err != nil {
+                t.Fatal(err)
+            }
+            helper.AssertIssues(t, tt.expected, runner.Issues)
+        })
+    }
+}
+```
