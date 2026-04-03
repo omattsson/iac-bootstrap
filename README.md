@@ -219,7 +219,7 @@ See [docs/agent-value-comparison.md](docs/agent-value-comparison.md) for side-by
 
 - **Adding a new Terraform module** — 16 manual steps → 3 agent-assisted steps (−81%)
 - **Adding a new environment stack** — 14 steps → 4 steps (−71%)
-- **Debugging a failing terraform plan** — 9 steps → 4 steps (−56%)
+- **Debugging a failing Terraform plan** — 9 steps → 4 steps (−56%)
 
 Suitable for team presentations, onboarding docs, or justifying AI tooling investment to leadership.
 
