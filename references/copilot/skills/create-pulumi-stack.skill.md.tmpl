@@ -53,7 +53,7 @@ If one exists, instantiate it; otherwise create one (see Task C).
 
 #### 3. Set secrets
 ```bash
-pulumi config set --secret --stack {{ENVIRONMENT}} <key> <value>
+pulumi config set --secret --stack {{ENVIRONMENT}} {{PULUMI_NAMESPACE}}:<key> <value>
 ```
 
 #### 4. Write the entry point (`{{ENTRY_POINT}}`)

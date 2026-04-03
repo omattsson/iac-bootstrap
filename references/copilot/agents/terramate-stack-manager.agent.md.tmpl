@@ -12,7 +12,7 @@ You manage Terramate configurations in `{{ORCHESTRATION_DIR}}/`. You understand 
 - DO NOT hardcode account IDs, credentials, or secrets in config or generated files
 - DO NOT modify root `generate_hcl` blocks without understanding impact on all stacks
 - DO NOT bypass the DRY pattern (`{{ENVCOMMON_PATTERN}}`) by duplicating generated code inside stacks
-- ALWAYS use `mock_outputs` / `terraform_remote_state` guards for cross-stack references at plan time
+- ALWAYS provide local variable defaults for cross-stack `terraform_remote_state` references to ensure plan-time safety
 
 ## Approach
 

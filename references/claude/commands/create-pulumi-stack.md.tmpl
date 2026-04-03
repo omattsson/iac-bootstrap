@@ -46,7 +46,7 @@ If unclear, ask:
 
 ### 3. Set secrets
 ```bash
-pulumi config set --secret --stack {{ENVIRONMENT}} <key> <value>
+pulumi config set --secret --stack {{ENVIRONMENT}} {{PULUMI_NAMESPACE}}:<key> <value>
 ```
 
 ### 4. Entry point (`{{ENTRY_POINT}}`)

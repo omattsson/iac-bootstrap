@@ -1,6 +1,6 @@
 ---
 description: "Pulumi program and stack configuration standards. Use when writing or modifying Pulumi programs, Pulumi.yaml project files, stack config files, or ComponentResource classes."
-applyTo: "{{ORCHESTRATION_DIR}}/**"
+applyTo: "{{ORCHESTRATION_DIR}}/**/*.{py,ts,go,cs,yaml}"
 ---
 
 # Pulumi Configuration Standards
@@ -21,8 +21,8 @@ config:
   {{PULUMI_NAMESPACE}}:environment: "{{ENVIRONMENT}}"
   {{PULUMI_NAMESPACE}}:location: "{{LOCATION}}"
   {{PULUMI_NAMESPACE}}:prefix: "{{PREFIX}}"
-  # Secrets are encrypted — set with: pulumi config set --secret key value
-  # They appear as: key: secure: <ciphertext>
+  # Secrets are encrypted — set with: pulumi config set --secret {{PULUMI_NAMESPACE}}:key value
+  # They appear as: {{PULUMI_NAMESPACE}}:key: secure: <ciphertext>
 ```
 
 ## ComponentResource Pattern
@@ -48,7 +48,7 @@ Use `pulumi.StackReference` to read outputs from other stacks:
 Always handle `None`/`undefined` for plan-time safety.
 
 ## Secret Management
-- Use `pulumi config set --secret` for sensitive values (keys, passwords, connection strings)
+- Use `pulumi config set --secret {{PULUMI_NAMESPACE}}:<key> <value>` for sensitive values (keys, passwords, connection strings)
 - Read namespaced secrets with `pulumi.Config("{{PULUMI_NAMESPACE}}").require_secret("key")` / `new pulumi.Config("{{PULUMI_NAMESPACE}}").requireSecret("key")`
 - State backend secret provider: `{{SECRET_PROVIDER}}`
 - Never log or export secret values
