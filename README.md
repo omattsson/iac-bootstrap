@@ -150,7 +150,7 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{MODULE_PREFIX}}` | tf-module | Module directory prefix |
 | `{{ORCHESTRATION_TOOL}}` | Terragrunt | Orchestration tool name |
 | `{{ORCHESTRATION_TOOL_LOWER}}` | terragrunt | Lowercase form for CLI commands |
-| `{{ORCHESTRATION_DIR}}` | core-infrastructure | Directory containing orchestration configs |
+| `{{ORCHESTRATION_DIR}}` | infrastructure-config | Directory containing orchestration configs |
 | `{{CI_CD_PLATFORM}}` | GitHub Actions | CI/CD platform |
 | `{{PROVIDER_NAME}}` | azurerm | Terraform provider name |
 | `{{RESOURCE_IDENTIFIER}}` | default | Standard resource identifier (e.g., `azurerm_key_vault.default`) |

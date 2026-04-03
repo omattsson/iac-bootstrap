@@ -7,7 +7,7 @@ This workspace contains infrastructure-as-code for Contoso's Azure platform.
 | Category | Repos/Dirs | Purpose |
 |----------|------------|---------|
 | **Terraform Modules** | `tf-module-*` | Reusable Azure resource modules |
-| **Orchestration** | `core-infrastructure/` | Terragrunt config for all environments |
+| **Orchestration** | `infrastructure-config/` | Terragrunt config for all environments |
 | **Pipelines** | `iac-pipeline-templates/` | Azure DevOps pipeline templates |
 
 ## Module Source Convention

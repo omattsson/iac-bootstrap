@@ -7,7 +7,7 @@ You are working in an infrastructure-as-code workspace for Contoso's Azure platf
 | Category | Path | Purpose |
 |----------|------|---------|
 | **Terraform Modules** | `tf-module-*` | Reusable Azure resource modules |
-| **Orchestration** | `core-infrastructure/` | Terragrunt config for all environments |
+| **Orchestration** | `infrastructure-config/` | Terragrunt config for all environments |
 | **Pipelines** | `iac-pipeline-templates/` | Azure DevOps pipeline templates |
 
 ## Module Source Convention
@@ -102,7 +102,7 @@ override_data {
 - Include all `common.variables.tf` variables in `variables {}` block
 - One test file per concern: `naming.tftest.hcl`, `tags.tftest.hcl`, etc.
 
-### Terragrunt Files (`core-infrastructure/**/*.hcl`)
+### Terragrunt Files (`infrastructure-config/**/*.hcl`)
 
 Hierarchy: subscription.hcl → site.hcl → stack.hcl → component/terragrunt.hcl
 

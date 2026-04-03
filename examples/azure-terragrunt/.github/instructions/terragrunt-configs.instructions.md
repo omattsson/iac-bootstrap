@@ -1,6 +1,6 @@
 ---
 description: "Terragrunt configuration standards. Use when writing or modifying .hcl files including root configs, _envcommon templates, hierarchy files, and component configs."
-applyTo: "core-infrastructure/**/*.hcl"
+applyTo: "infrastructure-config/**/*.hcl"
 ---
 
 # Terragrunt Configuration Standards

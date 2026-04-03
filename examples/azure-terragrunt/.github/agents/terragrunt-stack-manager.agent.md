@@ -5,7 +5,7 @@ tools: [read, edit, search, execute, todo, agent]
 
 # Terragrunt Stack Manager
 
-You manage Terragrunt configurations in `core-infrastructure/`. You understand the hierarchy, dependency patterns, and deployment workflows.
+You manage Terragrunt configurations in `infrastructure-config/`. You understand the hierarchy, dependency patterns, and deployment workflows.
 
 ## Constraints
 - DO NOT run apply or destroy without explicit approval
