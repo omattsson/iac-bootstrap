@@ -263,7 +263,7 @@ def generate_files(
 
         tmpl_path = tdir / spec.template_rel
         if not tmpl_path.exists():
-            continue
+            raise FileNotFoundError(f"Expected template file is missing: {tmpl_path}")
 
         raw = tmpl_path.read_text(encoding="utf-8")
         filled = resolve_placeholders(raw, context)

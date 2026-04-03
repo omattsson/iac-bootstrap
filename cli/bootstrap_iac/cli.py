@@ -172,8 +172,8 @@ _CICD_CHOICES = click.Choice(
 @click.option(
     "--validate",
     "validate_path",
-    metavar="PATH",
-    is_eager=True,
+    is_flag=False,
+    flag_value="__workspace__",
     default=None,
     help=(
         "Check files in PATH (or --workspace if omitted) for unreplaced "
