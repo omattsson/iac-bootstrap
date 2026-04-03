@@ -32,7 +32,7 @@ These variables appear across all modules:
 `{prefix}-{resource_abbreviation}-{suffix}`
 - S3: `{prefix}-s3-{suffix}` (lowercase, max 63 chars)
 - IAM roles: `{prefix}-role-{suffix}` (max 64 chars)
-- All names sanitized: `replace(var.suffix, "/[^0-9A-Za-z]+/", "-")`
+- All names sanitized: `regexreplace(var.suffix, "[^0-9A-Za-z]+", "-")`
 - Optional `full_name` override on most modules
 
 ## Tagging Standard

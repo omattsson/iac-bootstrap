@@ -49,7 +49,7 @@ terraform {
 #### locals.tf
 ```hcl
 locals {
-  name_suffix = replace(var.suffix, "/[^0-9A-Za-z]+/", "-")
+  name_suffix = regexreplace(var.suffix, "[^0-9A-Za-z]+", "-")
   name        = substr(var.full_name != null ? var.full_name : "${var.prefix}-{abbr}-${local.name_suffix}", 0, 63)
   tags        = merge(var.env_default_tags, var.tags)
 }

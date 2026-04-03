@@ -33,7 +33,7 @@ These variables appear across all modules:
 `{prefix}-{resource_abbreviation}-{suffix}`
 - Key Vault: `{prefix}-kv-{suffix}` (max 24 chars, truncated with `substr`)
 - Private Endpoints: `{prefix}-pe-{suffix}`
-- All names sanitized with `replace(var.suffix, "/[^0-9A-Za-z]+/", "-")`
+- All names sanitized with `regexreplace(var.suffix, "[^0-9A-Za-z]+", "-")`
 - Optional `full_name` override on most modules
 
 ## Tagging Standard

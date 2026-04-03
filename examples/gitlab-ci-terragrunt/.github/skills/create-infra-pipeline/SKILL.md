@@ -62,8 +62,7 @@ apply:{component}:
     AZURE_TOKEN:
       aud: api://AzureADTokenExchange
   before_script:
-    - az login --federated-token "$AZURE_TOKEN" --service-principal
-        -u "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID"
+    - az login --federated-token "$AZURE_TOKEN" --service-principal -u "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID"
   script:
     - cd "$TF_ROOT"
     - terragrunt init -lock-timeout=20m
@@ -78,8 +77,7 @@ apply:{component}:
     AZURE_TOKEN:
       aud: api://AzureADTokenExchange
   before_script:
-    - az login --federated-token "$AZURE_TOKEN" --service-principal
-        -u "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID"
+    - az login --federated-token "$AZURE_TOKEN" --service-principal -u "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID"
   script:
     - cd "$TF_ROOT"
     - terragrunt apply -lock-timeout=20m tfplan
@@ -99,8 +97,7 @@ drift:{environment}:
     AZURE_TOKEN:
       aud: api://AzureADTokenExchange
   before_script:
-    - az login --federated-token "$AZURE_TOKEN" --service-principal
-        -u "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID"
+    - az login --federated-token "$AZURE_TOKEN" --service-principal -u "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID"
   script:
     - cd config/{environment}
     - terragrunt run-all plan -detailed-exitcode -lock-timeout=20m
