@@ -1,0 +1,74 @@
+---
+name: create-orchestration-stack
+description: "Create or extend {{ORCHESTRATION_TOOL}} stacks, components, and environments. Use when: adding a new component to a stack, onboarding a new environment/region/stack, creating shared configs, wiring dependencies."
+---
+
+# Create {{ORCHESTRATION_TOOL}} Stack/Component
+
+Creates or extends {{ORCHESTRATION_TOOL}} configurations following the workspace hierarchy pattern.
+
+## When to Use
+- Adding a new component to an existing stack
+- Onboarding a new stack in an existing environment
+- Adding a new region/site to an environment
+- Creating shared configs for new modules
+- Wiring cross-component dependencies
+
+## Hierarchy
+
+```
+{{HIERARCHY_DIAGRAM}}
+```
+
+## Procedure
+
+### Task A: Add a New Component
+
+#### 1. Create shared config
+```hcl
+{{ENVCOMMON_TEMPLATE}}
+```
+<!-- Populate with the workspace's actual shared config pattern -->
+
+#### 2. Add module version
+In {{VERSION_TAG_LOCATION}}:
+```hcl
+{{VERSION_TAG_EXAMPLE}}
+```
+
+#### 3. Create component config
+```hcl
+{{COMPONENT_CONFIG_TEMPLATE}}
+```
+
+### Task B: Add a New Stack
+
+#### 1. Create stack-level config
+```hcl
+{{STACK_CONFIG_TEMPLATE}}
+```
+
+#### 2. Copy component dirs from a sibling stack
+
+### Task C: Add a New Region/Site
+
+#### 1. Create site-level config
+```hcl
+{{SITE_CONFIG_TEMPLATE}}
+```
+
+## Dependency Patterns
+
+### Mock outputs best practice
+Always provide realistic mock outputs matching the dependency's actual output structure:
+```hcl
+{{MOCK_OUTPUTS_EXAMPLE}}
+```
+
+## Validation Checklist
+1. `{{VALIDATE_COMMAND}}` passes
+2. `{{PLAN_COMMAND}}` shows expected resources
+3. Module version tag exists in version file
+4. Dependencies have correct mock outputs
+5. Shared config covers all required module variables
+6. Stack-specific overrides are minimal (DRY)

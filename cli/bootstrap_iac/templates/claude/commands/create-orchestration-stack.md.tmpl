@@ -1,0 +1,68 @@
+# Create {{ORCHESTRATION_TOOL}} Stack/Component
+
+Create or extend {{ORCHESTRATION_TOOL}} configurations following the workspace hierarchy.
+
+## Usage
+Describe what to add as the argument: `$ARGUMENTS`
+
+If unclear, ask:
+- Adding a component, a stack, or a new region/site?
+- Which module does it use?
+- What are its dependencies?
+
+## Hierarchy
+
+```
+{{HIERARCHY_DIAGRAM}}
+```
+
+## Task A: Add a New Component
+
+### 1. Create shared config
+```hcl
+{{ENVCOMMON_TEMPLATE}}
+```
+
+### 2. Add module version
+In {{VERSION_TAG_LOCATION}}:
+```hcl
+{{VERSION_TAG_EXAMPLE}}
+```
+
+### 3. Create component config
+```hcl
+{{COMPONENT_CONFIG_TEMPLATE}}
+```
+
+## Task B: Add a New Stack
+
+### 1. Create stack-level config
+```hcl
+{{STACK_CONFIG_TEMPLATE}}
+```
+
+### 2. Copy component dirs from a sibling stack
+
+## Task C: Add a New Region/Site
+
+### 1. Create site-level config
+```hcl
+{{SITE_CONFIG_TEMPLATE}}
+```
+
+## Dependency Pattern
+
+Always provide realistic mock outputs:
+```hcl
+{{MOCK_OUTPUTS_EXAMPLE}}
+```
+
+## Validation
+
+After creating:
+```bash
+{{VALIDATE_COMMAND}}
+{{PLAN_COMMAND}}
+```
+
+Check: module version exists, dependencies have mock outputs, shared config covers all variables, overrides are minimal (DRY).

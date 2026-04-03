@@ -1,0 +1,118 @@
+---
+name: create-infra-pipeline
+description: "Generate {{CI_CD_PLATFORM}} pipeline config for Terraform/{{ORCHESTRATION_TOOL}} deployments. Use when: creating CI/CD pipelines for infrastructure, adding plan/apply stages, configuring drift detection."
+---
+
+# Create Infrastructure Pipeline
+
+Generates {{CI_CD_PLATFORM}} pipeline configuration for infrastructure deployments.
+
+## When to Use
+- Creating a new deployment pipeline for a component or stack
+- Setting up drift detection with notifications
+- Configuring plan→apply flow with approval gates
+
+## Pipeline Architecture
+
+All pipelines follow a two-stage flow:
+1. **Plan stage** — runs always, publishes plan artifact
+2. **Apply stage** — runs on protected branches only, requires approval
+
+## Templates
+
+### Single Component Pipeline
+
+{{SINGLE_COMPONENT_PIPELINE}}
+<!-- Azure DevOps example:
+```yaml
+trigger:
+  branches:
+    include: [development, main]
+  paths:
+    include: [{environment}/{component}]
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: {{ORG}}/{{PIPELINE_TEMPLATES_REPO}}
+      ref: refs/heads/main
+
+extends:
+  template: terraform_apply_template.yml@templates
+  parameters:
+    deployment_environment: '{environment}'
+    project: '{component}'
+    pool_name: '{pool_name}'
+    approval_environment: '{approval_environment}'
+```
+-->
+<!-- GitHub Actions example:
+```yaml
+name: 'Terraform {component}'
+on:
+  push:
+    branches: [main]
+    paths: ['{environment}/{component}/**']
+  pull_request:
+    paths: ['{environment}/{component}/**']
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init
+      - run: terraform plan -out=tfplan
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: tfplan
+
+  apply:
+    needs: plan
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: {approval_environment}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/download-artifact@v4
+      - run: terraform apply tfplan
+```
+-->
+
+### Stack Pipeline (all components)
+
+{{STACK_PIPELINE}}
+
+### Drift Detection Pipeline
+
+{{DRIFT_PIPELINE}}
+
+## Authentication
+
+{{AUTH_PATTERN}}
+<!-- Example Azure MSI:
+- ARM.USE.MSI = true
+- ARM.USE.AZUREAD = true
+- az login --identity
+-->
+<!-- Example AWS OIDC:
+- uses: aws-actions/configure-aws-credentials@v4
+  with:
+    role-to-assume: arn:aws:iam::ACCOUNT:role/terraform
+-->
+<!-- Example GCP Workload Identity:
+- uses: google-github-actions/auth@v2
+  with:
+    workload_identity_provider: projects/PROJECT/locations/global/...
+-->
+
+## Standard Parameters
+
+{{STANDARD_PARAMETERS}}
+
+## Conventions
+{{PIPELINE_CONVENTIONS}}

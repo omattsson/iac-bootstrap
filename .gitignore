@@ -4,3 +4,18 @@
 *~
 .terraform/
 .terraform.lock.hcl
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# Pytest
+.pytest_cache/
