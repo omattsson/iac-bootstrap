@@ -1,6 +1,6 @@
 ---
 description: "OPA/Rego policy-as-code conventions for {{CLOUD_PROVIDER}} infrastructure. Use when writing, modifying, or reviewing Rego policies that evaluate Terraform plan JSON for compliance and governance."
-applyTo: "policies/**/*.rego,policies/**/*_test.rego"
+applyTo: "policies/**/*.rego"
 ---
 
 # OPA/Rego Policy Standards
@@ -80,7 +80,7 @@ import rego.v1
 
 # --- passing case ---
 test_no_violation_when_compliant if {
-    count(violations) == 0 with input as {
+    count(data.{{COMPANY_SLUG}}.{{POLICY_AREA}}.violations) == 0 with input as {
         "resource_changes": [{
             "address": "{{TERRAFORM_RESOURCE_TYPE}}.default",
             "type": "{{TERRAFORM_RESOURCE_TYPE}}",
@@ -96,7 +96,7 @@ test_no_violation_when_compliant if {
 
 # --- failing case ---
 test_violation_when_non_compliant if {
-    count(violations) > 0 with input as {
+    count(data.{{COMPANY_SLUG}}.{{POLICY_AREA}}.violations) > 0 with input as {
         "resource_changes": [{
             "address": "{{TERRAFORM_RESOURCE_TYPE}}.default",
             "type": "{{TERRAFORM_RESOURCE_TYPE}}",
