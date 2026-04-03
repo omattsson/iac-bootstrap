@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bootstrap-iac"
+version = "0.1.0"
+description = "Interactive CLI to bootstrap AI agent customizations for Terraform IaC workspaces"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.0",
+]
+
+[project.scripts]
+bootstrap-iac = "bootstrap_iac.main:cli"
+
+[tool.setuptools.packages.find]
+include = ["bootstrap_iac*"]
+
+[tool.setuptools.package-data]
+bootstrap_iac = ["templates/**/*.tmpl"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -4,6 +4,55 @@ Generate AI agent customizations (workspace instructions, agents, skills, file-s
 
 The bootstrap process scans your IaC workspace, interviews you about conventions, compares against [battle-tested best practices](references/iac-best-practices.md), and generates tool-specific configuration files.
 
+## CLI Quick Start
+
+The fastest way to bootstrap any IaC workspace is with the `bootstrap-iac` command:
+
+```bash
+# Clone the repo
+git clone https://github.com/omattsson/iac-bootstrap.git
+cd iac-bootstrap
+
+# Install the CLI
+pip install -e .
+
+# Run in your IaC workspace
+bootstrap-iac --cloud azure --output-dir ~/my-iac-workspace
+```
+
+### CLI Options
+
+```
+Usage: bootstrap-iac [OPTIONS]
+
+  Bootstrap AI agent customizations for a Terraform IaC workspace.
+
+Options:
+  --cloud [aws|azure|gcp]         Cloud provider (skips that interview question).
+  --output-dir PATH               Directory to write generated files into.  [default: .]
+  --tool [copilot|claude|both]    Target tool(s) to generate files for.
+  --workspace PATH                IaC workspace directory to scan for existing patterns.  [default: .]
+  --overwrite                     Overwrite existing output files (default: skip them).
+  --non-interactive               Use defaults for all questions (useful for CI/testing).
+  --version                       Show the version and exit.
+  --help                          Show this message and exit.
+```
+
+### Examples
+
+```bash
+# Azure workspace, generate for both Copilot and Claude (interactive)
+bootstrap-iac --cloud azure --output-dir ~/my-iac-workspace
+
+# AWS workspace, Copilot only, non-interactive
+bootstrap-iac --cloud aws --tool copilot --non-interactive --output-dir ~/my-iac-workspace
+
+# GCP workspace, Claude only, scan workspace for defaults
+bootstrap-iac --cloud gcp --tool claude --workspace ~/my-iac-workspace --output-dir ~/my-iac-workspace
+```
+
+The tool runs a short interview (13 questions with sensible defaults) and writes all output files immediately. Re-run with `--overwrite` to refresh existing files.
+
 ## What You Get
 
 | Area | VS Code Copilot | Claude Code |
