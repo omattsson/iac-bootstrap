@@ -1,6 +1,6 @@
 ---
 name: create-infra-pipeline
-description: "Generate Azure DevOps pipeline YAML for Terraform/Terragrunt deployments. Use when: creating CI/CD pipelines for infrastructure, adding plan/apply stages, configuring drift detection, adding approval gates, setting up a destroy pipeline."
+description: "Generate Azure DevOps pipeline YAML for Terraform/Terragrunt deployments. Use when: creating CI/CD pipelines for infrastructure, adding plan/apply stages, configuring drift detection, adding approval gates."
 ---
 
 # Create Infrastructure Pipeline

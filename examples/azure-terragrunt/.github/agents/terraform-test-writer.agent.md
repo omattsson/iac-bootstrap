@@ -1,5 +1,5 @@
 ---
-description: "Write and improve Terraform native tests (.tftest.hcl) for Azure modules. Use when: generating test suites, improving test coverage, testing naming patterns, conditional resources, tag merging, mock providers, or adding plan assertions."
+description: "Write and improve Terraform native tests (.tftest.hcl) for Azure modules. Use when: generating test suites, improving test coverage, testing naming patterns, conditional resources, tag merging, mock providers."
 tools: [read, edit, search, execute, todo]
 ---
 
