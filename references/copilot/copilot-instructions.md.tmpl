@@ -107,8 +107,8 @@ Add a `moved` block in the same commit as any resource or `for_each` key rename 
 
 ```hcl
 moved {
-  from = <resource_type>.old_name
-  to   = <resource_type>.default
+  from = azurerm_resource_group.old_name
+  to   = azurerm_resource_group.default
 }
 ```
 
@@ -121,7 +121,7 @@ moved {
 | Removed/renamed variable, changed output type | Major (`X.0.0`) |
 
 ### Major version migration guides
-Publish a `MIGRATION.md` at the repo root for every major version bump. Document: what broke, old vs new usage, and step-by-step upgrade instructions.
+Publish a `MIGRATION.md` at the module repository root for every major version bump, and include it with the corresponding major-version release/tag. Document: what broke, old vs new usage, and step-by-step upgrade instructions.
 
 ## Key Principles
 
