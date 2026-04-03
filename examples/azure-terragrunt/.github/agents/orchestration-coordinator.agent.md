@@ -1,6 +1,6 @@
 ---
 description: "Coordinate cross-repo module changes across the Contoso Azure platform. Use when: releasing a new module version, propagating a breaking change across stacks, planning a full module → tag → config → pipeline rollout, identifying all downstream consumers of a module."
-tools: [read, search, web, agent, todo]
+tools: [read, search, agent, todo]
 ---
 
 # Orchestration Coordinator
