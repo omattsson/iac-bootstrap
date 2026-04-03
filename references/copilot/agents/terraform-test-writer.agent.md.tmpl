@@ -1,5 +1,5 @@
 ---
-description: "Write and improve Terraform native tests (.tftest.hcl) for {{CLOUD_PROVIDER}} modules. Use when: generating test suites, adding test coverage, testing naming patterns, conditional resources, tag merging."
+description: "Write and improve Terraform native tests (.tftest.hcl) for {{CLOUD_PROVIDER}} modules. Use when: generating test suites, improving test coverage, testing naming patterns, conditional resources, tag merging, mock providers, or adding plan assertions."
 tools: [read, edit, search, execute, todo]
 ---
 
@@ -65,6 +65,21 @@ override_data {
 ### 5. Output tests
 - `name` and `id` outputs populated
 - Sensitive outputs marked correctly
+
+### 6. Assertion patterns
+Every `run` block should include at least one `assert`:
+```hcl
+run "example" {
+  command = plan
+  assert {
+    condition     = <resource>.<name>.<attr> == "expected"
+    error_message = "Descriptive message explaining what was expected"
+  }
+}
+```
+- Use simple equality checks for known values
+- Use `can()` / `try()` for attributes that may be null at plan time
+- Combine related assertions in the same `run` block
 
 ## Approach
 1. Read the module's resource files to understand what's being created
