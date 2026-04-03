@@ -66,6 +66,21 @@ override_data {
 - `name` and `id` outputs populated
 - Sensitive outputs marked correctly
 
+### 6. Assertion patterns
+Every `run` block should include at least one `assert`:
+```hcl
+run "example" {
+  command = plan
+  assert {
+    condition     = <resource>.<name>.<attr> == "expected"
+    error_message = "Descriptive message explaining what was expected"
+  }
+}
+```
+- Use simple equality checks for known values
+- Use `can()` / `try()` for attributes that may be null at plan time
+- Combine related assertions in the same `run` block
+
 ## Approach
 1. Read the module's resource files to understand what's being created
 2. Read `locals.tf` to understand naming and computed values
