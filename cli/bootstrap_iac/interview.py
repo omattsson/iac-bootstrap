@@ -218,12 +218,12 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
             "└── {environment}/\n"
             "    ├── globals.tm.hcl          # env-level values\n"
             "    └── {stack}/\n"
-            "        ├── terramate.tm.hcl    # stack definition\n"
+            "        ├── stack.tm.hcl        # stack definition\n"
             "        └── main.tf             # Terraform config"
         ),
         "hierarchy_files_description": (
             "- `globals.tm.hcl` — global or environment-level values\n"
-            "- `terramate.tm.hcl` — stack definition (tags, description)\n"
+            "- `stack.tm.hcl` — stack definition (tags, description)\n"
             "- `generate_hcl` blocks — dynamically generate Terraform files"
         ),
         "component_config_pattern": (
@@ -233,7 +233,7 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "mock_outputs_example": "# Terramate uses data sources for cross-stack references",
         "site_config_template": 'globals {\n  location = "westeurope"\n}',
         "stack_config_template": 'globals {\n  stack_name = "platform"\n}',
-        "input_flow_diagram": "globals.tm.hcl → env/globals.tm.hcl → stack/terramate.tm.hcl → generate_hcl",
+        "input_flow_diagram": "globals.tm.hcl → env/globals.tm.hcl → stack/stack.tm.hcl → generate_hcl",
         "dependency_conventions": (
             "- Use `terramate.required_by` for explicit ordering\n"
             "- Reference outputs via `data` blocks or remote state"
@@ -715,7 +715,7 @@ def _environment_hierarchy(orch: str) -> str:
         )
     if orch == "Terramate":
         return (
-            "stacks/{environment}/{stack}/terramate.tm.hcl\n\n"
+            "stacks/{environment}/{stack}/stack.tm.hcl\n\n"
             "Global values flow through globals.tm.hcl at each directory level."
         )
     return (
