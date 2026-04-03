@@ -1,0 +1,63 @@
+---
+description: "Terraform coding standards for {{COMPANY_NAME}} GCP modules. Use when writing or modifying .tf files including resources, variables, outputs, locals, and provider configurations."
+applyTo: "{{MODULE_PREFIX}}-*/**/*.tf"
+---
+
+# Terraform Module Standards (GCP)
+
+## File Organization
+- `main.tf` — provider requirements + data sources
+- `{resource}.tf` — core resources, named by GCP resource type (e.g., `storage_bucket.tf`, `cloud_run_service.tf`)
+- `locals.tf` — label construction, label merging, computed values
+- `variables.tf` — module-specific variables
+- `{{COMMON_VARS_FILE}}` — standard cross-module variables
+- `outputs.tf` — module outputs
+- `versions.tf` — terraform and provider version constraints
+
+## Resource Conventions
+- All single resources use identifier `"{{RESOURCE_IDENTIFIER}}"` (e.g., `google_storage_bucket.default`)
+- Map-driven resources use `for_each` with descriptive keys
+- Use `count` for boolean on/off features
+- Labels: `{{TAG_MERGE_PATTERN}}` — always (GCP uses `labels`, not `tags`)
+
+## Standard Variables (GCP)
+- `prefix` — resource name prefix
+- `project` — GCP project ID
+- `region` — GCP region (e.g., `us-central1`)
+- `labels` — additional labels (`map(string)`)
+- `env_default_labels` — default labels from orchestration layer
+- `network` — VPC network name (where applicable)
+- `subnetwork` — subnetwork name (where applicable)
+
+## Naming Pattern
+```hcl
+{{NAMING_PATTERN_HCL}}
+```
+
+## Variable Conventions
+- Use `optional(type, default)` syntax (Terraform 1.3+) for object attributes
+- Complex descriptions use `<<-EOT` heredoc format
+- All variables need `type`, `description`, and sensible `default` where possible
+
+## Provider Versions
+```hcl
+{{PROVIDER_VERSION_CONSTRAINTS}}
+```
+<!-- Recommended: google = { source = "hashicorp/google", version = ">=5.0,<6.0" } -->
+
+## IAM & Security
+- Use service accounts for identity-based access — never service account key files
+- Prefer Workload Identity Federation for CI/CD pipelines
+- `{{PRIVATE_ENDPOINT_PATTERN}}` — use Private Service Connect for private connectivity
+- Enable CMEK (`kms_key_name`) by default where supported
+- Use `prevent_destroy = true` lifecycle on stateful resources (GCS buckets, Cloud SQL instances)
+
+## Labels vs Tags
+GCP uses `labels` (not `tags`). Merge pattern:
+```hcl
+locals {
+  labels = merge(var.env_default_labels, var.labels)
+}
+```
+
+## No hardcoded secrets, project IDs, or credentials in module code. Use Workload Identity and Secret Manager.

@@ -110,13 +110,27 @@ Based on discovery + interview answers, generate customization files using templ
 | `.claude/commands/create-infra-pipeline.md` | `claude/commands/create-infra-pipeline.md.tmpl` |
 
 #### Generation rules:
-1. Only generate orchestration files if the workspace uses Terragrunt/Terramate/etc.
-2. Adapt CI/CD templates to the actual platform (GitHub Actions/ADO/GitLab)
-3. Adapt provider references to the actual cloud (azurerm/aws/google)
-4. Use actual module source URLs, not placeholders
-5. Include real naming patterns discovered from the workspace
-6. Skip files that already exist (warn and offer to merge)
-7. If generating for both tools, ensure consistency between Copilot and Claude outputs
+1. **Select the cloud variant** — use the AWS or GCP template variants when the workspace targets AWS or GCP (see table below). Fall back to the generic/Azure template only for Azure workspaces.
+2. Only generate orchestration files if the workspace uses Terragrunt/Terramate/etc.
+3. Adapt CI/CD templates to the actual platform (GitHub Actions/ADO/GitLab)
+4. Adapt provider references to the actual cloud (azurerm/aws/google)
+5. Use actual module source URLs, not placeholders
+6. Include real naming patterns discovered from the workspace
+7. Skip files that already exist (warn and offer to merge)
+8. If generating for both tools, ensure consistency between Copilot and Claude outputs
+
+#### Cloud variant selection:
+
+| Cloud | Copilot instruction template | Claude template |
+|-------|-----------------------------|--------------------|
+| **Azure** | `copilot/instructions/terraform-modules.instructions.md.tmpl` | `claude/CLAUDE.md.tmpl` |
+| **AWS** | `copilot/instructions/terraform-modules.instructions.aws.md.tmpl` | `claude/CLAUDE.aws.md.tmpl` |
+| **GCP** | `copilot/instructions/terraform-modules.instructions.gcp.md.tmpl` | `claude/CLAUDE.gcp.md.tmpl` |
+
+For the `create-terraform-module` Claude command, use the matching cloud variant:
+- AWS: `claude/commands/create-terraform-module.aws.md.tmpl`
+- GCP: `claude/commands/create-terraform-module.gcp.md.tmpl`
+- Azure: `claude/commands/create-terraform-module.md.tmpl`
 
 ### Phase 5: Validate
 

@@ -1,0 +1,53 @@
+---
+description: "Terraform coding standards for {{COMPANY_NAME}} AWS modules. Use when writing or modifying .tf files including resources, variables, outputs, locals, and provider configurations."
+applyTo: "{{MODULE_PREFIX}}-*/**/*.tf"
+---
+
+# Terraform Module Standards (AWS)
+
+## File Organization
+- `main.tf` — provider requirements + data sources
+- `{resource}.tf` — core resources, named by AWS resource type (e.g., `s3_bucket.tf`, `lambda_function.tf`)
+- `locals.tf` — name construction, tag merging, computed values
+- `variables.tf` — module-specific variables
+- `{{COMMON_VARS_FILE}}` — standard cross-module variables
+- `outputs.tf` — module outputs
+- `versions.tf` — terraform and provider version constraints
+
+## Resource Conventions
+- All single resources use identifier `"{{RESOURCE_IDENTIFIER}}"` (e.g., `aws_s3_bucket.default`)
+- Map-driven resources use `for_each` with descriptive keys
+- Use `count` for boolean on/off features
+- Tags: `{{TAG_MERGE_PATTERN}}` — always
+
+## Standard Variables (AWS)
+- `prefix` — resource name prefix
+- `region` — AWS region (e.g., `us-east-1`)
+- `tags` — additional tags (`map(string)`)
+- `env_default_tags` — default tags from orchestration layer
+- `vpc_id` — VPC to deploy resources into (where applicable)
+- `subnet_ids` — subnet IDs for resource placement (where applicable)
+
+## Naming Pattern
+```hcl
+{{NAMING_PATTERN_HCL}}
+```
+
+## Variable Conventions
+- Use `optional(type, default)` syntax (Terraform 1.3+) for object attributes
+- Complex descriptions use `<<-EOT` heredoc format
+- All variables need `type`, `description`, and sensible `default` where possible
+
+## Provider Versions
+```hcl
+{{PROVIDER_VERSION_CONSTRAINTS}}
+```
+<!-- Recommended: aws = { source = "hashicorp/aws", version = ">=5.0,<6.0" } -->
+
+## IAM & Security
+- Use IAM roles for identity-based access — never access keys or hardcoded credentials
+- `{{PRIVATE_ENDPOINT_PATTERN}}` — use VPC endpoints for private connectivity
+- Enable encryption at rest (`kms_key_id` or `server_side_encryption_configuration`) by default
+- `block_public_access` enabled on S3 buckets by default
+
+## No hardcoded secrets, account IDs, or credentials in module code. Use IAM roles and AWS Secrets Manager.

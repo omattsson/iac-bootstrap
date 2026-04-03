@@ -18,6 +18,30 @@ The bootstrap process scans your IaC workspace, interviews you about conventions
 | **Stack management** | `.github/skills/create-*-stack/SKILL.md` | `.claude/commands/create-orchestration-stack.md` |
 | **Pipeline generation** | `.github/skills/create-infra-pipeline/SKILL.md` | `.claude/commands/create-infra-pipeline.md` |
 
+## Choosing a Cloud Variant
+
+Templates come in cloud-specific variants. Choose the one that matches your provider:
+
+| Cloud | Copilot instruction template | Claude template | Example |
+|-------|-----------------------------|-----------------|----|
+| **Azure** | `terraform-modules.instructions.md.tmpl` | `CLAUDE.md.tmpl` | `examples/azure-terragrunt/` |
+| **AWS** | `terraform-modules.instructions.aws.md.tmpl` | `CLAUDE.aws.md.tmpl` | `examples/aws-github-actions/` |
+| **GCP** | `terraform-modules.instructions.gcp.md.tmpl` | `CLAUDE.gcp.md.tmpl` | `examples/gcp-github-actions/` |
+
+The key differences per cloud:
+
+| Concept | Azure | AWS | GCP |
+|---------|-------|-----|-----|
+| Provider | `azurerm` | `aws` | `google` |
+| Location variable | `location` | `region` | `region` |
+| Scoping construct | `resource_group_name` | `vpc_id` / `account_id` | `project` |
+| Identity/tags | `tags` | `tags` | `labels` |
+| Identity auth | Managed Identity | IAM roles + OIDC | Workload Identity Federation |
+| State backend | Azure Blob Storage | S3 + DynamoDB | GCS |
+| Provider version | `hashicorp/azurerm >=4.0` | `hashicorp/aws >=5.0` | `hashicorp/google >=5.0` |
+
+> **Multi-cloud workspaces:** Run the bootstrap once per cloud. Each cloud gets its own instruction files. The `iac-best-practices.instructions.md` is cloud-agnostic and shared across all variants.
+
 ## Quick Start
 
 ### VS Code Copilot
@@ -82,42 +106,46 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 │   │   │   ├── create-orchestration-stack.skill.md.tmpl
 │   │   │   └── create-infra-pipeline.skill.md.tmpl
 │   │   └── instructions/
-│   │       ├── iac-best-practices.instructions.md.tmpl
-│   │       ├── terraform-modules.instructions.md.tmpl
+│   │       ├── iac-best-practices.instructions.md.tmpl   # cloud-agnostic
+│   │       ├── terraform-modules.instructions.md.tmpl    # Azure variant
+│   │       ├── terraform-modules.instructions.aws.md.tmpl  # AWS variant
+│   │       ├── terraform-modules.instructions.gcp.md.tmpl  # GCP variant
 │   │       ├── terraform-tests.instructions.md.tmpl
 │   │       ├── orchestration-configs.instructions.md.tmpl
 │   │       └── pipeline-templates.instructions.md.tmpl
 │   │
 │   └── claude/                           # Claude Code output templates
-│       ├── CLAUDE.md.tmpl                # Combined instructions + rules
+│       ├── CLAUDE.md.tmpl                # Azure variant
+│       ├── CLAUDE.aws.md.tmpl            # AWS variant
+│       ├── CLAUDE.gcp.md.tmpl            # GCP variant
 │       └── commands/
 │           ├── create-terraform-module.md.tmpl
+│           ├── create-terraform-module.aws.md.tmpl
+│           ├── create-terraform-module.gcp.md.tmpl
 │           ├── create-orchestration-stack.md.tmpl
 │           └── create-infra-pipeline.md.tmpl
 │
 └── examples/
-    └── azure-terragrunt/                 # Complete example for Azure + Terragrunt
-        ├── .github/                      # Copilot output
+    ├── azure-terragrunt/                 # Azure + Terragrunt + Azure DevOps
+    │   ├── .github/                      # Copilot output
+    │   │   ├── copilot-instructions.md
+    │   │   ├── agents/
+    │   │   ├── skills/
+    │   │   └── instructions/
+    │   ├── CLAUDE.md                     # Claude Code output
+    │   └── .claude/commands/
+    ├── aws-github-actions/               # AWS + plain Terraform + GitHub Actions
+    │   ├── .github/
+    │   │   ├── copilot-instructions.md
+    │   │   └── instructions/
+    │   ├── CLAUDE.md
+    │   └── .claude/commands/
+    └── gcp-github-actions/               # GCP + plain Terraform + GitHub Actions
+        ├── .github/
         │   ├── copilot-instructions.md
-        │   ├── agents/
-        │   │   ├── infra-architect.agent.md
-        │   │   ├── terraform-module-builder.agent.md
-        │   │   ├── terraform-test-writer.agent.md
-        │   │   └── terragrunt-stack-manager.agent.md
-        │   ├── skills/
-        │   │   ├── create-terraform-module/SKILL.md
-        │   │   ├── create-terragrunt-stack/SKILL.md
-        │   │   └── create-infra-pipeline/SKILL.md
         │   └── instructions/
-        │       ├── terraform-modules.instructions.md
-        │       ├── terraform-tests.instructions.md
-        │       ├── terragrunt-configs.instructions.md
-        │       └── pipeline-templates.instructions.md
-        ├── CLAUDE.md                     # Claude Code output
+        ├── CLAUDE.md
         └── .claude/commands/
-            ├── create-terraform-module.md
-            ├── create-terragrunt-stack.md
-            └── create-infra-pipeline.md
 ```
 
 ## Best Practices Reference
@@ -212,6 +240,32 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{DRIFT_PIPELINE}}` | (YAML block) | Drift detection pipeline template |
 | `{{STANDARD_PARAMETERS}}` | (multi-line) | Pipeline parameter definitions |
 | `{{PIPELINE_CONVENTIONS}}` | (multi-line) | Pipeline naming/structure conventions |
+
+### Cloud-specific placeholders
+
+#### AWS
+
+| Placeholder | Example | Description |
+|-------------|---------|-------------|
+| `{{AWS_REGION}}` | `us-east-1` | Default AWS region |
+| `{{AWS_ACCOUNT_ID}}` | `123456789012` | AWS account ID (use a placeholder, never hardcode) |
+| `{{IAM_ROLE_ARN}}` | `arn:aws:iam::123456789012:role/github-actions-dev` | IAM role ARN for CI/CD |
+| `{{VPC_ID_ATTRIBUTE}}` | `vpc_id = var.vpc_id` | VPC reference attribute in resource blocks |
+| `{{SUBNET_IDS_ATTRIBUTE}}` | `subnet_ids = var.subnet_ids` | Subnet IDs attribute in resource blocks |
+| `{{S3_BACKEND_CONFIG}}` | (HCL backend block) | S3 + DynamoDB remote state configuration |
+| `{{OIDC_PROVIDER_ARN}}` | `arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com` | GitHub OIDC provider ARN |
+
+#### GCP
+
+| Placeholder | Example | Description |
+|-------------|---------|-------------|
+| `{{GCP_PROJECT}}` | `acme-dev-123456` | GCP project ID |
+| `{{GCP_REGION}}` | `us-central1` | Default GCP region |
+| `{{GCP_PROJECT_ATTRIBUTE}}` | `project = var.project` | Project attribute in resource blocks |
+| `{{GCP_LABELS_ATTRIBUTE}}` | `labels = local.labels` | Labels attribute (GCP uses `labels`, not `tags`) |
+| `{{GCP_SERVICE_ACCOUNT}}` | `github-actions-dev@acme-dev-123456.iam.gserviceaccount.com` | Service account email for CI/CD |
+| `{{GCS_BACKEND_CONFIG}}` | (HCL backend block) | GCS remote state configuration |
+| `{{WORKLOAD_IDENTITY_POOL}}` | `projects/123456/locations/global/workloadIdentityPools/github-pool` | Workload Identity Pool for GitHub Actions |
 
 ## Contributing
 
