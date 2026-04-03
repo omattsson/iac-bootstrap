@@ -1,0 +1,77 @@
+# Create Pulumi Stack/Component
+
+Create or extend Pulumi programs following the workspace project and stack hierarchy.
+
+## Usage
+Describe what to add as the argument: `$ARGUMENTS`
+
+If unclear, ask:
+- Adding a resource to an existing stack, or creating a new stack entirely?
+- Which cloud resource or shared ComponentResource does it involve?
+- Does it consume outputs from another stack?
+
+## Hierarchy
+
+```
+{{HIERARCHY_DIAGRAM}}
+```
+
+## Task A: Add a New Resource
+
+### 1. Check for a shared ComponentResource in `{{SHARED_COMPONENTS_DIR}}/`
+
+### 2. Add to the stack entry point
+```{{PULUMI_LANGUAGE_LOWER}}
+{{ENVCOMMON_TEMPLATE}}
+```
+
+### 3. Export outputs
+
+### 4. Preview
+```bash
+{{PLAN_COMMAND}}
+```
+
+## Task B: Create a New Stack
+
+### 1. `Pulumi.yaml`
+```yaml
+{{STACK_CONFIG_TEMPLATE}}
+```
+
+### 2. `Pulumi.{env}.yaml`
+```yaml
+{{SITE_CONFIG_TEMPLATE}}
+```
+
+### 3. Set secrets
+```bash
+pulumi config set --secret --stack {{ENVIRONMENT}} <key> <value>
+```
+
+### 4. Entry point (`{{ENTRY_POINT}}`)
+```{{PULUMI_LANGUAGE_LOWER}}
+{{COMPONENT_CONFIG_TEMPLATE}}
+```
+
+## Task C: Add a Shared ComponentResource
+
+```{{PULUMI_LANGUAGE_LOWER}}
+{{COMPONENT_CLASS_PATTERN}}
+```
+
+## Cross-Stack Reference Pattern
+
+```{{PULUMI_LANGUAGE_LOWER}}
+{{MOCK_OUTPUTS_EXAMPLE}}
+```
+
+## Validation
+
+After creating:
+```bash
+{{VALIDATE_COMMAND}}
+{{PLAN_COMMAND}}
+```
+
+Check: all config keys set, stack references safe for preview, no hardcoded secrets, new outputs exported.

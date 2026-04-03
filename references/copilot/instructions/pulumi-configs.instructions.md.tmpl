@@ -1,0 +1,66 @@
+---
+description: "Pulumi program and stack configuration standards. Use when writing or modifying Pulumi programs, Pulumi.yaml project files, stack config files, or ComponentResource classes."
+applyTo: "{{ORCHESTRATION_DIR}}/**"
+---
+
+# Pulumi Configuration Standards
+
+## Project Layout
+```
+{{ORCHESTRATION_DIR}}/{stack-name}/
+  Pulumi.yaml                  # Project metadata
+  Pulumi.{environment}.yaml    # Stack-specific config (committed, non-secret values)
+  {{ENTRY_POINT}}              # Main program entry point
+  {{SHARED_COMPONENTS_DIR}}/   # Shared ComponentResource classes
+  requirements.txt / package.json
+```
+
+## Stack Config Pattern (`Pulumi.{env}.yaml`)
+```yaml
+config:
+  {{PULUMI_NAMESPACE}}:environment: "{{ENVIRONMENT}}"
+  {{PULUMI_NAMESPACE}}:location: "{{LOCATION}}"
+  {{PULUMI_NAMESPACE}}:prefix: "{{PREFIX}}"
+  # Secrets are encrypted — set with: pulumi config set --secret key value
+  # They appear as: key: secure: <ciphertext>
+```
+
+## ComponentResource Pattern
+Every reusable resource group must be a ComponentResource:
+```{{PULUMI_LANGUAGE_LOWER}}
+{{COMPONENT_CLASS_PATTERN}}
+```
+
+## Naming Convention
+{{NAMING_PATTERN}}
+<!-- Example: f"{prefix}-{abbreviation}-{suffix}" with max-length enforcement -->
+
+## Tagging/Labeling Standard
+{{TAG_STRATEGY}}
+<!-- Example: merge default_tags (from config) with resource-specific tags.
+Resource-specific tags win on key conflicts. Always include: environment, managed_by, product. -->
+
+## Cross-Stack References
+Use `pulumi.StackReference` to read outputs from other stacks:
+```{{PULUMI_LANGUAGE_LOWER}}
+{{STACK_REFERENCE_PATTERN}}
+```
+Always handle `None`/`undefined` for plan-time safety.
+
+## Secret Management
+- Use `pulumi config set --secret` for sensitive values (keys, passwords, connection strings)
+- Read with `pulumi.Config().require_secret("key")` / `config.requireSecret("key")`
+- State backend secret provider: `{{SECRET_PROVIDER}}`
+- Never log or export secret values
+
+## State Backend
+{{STATE_BACKEND_PATTERN}}
+<!-- Example for Azure Blob:
+  backend: azblob://tfstate?storage_account=mystorageaccount
+-->
+
+## Deployment Commands
+- Preview: `pulumi preview --stack {{ENVIRONMENT}}`
+- Deploy: `pulumi up --stack {{ENVIRONMENT}} --yes` (always preview first)
+- Destroy: `pulumi destroy --stack {{ENVIRONMENT}}` (requires explicit approval)
+- Refresh: `pulumi refresh --stack {{ENVIRONMENT}}` (sync state with cloud)
