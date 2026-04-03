@@ -132,7 +132,7 @@ After collecting all gap analysis classifications, compute an overall maturity s
 
 **Gap severity:**
 - **Critical gap** — Any Missing category, or a Partial status in Security, Testing, CI/CD, or Module Design (weight ≥ 15%)
-- **Moderate gap** — Partial or Missing status in any other category (weight < 15%)
+- **Moderate gap** — Partial status in any other category (weight < 15%)
 
 #### Maturity Report Generation
 

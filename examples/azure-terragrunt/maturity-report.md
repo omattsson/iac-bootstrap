@@ -47,7 +47,7 @@
 ## Critical Gaps
 
 > Critical gaps carry significant risk or the highest remediation value. Address these first.
-> **Definition:** Any Missing category, or a Partial status in Security, Testing, or CI/CD (weight ≥ 15%).
+> **Definition:** Any Missing category, or a Partial status in Security, Testing, CI/CD, or Module Design (weight ≥ 15%).
 
 ### Security — Partial ⚠️
 
