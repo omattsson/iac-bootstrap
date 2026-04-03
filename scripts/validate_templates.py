@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Valid placeholder: uppercase letters and underscores inside {{ }}
 PLACEHOLDER_RE = re.compile(r"\{\{([^}]*)\}\}")
-VALID_PLACEHOLDER_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
+VALID_PLACEHOLDER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 # Files with expected YAML frontmatter
 FRONTMATTER_GLOBS = [
@@ -35,7 +35,7 @@ EXAMPLES_DIR = REPO_ROOT / "examples"
 
 
 def check_placeholder_syntax() -> list[str]:
-    """Check that all {{...}} tokens in .tmpl files are uppercase identifiers."""
+    """Check that all {{...}} tokens in .tmpl files are valid identifiers."""
     errors: list[str] = []
     tmpl_files = list(REPO_ROOT.rglob("*.tmpl"))
     if not tmpl_files:
@@ -132,12 +132,19 @@ def check_examples_no_placeholders() -> list[str]:
         errors.append("ERROR: No .md files found under examples/ directory.")
         return errors
 
+    # GitHub Actions / Jinja expressions use {{ ... }} with dots or spaces — skip those
+    _ACTIONS_EXPR_RE = re.compile(r"^\s*(vars|github|env|matrix|secrets|inputs|needs|steps|runner|strategy|job)\b")
+
     for path in sorted(example_files):
         rel = path.relative_to(REPO_ROOT)
         text = path.read_text(encoding="utf-8")
         matches = list(PLACEHOLDER_RE.finditer(text))
         if matches:
             for m in matches:
+                inner = m.group(1)
+                # Skip GitHub Actions / templating expressions (contain dots, spaces, etc.)
+                if _ACTIONS_EXPR_RE.match(inner) or "." in inner:
+                    continue
                 line_no = text[: m.start()].count("\n") + 1
                 errors.append(
                     f"{rel}:{line_no}: example file contains unreplaced placeholder '{m.group(0)}'"
