@@ -1,5 +1,5 @@
 ---
-description: "Terramate configuration standards. Use when writing or modifying Terramate config files including stack definitions, generate_hcl blocks, globals files, and hand-written .tf files inside stacks."
+description: "Terramate configuration standards. Use when writing or modifying Terramate config files including stack definitions, generate_hcl blocks, and globals files."
 applyTo: "infrastructure-config/**/*.tm.hcl"
 ---
 

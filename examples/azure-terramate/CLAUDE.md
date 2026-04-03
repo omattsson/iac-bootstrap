@@ -1,5 +1,8 @@
 # Contoso Infrastructure Automation — Terramate
 
+<!-- This is example generated output. The infrastructure-config/ directory would
+     exist in the target workspace, not in this bootstrap repo. -->
+
 You are working in an infrastructure-as-code workspace for Contoso's Azure platform, orchestrated with **Terramate**.
 
 ## Workspace Structure
@@ -33,7 +36,7 @@ These variables appear across all modules:
 `{prefix}-{resource_abbreviation}-{suffix}`
 - Key Vault: `{prefix}-kv-{suffix}` (max 24 chars, truncated with `substr`)
 - Private Endpoints: `{prefix}-pe-{suffix}`
-- Names sanitized: `replace(var.suffix, "/[^0-9A-Za-z]+/", "-")`
+- Names sanitized: `regexreplace(var.suffix, "[^0-9A-Za-z]+", "-")`
 - Optional `full_name` override on most modules
 
 ## Tagging Standard

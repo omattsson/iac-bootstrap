@@ -1,5 +1,8 @@
 # Contoso Infrastructure Automation — Pulumi
 
+<!-- This is example generated output. The infra/ directory would exist in the
+     target workspace, not in this bootstrap repo. -->
+
 You are working in an infrastructure-as-code workspace for Contoso's Azure platform, managed with **Pulumi (Python)**.
 
 ## Workspace Structure
@@ -114,7 +117,7 @@ vnet_id = networking.get_output("vnet_id")
 
 ### Secrets
 
-- Read with: `pulumi.Config().require_secret("clientSecret")`
+- Read with: `pulumi.Config("contoso").require_secret("clientSecret")`
 - Never log or `pulumi.export` secret values
 - Rotate via: `pulumi config set --secret --stack {env} contoso:clientSecret <new-value>`
 
@@ -138,6 +141,6 @@ Two-stage: Preview → Apply (on protected branches with approval). MSI/OIDC aut
 
 1. **Minimal intervention** — smallest change that fulfills the requirement
 2. **ComponentResources** — all reusable resource groups encapsulated as classes
-3. **No hardcoded secrets** — `pulumi.Config().require_secret()` or Key Vault references
+3. **No hardcoded secrets** — `pulumi.Config("contoso").require_secret()` or Key Vault references
 4. **Stack references** — cross-stack values via `pulumi.StackReference`, never hardcoded
 5. **Preview before up** — always preview, review diff, then apply

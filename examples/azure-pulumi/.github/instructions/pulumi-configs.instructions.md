@@ -11,7 +11,7 @@ infra/{stack-name}/
   Pulumi.yaml                   # Project metadata (name, runtime)
   Pulumi.{environment}.yaml     # Stack-specific config (committed, non-secret values)
   __main__.py                   # Entry point: instantiate components, export outputs
-  requirements.txt              # Pin all dependencies with exact versions
+  requirements.txt              # Pin dependencies with exact versions or compatible bounded ranges
 infra/components/               # Shared ComponentResource classes (imported by stacks)
   key_vault.py
   networking.py
@@ -84,7 +84,7 @@ subnet_id = networking.get_output("subnets").apply(
 
 ## Secret Management
 - Use `pulumi config set --secret contoso:<key> <value>` for sensitive values
-- Read with `pulumi.Config().require_secret("key")`
+- Read namespaced secrets with `pulumi.Config("contoso").require_secret("key")`
 - State backend secret provider: Azure KeyVault (`azurekeyvault://contoso-pulumi-kv`)
 - Never log or export secret values via `pulumi.export`
 

@@ -49,7 +49,7 @@ Always handle `None`/`undefined` for plan-time safety.
 
 ## Secret Management
 - Use `pulumi config set --secret` for sensitive values (keys, passwords, connection strings)
-- Read with `pulumi.Config().require_secret("key")` / `config.requireSecret("key")`
+- Read namespaced secrets with `pulumi.Config("{{PULUMI_NAMESPACE}}").require_secret("key")` / `new pulumi.Config("{{PULUMI_NAMESPACE}}").requireSecret("key")`
 - State backend secret provider: `{{SECRET_PROVIDER}}`
 - Never log or export secret values
 

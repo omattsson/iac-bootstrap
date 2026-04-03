@@ -38,10 +38,15 @@ infra/
 
 #### 2. Import and instantiate in `__main__.py`
 ```python
+import sys
+from pathlib import Path
+
 import pulumi
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 from components.key_vault import KeyVaultComponent
 
-cfg = pulumi.Config()
+cfg = pulumi.Config("contoso")
 env = cfg.require("environment")
 prefix = cfg.require("prefix")
 rg = cfg.require("resourceGroupName")

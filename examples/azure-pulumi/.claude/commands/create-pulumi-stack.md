@@ -28,7 +28,7 @@ infra/
 ```python
 from components.{name} import {Name}Component
 
-cfg = pulumi.Config()
+cfg = pulumi.Config("contoso")
 env = cfg.require("environment")
 default_tags = {"environment": env, "managed_by": "Pulumi", "product": "{product}"}
 

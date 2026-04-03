@@ -1,5 +1,8 @@
 # Workspace Instructions — Contoso Infrastructure Automation
 
+<!-- This is example generated output. The infra/ directory would exist in the
+     target workspace, not in this bootstrap repo. -->
+
 ## Workspace Overview
 
 This workspace contains infrastructure-as-code for Contoso's Azure platform, managed with **Pulumi (Python)**.
@@ -59,6 +62,6 @@ pulumi config set --secret --stack dev contoso:clientSecret <value>
 
 1. **Minimal intervention** — smallest change that fulfills the requirement
 2. **ComponentResources** — reusable resource groups encapsulated as classes in `infra/components/`
-3. **No hardcoded secrets** — use `pulumi.Config().require_secret()` or Key Vault references
+3. **No hardcoded secrets** — use `pulumi.Config("contoso").require_secret()` or Key Vault references
 4. **Stack references** — cross-stack outputs via `pulumi.StackReference`, never hardcoded
 5. **Preview before up** — always run `pulumi preview` before `pulumi up`

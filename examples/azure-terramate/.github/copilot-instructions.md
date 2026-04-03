@@ -1,5 +1,8 @@
 # Workspace Instructions — Contoso Infrastructure Automation
 
+<!-- This is example generated output. The infrastructure-config/ directory would
+     exist in the target workspace, not in this bootstrap repo. -->
+
 ## Workspace Overview
 
 This workspace contains infrastructure-as-code for Contoso's Azure platform.
@@ -33,7 +36,7 @@ These variables appear across all modules:
 `{prefix}-{resource_abbreviation}-{suffix}`
 - Key Vault: `{prefix}-kv-{suffix}` (max 24 chars, truncated with `substr`)
 - Private Endpoints: `{prefix}-pe-{suffix}`
-- All names sanitized with `replace(var.suffix, "/[^0-9A-Za-z]+/", "-")`
+- All names sanitized with `regexreplace(var.suffix, "[^0-9A-Za-z]+", "-")`
 - Optional `full_name` override on most modules
 
 ## Tagging Standard
