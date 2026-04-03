@@ -256,7 +256,7 @@ destroy:{component}:
 <!-- GitHub Actions — AWS OIDC:
 - uses: aws-actions/configure-aws-credentials@v4
   with:
-    role-to-assume: arn:aws:iam::ACCOUNT:role/terraform-plan
+    role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/terraform-plan
     aws-region: us-east-1
 - Separate roles for plan (read-only) and apply (write)
 -->
