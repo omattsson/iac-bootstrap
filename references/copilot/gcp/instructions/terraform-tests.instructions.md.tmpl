@@ -20,8 +20,6 @@ override_data {
 }
 ```
 
-**Note:** This `override_data` block only works if the module under test defines `data "google_project" "current"` (typically in `main.tf`). If the module does not use that data source, omit the `override_data` block.
-
 ## All tests use `command = plan` — never `command = apply`.
 
 ## Required Variables

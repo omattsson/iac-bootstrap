@@ -1,0 +1,166 @@
+# Create Terraform Module — AWS
+
+Scaffold a new `{{MODULE_PREFIX}}-{name}` directory following workspace conventions.
+
+## Usage
+Provide the module name as the argument: `$ARGUMENTS`
+
+If no name is given, ask for:
+- Module name (lowercase, hyphenated)
+- Primary AWS resource type(s)
+- Optional features: {{OPTIONAL_FEATURES}}
+<!-- Example AWS features: vpc_endpoints, kms_encryption, iam_role, cloudwatch_logs -->
+
+## Directory Structure
+
+```
+{{MODULE_PREFIX}}-{name}/
+├── main.tf                    # Provider requirements + data sources
+├── {resource}.tf              # Core resource(s)
+├── locals.tf                  # Name construction, tag merging
+├── variables.tf               # Module-specific variables
+├── {{COMMON_VARS_FILE}}       # Standard cross-module variables
+├── outputs.tf                 # Module outputs
+├── versions.tf                # Version constraints
+├── README.md                  # Documentation
+├── .pre-commit-config.yaml    # Validation hooks
+├── .tflint.hcl                # TFLint rules
+├── .terraform-docs.yml        # Doc generation
+├── examples/
+│   └── basic/
+│       ├── main.tf
+│       └── variables.tf
+└── tests/
+    └── {resource}.tftest.hcl  # Native terraform tests
+```
+
+## File Templates
+
+### versions.tf
+```hcl
+terraform {
+  required_version = ">=1.3"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">=5.0,<6.0"
+    }
+  }
+}
+```
+
+### main.tf — Data Sources
+```hcl
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+```
+
+### common.variables.tf — Standard Cross-Module Variables
+```hcl
+variable "prefix" {
+  type        = string
+  description = "Resource name prefix."
+}
+
+variable "region" {
+  type        = string
+  description = "AWS region."
+}
+
+variable "tags" {
+  type        = map(string)
+  default     = {}
+  description = "Additional resource tags. Merged with env_default_tags (these win on conflict)."
+}
+
+variable "env_default_tags" {
+  type        = map(string)
+  default     = {}
+  description = "Default tags from the orchestration layer."
+}
+```
+
+### locals.tf
+```hcl
+locals {
+  {{NAMING_LOCALS}}
+  tags = merge(var.env_default_tags, var.tags)
+}
+```
+
+### Resource file
+```hcl
+resource "{{PROVIDER_RESOURCE}}" "default" {
+  {{NAMING_ATTRIBUTE}}
+
+  tags = local.tags
+}
+```
+
+### outputs.tf
+```hcl
+output "name" {
+  value       = {{PROVIDER_RESOURCE}}.default.{{NAME_ATTRIBUTE}}
+  description = "Name of the resource."
+}
+
+output "id" {
+  value       = {{PROVIDER_RESOURCE}}.default.id
+  description = "The ID of the resource."
+}
+
+output "arn" {
+  value       = {{PROVIDER_RESOURCE}}.default.arn
+  description = "The ARN of the resource."
+}
+```
+
+### Test file
+```hcl
+mock_provider "aws" {}
+
+override_data {
+  target = data.aws_caller_identity.current
+  values = {
+    account_id = "123456789012"
+    arn        = "arn:aws:iam::123456789012:root"
+    user_id    = "123456789012"
+  }
+}
+
+variables {
+  prefix           = "test-auto"
+  region           = "us-east-1"
+  tags             = {}
+  env_default_tags = { managed_by = "Terraform" }
+}
+
+run "creates_resource_with_correct_name" {
+  command = plan
+  assert {
+    condition     = {{PROVIDER_RESOURCE}}.default.{{NAME_ATTRIBUTE}} == "{{EXPECTED_NAME_PATTERN}}"
+    error_message = "Name should follow naming convention"
+  }
+}
+
+run "merges_tags_correctly" {
+  command = plan
+  variables {
+    tags = { extra = "tag" }
+  }
+  assert {
+    condition     = {{PROVIDER_RESOURCE}}.default.tags["extra"] == "tag"
+    error_message = "Custom tags should be merged"
+  }
+}
+```
+
+## Post-Creation
+
+Run these commands after scaffolding:
+```bash
+cd {{MODULE_PREFIX}}-{name}
+terraform fmt -recursive
+terraform validate
+terraform test
+```

@@ -1,21 +1,21 @@
 ---
 name: create-terraform-module
-description: "Create a new reusable GCP Terraform module following {{COMPANY_NAME}} conventions. Use when: scaffolding a new {{MODULE_PREFIX}}-* repo, adding GCP resource modules, creating module boilerplate."
+description: "Create a new reusable AWS Terraform module following {{COMPANY_NAME}} conventions. Use when: scaffolding a new {{MODULE_PREFIX}}-* repo, adding AWS resource modules, creating module boilerplate."
 ---
 
-# Create Terraform Module — GCP
+# Create Terraform Module — AWS
 
 Scaffolds a new `{{MODULE_PREFIX}}-{name}` directory following workspace conventions.
 
 ## When to Use
-- Creating a new GCP resource module from scratch
+- Creating a new AWS resource module from scratch
 - Generating boilerplate for a new module repo
 - Adding standard files (tests, examples, pre-commit) to an existing module
 
 ## Prerequisites
 - Module name (lowercase, hyphenated)
-- Primary GCP resource type(s)
-- Optional features needed (Private Service Connect, KMS encryption, IAM bindings)
+- Primary AWS resource type(s)
+- Optional features needed (VPC endpoints, KMS encryption, IAM roles)
 
 ## Procedure
 
@@ -24,14 +24,14 @@ Ask for:
 - Module name: used as `{{MODULE_PREFIX}}-{name}`
 - Primary resource(s) to manage
 - Optional features: {{OPTIONAL_FEATURES}}
-<!-- Example GCP features: private_service_connect, kms_encryption, iam_bindings, vpc_peering -->
+<!-- Example AWS features: vpc_endpoints, kms_encryption, iam_role, cloudwatch_logs -->
 
 ### 2. Create Directory Structure
 ```
 {{MODULE_PREFIX}}-{name}/
 ├── main.tf                    # Provider requirements + data sources
 ├── {resource}.tf              # Core resource(s)
-├── locals.tf                  # Name construction, label merging
+├── locals.tf                  # Name construction, tag merging
 ├── variables.tf               # Module-specific variables
 ├── {{COMMON_VARS_FILE}}       # Standard cross-module variables
 ├── outputs.tf                 # Module outputs
@@ -55,21 +55,20 @@ Ask for:
 terraform {
   required_version = ">=1.3"
   required_providers {
-    google = {
-      source  = "hashicorp/google"
+    aws = {
+      source  = "hashicorp/aws"
       version = ">=5.0,<6.0"
     }
   }
 }
 ```
 
-#### locals.tf — Naming and Label Pattern
+#### locals.tf — Naming Pattern
 ```hcl
 locals {
   {{NAMING_LOCALS}}
-  # Labels: defaults + resource-specific, resource-specific wins
-  # GCP labels: lowercase, max 63 chars, alphanumeric + dashes + underscores
-  labels = merge(var.env_default_labels, var.labels)
+  # Tags: defaults + resource-specific, resource-specific wins
+  tags = merge(var.env_default_tags, var.tags)
 }
 ```
 
@@ -80,37 +79,31 @@ variable "prefix" {
   description = "Resource name prefix."
 }
 
-variable "project_id" {
-  type        = string
-  description = "GCP project ID."
-}
-
 variable "region" {
   type        = string
-  description = "GCP region."
+  description = "AWS region."
 }
 
-variable "labels" {
+variable "tags" {
   type        = map(string)
   default     = {}
-  description = "Additional resource labels. Merged with env_default_labels (these win on conflict)."
+  description = "Additional resource tags. Merged with env_default_tags (these win on conflict)."
 }
 
-variable "env_default_labels" {
+variable "env_default_tags" {
   type        = map(string)
   default     = {}
-  description = "Default labels from the orchestration layer."
+  description = "Default tags from the orchestration layer."
 }
 ```
 
 #### Resource file pattern
 ```hcl
 resource "{{PROVIDER_RESOURCE}}" "default" {
-  name       = local.name
-  project    = var.project_id
-  {{LOCATION_ATTRIBUTE}}
+  # name or name_prefix depends on the resource type
+  {{NAMING_ATTRIBUTE}}
 
-  labels = local.labels
+  tags = local.tags
 
   # Resource-specific configuration...
 }
@@ -119,7 +112,7 @@ resource "{{PROVIDER_RESOURCE}}" "default" {
 #### outputs.tf
 ```hcl
 output "name" {
-  value       = {{PROVIDER_RESOURCE}}.default.name
+  value       = {{PROVIDER_RESOURCE}}.default.{{NAME_ATTRIBUTE}}
   description = "Name of the resource."
 }
 
@@ -128,49 +121,48 @@ output "id" {
   description = "The ID of the resource."
 }
 
-output "self_link" {
-  value       = {{PROVIDER_RESOURCE}}.default.self_link
-  description = "The self-link URI of the resource."
+output "arn" {
+  value       = {{PROVIDER_RESOURCE}}.default.arn
+  description = "The ARN of the resource."
 }
 ```
 
 #### Test file pattern
 ```hcl
-mock_provider "google" {}
+mock_provider "aws" {}
 
 override_data {
-  target = data.google_project.current
+  target = data.aws_caller_identity.current
   values = {
-    project_id = "test-project-123"
-    number     = 123456789
-    name       = "test-project"
+    account_id = "123456789012"
+    arn        = "arn:aws:iam::123456789012:root"
+    user_id    = "123456789012"
   }
 }
 
 variables {
-  prefix             = "test-auto"
-  project_id         = "test-project-123"
-  region             = "europe-west1"
-  labels             = {}
-  env_default_labels = { managed_by = "terraform" }
+  prefix           = "test-auto"
+  region           = "us-east-1"
+  tags             = {}
+  env_default_tags = { managed_by = "Terraform" }
 }
 
 run "creates_resource_with_correct_name" {
   command = plan
   assert {
-    condition     = {{PROVIDER_RESOURCE}}.default.name == "{{EXPECTED_NAME_PATTERN}}"
+    condition     = {{PROVIDER_RESOURCE}}.default.{{NAME_ATTRIBUTE}} == "{{EXPECTED_NAME_PATTERN}}"
     error_message = "Name should follow naming convention"
   }
 }
 
-run "merges_labels_correctly" {
+run "merges_tags_correctly" {
   command = plan
   variables {
-    labels = { extra = "label" }
+    tags = { extra = "tag" }
   }
   assert {
-    condition     = {{PROVIDER_RESOURCE}}.default.labels["extra"] == "label"
-    error_message = "Custom labels should be merged"
+    condition     = {{PROVIDER_RESOURCE}}.default.tags["extra"] == "tag"
+    error_message = "Custom tags should be merged"
   }
 }
 ```
