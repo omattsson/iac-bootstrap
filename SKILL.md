@@ -131,7 +131,7 @@ After collecting all gap analysis classifications, compute an overall maturity s
 **For N/A categories:** exclude the category from the total and renormalize the remaining weights so they sum to 100%.
 
 **Gap severity:**
-- **Critical gap** — Any Missing category, or a Partial status in Security, Testing, or CI/CD (weight ≥ 15%)
+- **Critical gap** — Any Missing category, or a Partial status in Security, Testing, CI/CD, or Module Design (weight ≥ 15%)
 - **Moderate gap** — Partial or Missing status in any other category (weight < 15%)
 
 #### Maturity Report Generation
@@ -151,7 +151,7 @@ For **strengths**, list each fully-adopted category with a one-sentence note on 
 
 For **recommended next actions**, provide 3–5 concrete, prioritized steps drawn from the critical and moderate gaps.
 
-Save the report as `maturity-report.md` in the workspace root alongside any other generated files.
+The report content is prepared during Phase 3 but written to disk during Phase 4 (see Generation rules).
 
 ### Phase 4: Generate Files
 
@@ -193,6 +193,7 @@ Based on discovery + interview answers, generate customization files using templ
 5. Include real naming patterns discovered from the workspace
 6. Skip files that already exist (warn and offer to merge)
 7. If generating for both tools, ensure consistency between Copilot and Claude outputs
+8. Save the maturity report as `maturity-report.md` in the workspace root using the template at `references/maturity-report.md.tmpl`
 
 ### Phase 5: Validate
 
