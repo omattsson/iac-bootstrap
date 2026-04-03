@@ -36,7 +36,7 @@ cd ~/my-iac-workspace
 bootstrap-iac
 ```
 
-The tool scans your workspace, pre-fills defaults, prompts for ~10 answers,
+The tool scans your workspace, pre-fills defaults, prompts for a handful of answers,
 and writes all customisation files. See [cli/README.md](cli/README.md) for the
 full CLI reference.
 
