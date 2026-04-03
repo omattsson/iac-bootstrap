@@ -42,8 +42,8 @@ def check_placeholder_syntax() -> list[str]:
         rel = path.relative_to(REPO_ROOT)
         text = path.read_text(encoding="utf-8")
 
-        # Detect unbalanced or malformed braces (e.g. {{{ or single { before word)
-        # Check for triple braces
+        # Detect triple braces, then validate matched {{...}} placeholders.
+        # This does not detect unmatched {{ or }} outside recognized tokens.
         if "{{{" in text or "}}}" in text:
             errors.append(f"{rel}: contains triple braces '{{{{{{' or '}}}}}}'")
 
@@ -61,13 +61,20 @@ def check_placeholder_syntax() -> list[str]:
 
 def _extract_frontmatter(text: str) -> tuple[str | None, str]:
     """Return (frontmatter_str, rest) or (None, text) if no frontmatter."""
-    if not text.startswith("---"):
+    opening_match = re.match(r"\A---[ \t]*\r?\n", text)
+    if opening_match is None:
         return None, text
-    end = text.find("\n---", 3)
-    if end == -1:
+
+    closing_match = re.search(r"(?m)^---[ \t]*$", text[opening_match.end():])
+    if closing_match is None:
         return None, text
-    fm = text[3:end].strip()
-    rest = text[end + 4 :]
+
+    frontmatter_start = opening_match.end()
+    frontmatter_end = frontmatter_start + closing_match.start()
+    closing_end = frontmatter_start + closing_match.end()
+
+    fm = text[frontmatter_start:frontmatter_end].strip()
+    rest = text[closing_end:]
     return fm, rest
 
 
@@ -142,7 +149,7 @@ def check_skill_md_template_references() -> list[str]:
     tmpl_refs = re.findall(r"`([^`]+\.tmpl)`", skill_text)
 
     if not tmpl_refs:
-        errors.append("WARNING: No .tmpl references found in SKILL.md — check the regex.")
+        errors.append("ERROR: No .tmpl references found in SKILL.md — check the regex.")
         return errors
 
     seen: set[str] = set()

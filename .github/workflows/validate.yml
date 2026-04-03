@@ -25,7 +25,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install pyyaml
 
-      - name: Check placeholder syntax in .tmpl files
+      - name: Run template validation
         run: python scripts/validate_templates.py
 
   markdown-lint:
@@ -42,4 +42,4 @@ jobs:
         uses: DavidAnson/markdownlint-cli2-action@v19
         with:
           config: .markdownlint.yml
-          globs: "README.md SKILL.md"
+          globs: "README.md SKILL.md CLAUDE.md"

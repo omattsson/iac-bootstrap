@@ -18,6 +18,3 @@ MD026: false
 # Fenced code blocks should have a language — plain-text blocks are used for
 # interview question lists and directory trees
 MD040: false
-
-# Table column style — existing tables use a compact pipe style without padding
-MD060: false
