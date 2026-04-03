@@ -281,6 +281,48 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_location": "versions.tf → `required_providers`",
         "version_tag_example": 'terraform {\n  required_providers {\n    azurerm = {\n      version = ">=4.0.0,<5.0.0"\n    }\n  }\n}',
     },
+    "Pulumi": {
+        "tool_lower": "pulumi",
+        "validate_command": "pulumi preview",
+        "plan_command": "pulumi preview",
+        "plan_all_command": "pulumi preview",
+        "plan_single_command": "pulumi preview --stack .",
+        "graph_command": "pulumi stack graph",
+        "extra_run_flags": "--non-interactive",
+        "envcommon_pattern": "Pulumi.*.yaml",
+        "hierarchy_diagram": (
+            "infra/\n"
+            "├── Pulumi.yaml               # project definition\n"
+            "├── Pulumi.dev.yaml           # dev stack config\n"
+            "├── Pulumi.prod.yaml          # prod stack config\n"
+            "├── __main__.py               # program entry point\n"
+            "└── components/               # reusable components\n"
+            "    └── {component}.py"
+        ),
+        "hierarchy_files_description": (
+            "- `Pulumi.yaml` — project name, runtime, description\n"
+            "- `Pulumi.{stack}.yaml` — per-stack configuration values\n"
+            "- `__main__.py` — infrastructure program entry point\n"
+            "- `components/` — reusable Pulumi component resources"
+        ),
+        "component_config_pattern": (
+            "class MyComponent(pulumi.ComponentResource):\n"
+            "    def __init__(self, name, opts=None):\n"
+            "        super().__init__('pkg:index:MyComponent', name, {}, opts)"
+        ),
+        "envcommon_template": "# Pulumi.dev.yaml\nconfig:\n  prefix: dev\n  location: westeurope",
+        "mock_outputs_example": "# Use pulumi.StackReference for cross-stack references",
+        "site_config_template": "config:\n  location: westeurope",
+        "stack_config_template": "config:\n  prefix: myapp-dev",
+        "input_flow_diagram": "Pulumi.yaml → Pulumi.{stack}.yaml → __main__.py → components/",
+        "dependency_conventions": (
+            "- Use `pulumi.StackReference` for cross-stack dependencies\n"
+            "- Use `ComponentResource` for logical grouping\n"
+            "- Use `depends_on` for explicit ordering within a stack"
+        ),
+        "version_tag_location": "Pulumi.yaml → description / requirements.txt",
+        "version_tag_example": "# requirements.txt\npulumi>=3.0.0,<4.0.0\npulumi-azure-native>=2.0.0",
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -560,6 +602,9 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("RESOURCE_IDENTIFIER", "default")
     ctx.setdefault("COMMON_VARS_FILE", "common.variables.tf")
+    _data_resource_map = {"azurerm": "client_config", "aws": "caller_identity", "google": "client_config"}
+    _provider = ctx.get("PROVIDER_NAME", "azurerm")
+    _data_resource = _data_resource_map.get(_provider, "client_config")
     ctx.setdefault(
         "DATA_SOURCE_OVERRIDE",
         (
@@ -569,7 +614,7 @@ def build_context(answers: dict) -> dict:
             '    id = "/subscriptions/00000000-0000-0000-0000-000000000000"\n'
             '  }\n'
             '}'
-        ).replace("{provider}", ctx.get("PROVIDER_NAME", "azurerm")),
+        ).replace("{provider}", _provider).replace("{resource}", _data_resource),
     )
     ctx.setdefault(
         "TEST_STANDARD_VARIABLES",

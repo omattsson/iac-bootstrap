@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -67,6 +68,8 @@ def _detect_cloud_provider(workspace: Path) -> Optional[str]:
     """Return detected cloud provider from .tf files, or None."""
     counts: dict[str, int] = {"Azure": 0, "AWS": 0, "GCP": 0}
     for tf_file in workspace.rglob("*.tf"):
+        if ".terraform" in tf_file.parts:
+            continue
         try:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
         except OSError:
@@ -101,8 +104,6 @@ def _detect_module_prefix(workspace: Path) -> Optional[str]:
                 break
     if candidates:
         # Return the most common prefix
-        from collections import Counter
-
         return Counter(candidates).most_common(1)[0][0]
     # Check for a generic "modules/" directory
     if (workspace / "modules").is_dir():
@@ -113,12 +114,16 @@ def _detect_module_prefix(workspace: Path) -> Optional[str]:
 def _detect_orchestration(workspace: Path) -> tuple[Optional[str], Optional[str]]:
     """Return (tool_name, dir_name) or (None, None)."""
     for hcl_file in workspace.rglob("terragrunt.hcl"):
+        if ".terraform" in hcl_file.parts:
+            continue
         rel = hcl_file.parent.relative_to(workspace)
         parts = rel.parts
         # The orchestration dir is typically the top-level dir containing .hcl files
         orch_dir = parts[0] if parts else "."
         return "Terragrunt", orch_dir
     for hcl_file in workspace.rglob("terramate.tm.hcl"):
+        if ".terraform" in hcl_file.parts:
+            continue
         rel = hcl_file.parent.relative_to(workspace)
         parts = rel.parts
         orch_dir = parts[0] if parts else "."

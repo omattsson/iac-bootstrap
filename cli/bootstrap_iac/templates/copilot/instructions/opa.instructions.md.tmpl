@@ -1,0 +1,139 @@
+---
+description: "OPA/Rego policy-as-code conventions for {{CLOUD_PROVIDER}} infrastructure. Use when writing, modifying, or reviewing Rego policies that evaluate Terraform plan JSON for compliance and governance."
+applyTo: "policies/**/*.rego"
+---
+
+# OPA/Rego Policy Standards
+
+## When to Use OPA/Rego
+Use OPA policies for **plan-time governance** evaluated against `terraform show -json` output:
+- Enforce organizational policies across all modules from one place
+- Evaluate complex cross-resource relationships
+- Gate plan approval in CI/CD pipelines
+- Policy logic that needs version-controlled, reviewable rules
+
+## Policy Layout
+
+```
+policies/
+  {{COMPANY_SLUG}}/
+    naming.rego                ← naming convention checks
+    naming_test.rego
+    tags.rego                  ← required tag checks
+    tags_test.rego
+    network.rego               ← network hardening checks
+    network_test.rego
+  data/
+    allowed_regions.json       ← reference data files
+    required_tags.json
+```
+
+## Policy Boilerplate
+
+```rego
+package {{COMPANY_SLUG}}.{{POLICY_AREA}}
+
+import rego.v1
+
+# Collect all violations — callers check `count(violations) == 0`
+violations contains msg if {
+    some resource in input.resource_changes
+    resource.type == "{{TERRAFORM_RESOURCE_TYPE}}"
+    resource.change.actions[_] in {"create", "update"}
+    {{VIOLATION_CONDITION}}
+    msg := sprintf("{{ERROR_MESSAGE_TEMPLATE}}", [{{MSG_ARGS}}])
+}
+```
+<!-- Example violation condition for tag check:
+    not resource.change.after.tags["environment"]
+    msg := sprintf("Resource %s is missing required tag 'environment'", [resource.address])
+-->
+
+## Evaluating Policies Against a Plan
+
+```bash
+# Generate plan JSON
+terraform plan -out=tfplan.binary
+terraform show -json tfplan.binary > tfplan.json
+
+# Evaluate with OPA
+opa eval \
+  --input tfplan.json \
+  --data policies/ \
+  --format pretty \
+  "data.{{COMPANY_SLUG}}.{{POLICY_AREA}}.violations"
+
+# Non-zero exit if any violations
+opa eval \
+  --input tfplan.json \
+  --data policies/ \
+  --fail-defined \
+  "data.{{COMPANY_SLUG}}.{{POLICY_AREA}}.violations"
+```
+
+## Policy Test Boilerplate
+
+```rego
+package {{COMPANY_SLUG}}.{{POLICY_AREA}}_test
+
+import rego.v1
+
+# --- passing case ---
+test_no_violation_when_compliant if {
+    count(data.{{COMPANY_SLUG}}.{{POLICY_AREA}}.violations) == 0 with input as {
+        "resource_changes": [{
+            "address": "{{TERRAFORM_RESOURCE_TYPE}}.default",
+            "type": "{{TERRAFORM_RESOURCE_TYPE}}",
+            "change": {
+                "actions": ["create"],
+                "after": {
+                    {{COMPLIANT_RESOURCE_ATTRIBUTES}}
+                }
+            }
+        }]
+    }
+}
+
+# --- failing case ---
+test_violation_when_non_compliant if {
+    count(data.{{COMPANY_SLUG}}.{{POLICY_AREA}}.violations) > 0 with input as {
+        "resource_changes": [{
+            "address": "{{TERRAFORM_RESOURCE_TYPE}}.default",
+            "type": "{{TERRAFORM_RESOURCE_TYPE}}",
+            "change": {
+                "actions": ["create"],
+                "after": {
+                    {{NON_COMPLIANT_RESOURCE_ATTRIBUTES}}
+                }
+            }
+        }]
+    }
+}
+```
+
+## Running Policy Tests
+```bash
+# Run all policy tests
+opa test policies/ -v
+
+# Run tests for a specific package
+opa test policies/{{COMPANY_SLUG}}/ -v --run {{POLICY_AREA}}
+```
+
+## CI Integration Pattern
+```yaml
+- name: Evaluate OPA policies
+  run: |
+    terraform show -json tfplan.binary > tfplan.json
+    opa eval \
+      --input tfplan.json \
+      --data policies/ \
+      --fail-defined \
+      "data.{{COMPANY_SLUG}}.{{POLICY_AREA}}.violations"
+```
+
+## Conventions
+- One package per policy area (`naming`, `tags`, `network`, `iam`)
+- Always expose violations as a **set named `violations`** for consistent CI queries
+- Test files co-located with policy files, suffix `_test.rego`
+- Reference data (allowed regions, required tag keys) in `data/` as JSON — never hardcode in Rego

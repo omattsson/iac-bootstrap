@@ -23,6 +23,10 @@ VALID_PLACEHOLDER_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 FRONTMATTER_GLOBS = [
     "references/copilot/agents/*.tmpl",
     "references/copilot/instructions/*.tmpl",
+    "references/copilot/aws/agents/*.tmpl",
+    "references/copilot/aws/instructions/*.tmpl",
+    "references/copilot/gcp/agents/*.tmpl",
+    "references/copilot/gcp/instructions/*.tmpl",
 ]
 
 SKILL_MD = REPO_ROOT / "SKILL.md"
@@ -160,10 +164,14 @@ def check_skill_md_template_references() -> list[str]:
         if ref in seen:
             continue
         seen.add(ref)
-        full_path = REFERENCES_DIR / ref
+        # Strip leading references/ prefix since REFERENCES_DIR already points there
+        rel = ref
+        if rel.startswith("references/"):
+            rel = rel[len("references/"):]
+        full_path = REFERENCES_DIR / rel
         if not full_path.exists():
             errors.append(
-                f"SKILL.md references '{ref}' but file does not exist at references/{ref}"
+                f"SKILL.md references '{ref}' but file does not exist at references/{rel}"
             )
 
     return errors

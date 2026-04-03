@@ -1,0 +1,84 @@
+---
+description: "Terratest (Go) integration test conventions for {{CLOUD_PROVIDER}} modules. Use when writing, modifying, or reviewing Go-based integration tests that deploy real resources to validate module behavior end-to-end."
+applyTo: "tests/integration/**/*_test.go"
+---
+
+# Terratest Integration Test Standards
+
+## When to Use Terratest
+Use Terratest for integration tests that **require real cloud resources**:
+- Validating actual resource creation, configuration, and networking
+- Testing provider behavior that mock providers cannot simulate
+- End-to-end smoke tests run in non-production environments
+
+Prefer native `.tftest.hcl` (plan-only) for unit-style assertions. Use Terratest only when plan-only coverage is insufficient.
+
+## Test File Layout
+
+```
+tests/
+  integration/
+    {module}_test.go     ← one file per module or scenario
+    go.mod
+    go.sum
+```
+
+## Required Boilerplate
+
+```go
+package test
+
+import (
+    "os"
+    "testing"
+
+    "github.com/gruntwork-io/terratest/modules/terraform"
+    "github.com/stretchr/testify/assert"
+)
+
+func Test{{MODULE_PASCAL_CASE}}(t *testing.T) {
+    t.Parallel()
+
+    opts := &terraform.Options{
+        TerraformDir: "../../",
+        Vars: map[string]interface{}{
+            {{TERRATEST_STANDARD_VARS}}
+        },
+    }
+
+    defer terraform.Destroy(t, opts)
+    terraform.InitAndApply(t, opts)
+
+    // Assertions go here
+}
+```
+<!-- Example standard vars for Azure:
+    "prefix":              "test-auto",
+    "location":            "{{DEFAULT_REGION}}",
+    "resource_group_name": os.Getenv("TF_VAR_resource_group_name"),
+-->
+
+## Conventions
+
+- Always call `defer terraform.Destroy(t, opts)` **before** `InitAndApply` — ensures cleanup even on test failure
+- Run tests in isolated resource groups or namespaces; never share state between test runs
+- Use `t.Parallel()` unless tests share resources
+- Assert specific output values with `terraform.Output(t, opts, "output_name")`
+- Use `os.Getenv` for sensitive inputs (subscription IDs, credentials) — never hardcode
+- Test environment set via environment variables or a dedicated `tfvars` file ignored by git
+
+## Assertions Pattern
+
+```go
+resourceName := terraform.Output(t, opts, "name")
+assert.Equal(t, "expected-name", resourceName)
+
+resourceID := terraform.Output(t, opts, "id")
+assert.NotEmpty(t, resourceID)
+```
+
+## CI Considerations
+- Terratest runs in a dedicated integration test pipeline stage, **not** on every PR
+- Requires cloud credentials injected as environment variables (never stored in code)
+- Set a short `lock-timeout` to avoid pipeline stalls
+- Tag all test resources with `managed_by = "terratest"` for cleanup identification

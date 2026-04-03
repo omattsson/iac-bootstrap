@@ -1,0 +1,164 @@
+# {{COMPANY_NAME}} Infrastructure Automation
+
+You are working in an infrastructure-as-code workspace for {{COMPANY_NAME}}'s GCP platform.
+
+## Workspace Structure
+
+| Category | Path | Purpose |
+|----------|------|---------|
+| **Terraform Modules** | `{{MODULE_PREFIX}}-*` | Reusable GCP resource modules |
+| **Orchestration** | `{{ORCHESTRATION_DIR}}/` | {{ORCHESTRATION_TOOL}} config for all environments |
+| **Pipelines** | `{{PIPELINE_DIR}}/` | {{CI_CD_PLATFORM}} pipeline templates |
+
+## Module Source Convention
+
+{{MODULE_SOURCE_PATTERN}}
+
+Version tags managed in {{VERSION_TAG_LOCATION}}.
+
+## Standard Variable Set
+
+These variables appear across all modules:
+{{STANDARD_VARIABLES}}
+<!-- Example:
+- `prefix` — Resource name prefix
+- `project_id` — GCP project ID
+- `region` — GCP region (e.g., `europe-west1`)
+- `labels` — Additional resource labels (map(string))
+- `env_default_labels` — Default labels from orchestration layer
+-->
+
+## Naming Convention
+
+{{NAMING_PATTERN}}
+
+## Labeling Standard
+
+{{TAG_STRATEGY}}
+<!-- Example:
+local.labels = merge(var.env_default_labels, var.labels)
+Required labels: environment, product, managed_by = "terraform"
+Note: GCP label keys/values must be lowercase, max 63 chars.
+-->
+
+## Environment Hierarchy
+
+{{ENVIRONMENT_HIERARCHY}}
+
+---
+
+## Coding Standards
+
+### Terraform Files (`{{MODULE_PREFIX}}-*/**/*.tf`)
+
+**File organization:**
+- `main.tf` — provider requirements + data sources
+- `{resource}.tf` — core resources, named by GCP resource type
+- `locals.tf` — name construction, label merging, computed values
+- `variables.tf` — module-specific variables
+- `{{COMMON_VARS_FILE}}` — standard cross-module variables
+- `outputs.tf` — module outputs (at minimum: `name`, `id`, `self_link`)
+- `versions.tf` — terraform and provider version constraints
+
+**Resource conventions:**
+- Single resources use identifier `"default"` (e.g., `google_storage_bucket.default`)
+- Map-driven resources use `for_each` with descriptive keys
+- Boolean toggles use `count`
+- Labels: `merge(var.env_default_labels, var.labels)` — always
+- GCP labels must be lowercase — validate and sanitize inputs
+
+**Naming pattern:**
+```hcl
+{{NAMING_PATTERN_HCL}}
+```
+
+**Provider versions:**
+```hcl
+google = { source = "hashicorp/google", version = ">=5.0,<6.0" }
+```
+
+**No hardcoded secrets, project IDs, or credentials in module code.**
+
+### Test Files (`**/*.tftest.hcl`)
+
+**Required boilerplate in every test:**
+```hcl
+mock_provider "google" {}
+
+override_data {
+  target = data.google_project.current
+  values = {
+    project_id = "test-project-123"
+    number     = 123456789
+    name       = "test-project"
+  }
+}
+```
+
+- All tests use `command = plan` — never `command = apply`
+- Include all `{{COMMON_VARS_FILE}}` variables in the `variables {}` block
+- Standard test variables: `prefix = "test-auto"`, `project_id = "test-project-123"`, `region = "europe-west1"`, `labels = {}`, `env_default_labels = { managed_by = "terraform" }`
+- One test file per concern: `naming.tftest.hcl`, `labels.tftest.hcl`, etc.
+
+### Orchestration Files (`{{ORCHESTRATION_DIR}}/**/*.hcl`)
+
+{{HIERARCHY_FILES_DESCRIPTION}}
+
+**Shared config pattern ({{ENVCOMMON_PATTERN}}):**
+- Read hierarchy variables from parent files (project ID, region, module versions)
+- Define source URL pointing to the module repo
+- Declare dependencies with realistic mock outputs
+- Provide inputs mapping hierarchy variables to module variables
+
+**Component config pattern:**
+```hcl
+{{COMPONENT_CONFIG_PATTERN}}
+```
+
+Version tags from {{VERSION_TAG_LOCATION}}. Never hardcode versions in component files.
+
+### Pipeline Files
+
+**Two-stage pattern:** Plan stage → Apply stage (on protected branches with approval).
+
+**GCP Authentication (Workload Identity Federation — no service account keys):**
+```yaml
+- uses: google-github-actions/auth@v2
+  with:
+    workload_identity_provider: projects/{{GCP_PROJECT_NUMBER}}/locations/global/workloadIdentityPools/{{WIF_POOL}}/providers/{{WIF_PROVIDER}}
+    service_account: terraform@{{GCP_PROJECT_ID}}.iam.gserviceaccount.com
+```
+
+{{TEMPLATE_REFERENCE_PATTERN}}
+
+---
+
+## Behavioral Rules
+
+### When building or modifying Terraform modules:
+- DO NOT run `terraform apply` or `terraform destroy`
+- DO NOT hardcode secrets, project IDs, or credentials
+- DO NOT change `{{COMMON_VARS_FILE}}` unless the variable is genuinely cross-module
+- DO NOT break backward compatibility without explicit approval
+- ONLY use `command = plan` in tests
+
+### When writing tests:
+- DO NOT use `command = apply`
+- DO NOT create real GCP resources
+- ALWAYS include all required `{{COMMON_VARS_FILE}}` variables
+- ALWAYS use `mock_provider "google" {}`
+- ALWAYS override `data.google_project.current`
+
+### When modifying orchestration configs:
+- DO NOT run apply or destroy without explicit approval
+- DO NOT hardcode project IDs or credentials
+- DO NOT modify root configs without understanding impact on all stacks
+- DO NOT bypass the DRY pattern
+- ALWAYS provide mock_outputs in dependency blocks
+
+### General principles:
+1. **Minimal intervention** — smallest change that fulfills the requirement
+2. **DRY** — common config extracted, variables flow from hierarchy
+3. **No hardcoded secrets** — use Secret Manager, Workload Identity, or service accounts
+4. **Plan-only tests** — mock providers, no real resources
+5. **Pre-commit hooks** — `terraform_fmt`, `tflint`, validation

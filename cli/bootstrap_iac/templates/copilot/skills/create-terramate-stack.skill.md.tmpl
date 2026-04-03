@@ -1,0 +1,77 @@
+---
+name: create-terramate-stack
+description: "Create or extend Terramate stacks, generate_hcl blocks, and globals. Use when: adding a new stack, creating shared generated configs, wiring cross-stack ordering, updating module versions."
+---
+
+# Create Terramate Stack/Component
+
+Creates or extends Terramate configurations following the workspace stack hierarchy.
+
+## When to Use
+- Adding a new stack to an environment
+- Adding a new environment for an existing service
+- Creating or updating shared `generate_hcl` blocks (backend, provider, variables)
+- Wiring cross-stack `before`/`after` ordering
+- Updating module version globals
+
+## Hierarchy
+
+```
+{{HIERARCHY_DIAGRAM}}
+```
+
+## Procedure
+
+### Task A: Add a New Stack
+
+#### 1. Create the stack directory and `stack.tm.hcl`
+```hcl
+{{COMPONENT_CONFIG_PATTERN}}
+```
+
+#### 2. Add module version to globals
+In {{VERSION_TAG_LOCATION}}:
+```hcl
+{{VERSION_TAG_EXAMPLE}}
+```
+
+#### 3. Create the stack's Terraform entry file
+```hcl
+{{ENVCOMMON_TEMPLATE}}
+```
+
+#### 4. Regenerate all `generate_hcl` outputs
+```bash
+terramate generate
+```
+Review the diff — only the new stack's generated files should appear.
+
+### Task B: Add a New Environment
+
+#### 1. Create environment-level `globals.tm.hcl`
+```hcl
+{{STACK_CONFIG_TEMPLATE}}
+```
+
+#### 2. Copy stack directories from a sibling environment and update globals
+
+### Task C: Update Shared generate_hcl
+
+#### 1. Edit the shared block in `{{ENVCOMMON_PATTERN}}`
+#### 2. Run `terramate generate`
+#### 3. Review diff across all affected stacks before committing
+
+## Cross-Stack Dependency Pattern
+
+Declare ordering in `stack.tm.hcl` and read outputs via `terraform_remote_state`:
+```hcl
+{{REMOTE_STATE_EXAMPLE}}
+```
+
+## Validation Checklist
+1. `{{VALIDATE_COMMAND}}` passes
+2. `{{PLAN_COMMAND}}` shows expected resources
+3. Module version is present in {{VERSION_TAG_LOCATION}}
+4. `terramate generate` produces no unexpected diff
+5. Stack `id` is unique across the workspace
+6. `after` ordering is correct and no circular deps

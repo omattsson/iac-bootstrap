@@ -1,0 +1,88 @@
+---
+description: "Terramate configuration standards. Use when writing or modifying Terramate config files including stack definitions, generate_hcl blocks, globals, and root configs."
+applyTo: "{{ORCHESTRATION_DIR}}/**/*.tm.hcl"
+---
+
+# Terramate Configuration Standards
+
+## Stack Definition Pattern
+Every stack directory must contain a `stack.tm.hcl` file:
+```hcl
+stack {
+  name        = "{{STACK_NAME_EXAMPLE}}"
+  description = "{{STACK_DESCRIPTION_EXAMPLE}}"
+  id          = "{{STACK_ID_EXAMPLE}}"  # Unique slug or UUID
+
+  # Explicit ordering (use instead of implicit path ordering)
+  after = [
+    "{{DEPENDENCY_STACK_PATH}}",
+  ]
+}
+```
+
+## Globals Pattern (`globals.tm.hcl`)
+Share values across stacks using globals:
+```hcl
+globals {
+  environment = "{{ENVIRONMENT}}"
+  location    = "{{LOCATION}}"
+  prefix      = "{{PREFIX}}"
+
+  module_versions = {
+    "{{MODULE_NAME}}" = "{{MODULE_VERSION}}"
+  }
+}
+```
+
+## Hierarchy Files
+{{HIERARCHY_FILES_DESCRIPTION}}
+<!-- Example:
+- Root `globals.tm.hcl` — org-wide defaults (company, cloud provider, state backend)
+- Environment-level `globals.tm.hcl` — environment name, location, identity config
+- Stack-level `globals.tm.hcl` — stack prefix, service name
+- `stack.tm.hcl` — stack identity and ordering
+-->
+
+## Shared generate_hcl Pattern (`{{ENVCOMMON_PATTERN}}`)
+Shared `generate_hcl` blocks generate Terraform config DRY across stacks:
+```hcl
+generate_hcl "_generated_backend.tf" {
+  content {
+    terraform {
+      backend "azurerm" {
+        resource_group_name  = global.state_resource_group
+        storage_account_name = global.state_storage_account
+        container_name       = "tfstate"
+        key                  = "${terramate.stack.path.relative}/terraform.tfstate"
+      }
+    }
+  }
+}
+
+generate_hcl "_generated_provider.tf" {
+  content {
+    provider "azurerm" {
+      features {}
+      subscription_id = global.subscription_id
+    }
+  }
+}
+```
+
+## Module Source Convention
+{{MODULE_SOURCE_CONVENTION}}
+Version tags from {{VERSION_TAG_LOCATION}}. Reference via `global.module_versions.{name}`.
+
+## Cross-Stack Dependencies
+{{DEPENDENCY_CONVENTIONS}}
+<!-- Example:
+- Declare ordering with `after = [...]` in `stack.tm.hcl`
+- Reference outputs via `terraform_remote_state` data source
+- Always provide a default/fallback for plan-time runs without remote state
+-->
+
+## generate_hcl Rules
+- Generated files are prefixed with `_generated_` and committed to the repo
+- Run `terramate generate` after any change to `generate_hcl` blocks
+- Never hand-edit generated `_generated_*.tf` files — changes will be overwritten
+- Use `assert` blocks in `generate_hcl` to validate required globals are set

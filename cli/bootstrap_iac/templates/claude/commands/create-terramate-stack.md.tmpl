@@ -1,0 +1,72 @@
+# Create Terramate Stack/Component
+
+Create or extend Terramate configurations following the workspace stack hierarchy.
+
+## Usage
+Describe what to add as the argument: `$ARGUMENTS`
+
+If unclear, ask:
+- Adding a new stack, a new environment, or updating shared generated config?
+- Which Terraform module does the stack deploy?
+- Does it depend on outputs from another stack?
+
+## Hierarchy
+
+```
+{{HIERARCHY_DIAGRAM}}
+```
+
+## Task A: Add a New Stack
+
+### 1. Create `stack.tm.hcl`
+```hcl
+{{COMPONENT_CONFIG_PATTERN}}
+```
+
+### 2. Add module version to globals
+In {{VERSION_TAG_LOCATION}}:
+```hcl
+{{VERSION_TAG_EXAMPLE}}
+```
+
+### 3. Create the stack's Terraform entry file
+```hcl
+{{ENVCOMMON_TEMPLATE}}
+```
+
+### 4. Regenerate outputs
+```bash
+terramate generate
+```
+Review the diff — only the new stack's generated files should appear.
+
+## Task B: Add a New Environment
+
+### 1. Create environment globals
+```hcl
+{{STACK_CONFIG_TEMPLATE}}
+```
+
+### 2. Copy stack dirs from sibling environment and update globals
+
+## Task C: Update Shared generate_hcl
+
+### 1. Edit shared block in `{{ENVCOMMON_PATTERN}}`
+### 2. Run `terramate generate` and review the diff
+### 3. Commit generated files alongside the config change
+
+## Cross-Stack Dependency Pattern
+
+```hcl
+{{REMOTE_STATE_EXAMPLE}}
+```
+
+## Validation
+
+After creating:
+```bash
+{{VALIDATE_COMMAND}}
+{{PLAN_COMMAND}}
+```
+
+Check: module version in globals, `terramate generate` clean diff, unique stack ID, no circular `after` deps.
