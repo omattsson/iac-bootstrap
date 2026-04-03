@@ -12,6 +12,7 @@
 #
 # Output format (one line per finding):
 #   SMELL  <anti-pattern-id>  <file>:<line>  <description>
+#   SMELL  <anti-pattern-id>  <dir>/         <description>   (directory-scoped)
 #   PASS   <anti-pattern-id>  <description>
 #
 # Exit codes:
@@ -54,7 +55,7 @@ _hcl_files() {
 
 # Enumerate unique directories that contain at least one .tf file
 _module_dirs() {
-  _tf_files | xargs -r -I{} dirname {} 2>/dev/null | sort -u
+  find "$ROOT" -name "*.tf" ! -path '*/.terraform/*' -exec dirname {} \; 2>/dev/null | sort -u
 }
 
 # =============================================================================
@@ -88,7 +89,7 @@ while IFS= read -r file; do
     echo "$content" | grep -qE 'description[[:space:]]*=' && continue
     _smell "hardcoded-secrets" "${file}:${lineno}" "Possible hardcoded credential in assignment"
     _smell_found=1
-  done < <(grep -inE "$_SECRET_RE" "$file" 2>/dev/null | grep -v '^[[:space:]]*#' || true)
+  done < <(grep -inE "$_SECRET_RE" "$file" 2>/dev/null | grep -vE '^[[:space:]]*(#|//)' || true)
 done < <(_tf_files; _hcl_files)
 
 [ "$_smell_found" -eq 0 ] && _pass "hardcoded-secrets" "No hardcoded secrets detected in .tf / .hcl files"
@@ -101,7 +102,7 @@ CHECKS=$(( CHECKS + 1 ))
 _smell_found=0
 
 while IFS= read -r mdir; do
-  res_count=$(grep -rc '^resource ' "$mdir" --include="*.tf" 2>/dev/null \
+  res_count=$(grep -Erc '^[[:space:]]*resource[[:space:]]+"' "$mdir" --include="*.tf" 2>/dev/null \
     | awk -F: '{s+=$2} END {print s+0}')
   [ "$res_count" -eq 0 ] && continue
 
@@ -128,7 +129,7 @@ _smell_found=0
 RESOURCE_THRESHOLD=10
 
 while IFS= read -r mdir; do
-  count=$(grep -rc '^resource ' "$mdir" --include="*.tf" 2>/dev/null \
+  count=$(grep -Erc '^[[:space:]]*resource[[:space:]]+"' "$mdir" --include="*.tf" 2>/dev/null \
     | awk -F: '{s+=$2} END {print s+0}')
   if [ "$count" -ge "$RESOURCE_THRESHOLD" ]; then
     _smell "monolithic-module" "${mdir}/" \
@@ -170,12 +171,12 @@ CHECKS=$(( CHECKS + 1 ))
 _smell_found=0
 
 while IFS= read -r mdir; do
-  res_count=$(grep -rc '^resource ' "$mdir" --include="*.tf" 2>/dev/null \
+  res_count=$(grep -Erc '^[[:space:]]*resource[[:space:]]+"' "$mdir" --include="*.tf" 2>/dev/null \
     | awk -F: '{s+=$2} END {print s+0}')
   [ "$res_count" -eq 0 ] && continue
 
-  tag_count=$(grep -r '\btags\b\|\blabels\b' "$mdir" --include="*.tf" 2>/dev/null \
-    | grep -v '^[[:space:]]*#' | wc -l)
+  tag_count=$(grep -r -E '(^|[^[:alnum:]_])(tags|labels)([^[:alnum:]_]|$)' "$mdir" --include="*.tf" 2>/dev/null \
+    | grep -v -E '^[[:space:]]*(#|//)' | wc -l)
 
   if [ "$tag_count" -eq 0 ]; then
     _smell "no-tagging-standard" "${mdir}/" \
@@ -273,28 +274,30 @@ while i < len(content):
             break
     i += 1
 
-block = content[brace_start+1:i]
+block_start = brace_start + 1
+block = content[block_start:i]
+block_start_line = content.count('\n', 0, block_start) + 1
 
 # Each provider entry: name = { source = "..." [version = "..."] }
 for pm in re.finditer(r'(\w+)\s*=\s*\{([^}]*)\}', block, re.DOTALL):
     pname = pm.group(1)
     pbody = pm.group(2)
     if re.search(r'\bsource\s*=', pbody) and not re.search(r'\bversion\s*=', pbody):
-        print(pname)
+        provider_line = block_start_line + block.count('\n', 0, pm.start(1))
+        print(f"{pname}:{provider_line}")
 PYEOF
         )
         if [ -n "$missing_providers" ]; then
-          while IFS= read -r provider; do
-            lineno=$(grep -Fn "$provider" "$file" 2>/dev/null | head -1 | cut -d: -f1)
+          while IFS=: read -r provider lineno; do
             _smell "missing-provider-version" "${file}:${lineno:-?}" \
               "Provider '${provider}' has source but no version constraint in required_providers"
             _smell_found=1
           done <<< "$missing_providers"
         fi
       else
-        # Fallback: compare count of source = vs version = lines inside required_providers
-        sources=$(awk '/required_providers/{f=1} f && /source[[:space:]]*=/{c++} /^[[:space:]]*\}[[:space:]]*$/ && f{f=0} END{print c+0}' "$file")
-        versions=$(awk '/required_providers/{f=1} f && /version[[:space:]]*=/{c++} /^[[:space:]]*\}[[:space:]]*$/ && f{f=0} END{print c+0}' "$file")
+        # Fallback: use awk with brace-depth tracking to count source/version inside required_providers
+        sources=$(awk 'BEGIN{d=0;f=0;c=0} /required_providers/{f=1} f && /{/{d++} f && d>=2 && /source[[:space:]]*=/{c++} f && /}/{d--; if(d==0) f=0} END{print c+0}' "$file")
+        versions=$(awk 'BEGIN{d=0;f=0;c=0} /required_providers/{f=1} f && /{/{d++} f && d>=2 && /version[[:space:]]*=/{c++} f && /}/{d--; if(d==0) f=0} END{print c+0}' "$file")
         if [ "$sources" -gt "$versions" ]; then
           _smell "missing-provider-version" "$file:?" \
             "Some providers in required_providers appear to be missing a version constraint"

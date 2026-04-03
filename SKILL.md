@@ -58,7 +58,7 @@ Before generating files, run the code smell detector and then compare the worksp
 
 #### Step 3a: Run the Code Smell Detector
 
-Execute [`tools/detect-smells.sh`](./tools/detect-smells.sh) against the target workspace to get file-level, line-level findings:
+Execute [`tools/detect-smells.sh`](./tools/detect-smells.sh) against the target workspace to get file-level and directory-level findings:
 
 ```bash
 bash <iac-bootstrap-repo>/tools/detect-smells.sh <target-workspace>

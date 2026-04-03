@@ -125,7 +125,7 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 
 ## Code Smell Detector
 
-[`tools/detect-smells.sh`](tools/detect-smells.sh) scans a Terraform workspace for common anti-patterns and prints each finding with the exact file path and line number.
+[`tools/detect-smells.sh`](tools/detect-smells.sh) scans a Terraform workspace for common anti-patterns and prints each finding with a relevant location (file or module directory), including a line number when available.
 
 ```bash
 bash tools/detect-smells.sh /path/to/your-iac-workspace
