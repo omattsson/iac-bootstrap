@@ -1,0 +1,43 @@
+# Create Infrastructure Pipeline
+
+Generate {{CI_CD_PLATFORM}} pipeline configuration for infrastructure deployments.
+
+## Usage
+Describe the pipeline as the argument: `$ARGUMENTS`
+
+If unclear, ask:
+- Single component or full stack?
+- Which environment(s)?
+- Drift detection needed?
+
+## Pipeline Architecture
+
+All pipelines follow a two-stage flow:
+1. **Plan** — runs always, publishes plan artifact
+2. **Apply** — runs on protected branches only, requires approval
+
+## Templates
+
+### Single Component Pipeline
+
+{{SINGLE_COMPONENT_PIPELINE}}
+
+### Stack Pipeline (all components)
+
+{{STACK_PIPELINE}}
+
+### Drift Detection Pipeline
+
+{{DRIFT_PIPELINE}}
+
+## Authentication
+
+{{AUTH_PATTERN}}
+
+## Standard Parameters
+
+{{STANDARD_PARAMETERS}}
+
+## Conventions
+
+{{PIPELINE_CONVENTIONS}}
