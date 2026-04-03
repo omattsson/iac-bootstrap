@@ -22,34 +22,78 @@ All templates are parameterized and adapted to the target company's conventions.
 
 ### Phase 1: Discovery
 
-Explore the target workspace to understand existing patterns:
+Explore the target workspace to understand existing patterns and auto-populate interview answers.
+
+#### 1a. Structural scan
 
 1. **Scan for Terraform modules**: `file_search("**/main.tf")` or `file_search("**/versions.tf")`
 2. **Scan for orchestration configs**: `file_search("**/terragrunt.hcl")`, `file_search("**/root.hcl")`, `file_search("**/terramate.tm.hcl")`
 3. **Scan for CI/CD pipelines**: `file_search("**/*.yml")` in pipeline directories
 4. **Check for existing customizations**: `file_search("**/.github/copilot-instructions.md")`, `file_search("**/CLAUDE.md")`
 
-Build a profile of the workspace by reading representative files.
+#### 1b. Auto-detection heuristics
+
+Run the following checks and record each detected value. Mark each answer as **detected**, **ambiguous** (multiple candidates found), or **unknown** (no signal found).
+
+| Interview Q# | What to detect | How to detect |
+|---|---|---|
+| **Q2 — Cloud provider** | Azure / AWS / GCP / multi-cloud | Search `**/*.tf` for `provider "azurerm"` → Azure; `provider "aws"` → AWS; `provider "google"` → GCP. If exactly one provider family is found → mark as that cloud. If two or more distinct provider families are found → mark as multi-cloud (not ambiguous). |
+| **Q3 — Module source pattern** | Git URL template for `source =` | Grep `**/*.tf` and `**/*.hcl` for `source\s*=\s*"git::` lines; extract the base URL and tag-ref pattern. If all occurrences share the same base URL → detected. If multiple distinct base URLs are found → mark as ambiguous and list all candidates. |
+| **Q4 — Module prefix** | Directory prefix used for modules | List directories within the workspace root that match `tf-module-*`, `terraform-*`, `modules/`, or similar. Do not look outside the workspace root. If all matching directories share a common prefix → detected. If no match → unknown. |
+| **Q5 — Orchestration tool** | Terragrunt / Terramate / workspaces / none | `file_search("**/terragrunt.hcl")` → Terragrunt; `file_search("**/*.tm.hcl")` → Terramate; `file_search("**/*.tfworkspace")` or `terraform workspace list` output in docs → Workspaces. |
+| **Q6 — CI/CD platform** | GitHub Actions / Azure DevOps / GitLab CI / Atlantis | `file_search(".github/workflows/*.yml")` → GitHub Actions; `file_search("azure-pipelines*.yml")` or `azure-pipelines/` dir → Azure DevOps; `file_search(".gitlab-ci.yml")` → GitLab CI; `file_search("atlantis.yaml")` → Atlantis. |
+| **Q7 — Auth pattern** | Managed Identity / OIDC / service principal / IAM roles | In provider blocks, look for `use_msi = true` or `use_cli = true` → Managed Identity; `use_oidc = true` or `oidc_*` attributes → OIDC; `client_id` + `client_secret` env refs → Service Principal; `assume_role` or `web_identity_token_file` → IAM/OIDC (AWS). |
+| **Q8 — State backend** | Azure Blob / S3 / GCS / Terraform Cloud | Search `**/*.tf` and `**/*.hcl` for `backend "azurerm"` → Azure Blob; `backend "s3"` → S3; `backend "gcs"` → GCS; `backend "remote"` or `cloud {}` → Terraform Cloud. |
+| **Q9 — Naming convention** | Naming pattern expression | Read `locals.tf` in each discovered module; look for name construction expressions (e.g., `"${var.prefix}-kv-${local.suffix}"`). If all modules use the same pattern → detected. If patterns differ across modules → mark as ambiguous and list the most common pattern plus any outliers. |
+| **Q11 — Test framework** | Native tftest / Terratest / both | `file_search("**/*.tftest.hcl")` → native terraform test; `file_search("**/*_test.go")` → Terratest; both present → both. |
+
+#### 1c. Build workspace profile
+
+After running the checks, compile a workspace profile:
+
+```
+Workspace profile (auto-detected):
+  Cloud provider:      <value or UNKNOWN>
+  Module prefix:       <value or UNKNOWN>
+  Module source URL:   <value or UNKNOWN>
+  Orchestration tool:  <value or UNKNOWN>
+  CI/CD platform:      <value or UNKNOWN>
+  Auth pattern:        <value or UNKNOWN>
+  State backend:       <value or UNKNOWN>
+  Naming pattern:      <value or UNKNOWN>
+  Test framework:      <value or UNKNOWN>
+```
 
 ### Phase 2: Interview
 
-Gather what can't be inferred from code:
+Present the auto-detected answers to the user for confirmation, then ask only for the answers that are **unknown** or **ambiguous**. Format the pre-filled answers as a numbered list matching the original question order, with detected values shown inline so the user can confirm or override each one.
+
+**Pre-fill confirmation block (always present):**
 
 ```
-Questions:
+Based on scanning your workspace, I've pre-filled the following answers.
+Please confirm each one or type a correction (press Enter to accept):
+
+2.  Cloud provider(s):     <detected value, or "unknown — please provide">
+3.  Module source pattern: <detected value, or "unknown — please provide">
+4.  Module prefix:         <detected value, or "unknown — please provide">
+5.  Orchestration tool:    <detected value, or "unknown — please provide">
+6.  CI/CD platform:        <detected value, or "unknown — please provide">
+7.  Auth pattern:          <detected value, or "unknown — please provide">
+8.  State backend:         <detected value, or "unknown — please provide">
+9.  Naming convention:     <detected value, or "unknown — please provide">
+11. Test framework:        <detected value, or "unknown — please provide">
+```
+
+**Then ask only the unanswered questions:**
+
+```
+Still need your input for:
 1.  Company/org name — used in descriptions and comments
-2.  Cloud provider(s) — Azure, AWS, GCP, or multi-cloud
-3.  Module source pattern — Git URL pattern for module sourcing
-4.  Module prefix — directory naming (e.g., tf-module-*, terraform-aws-*, modules/)
-5.  Orchestration tool — Terragrunt, Terramate, plain Terraform workspaces, or none
-6.  CI/CD platform — GitHub Actions, Azure DevOps, GitLab CI, Atlantis
-7.  Auth pattern — Managed Identity, OIDC, service principal, IAM roles
-8.  State backend — Azure Blob, S3, GCS, Terraform Cloud
-9.  Naming convention — how resources are named (prefix-type-suffix, etc.)
-10. Tag/label standard — required tags and merge strategy
-11. Test framework — native terraform test, Terratest, or both
+10. Tag/label standard — required tags and merge strategy (e.g., managed_by, environment, product)
 12. Standard variables — cross-module variables that all modules receive
 13. Target tool(s) — VS Code Copilot, Claude Code, or both
+    (plus any of Q2–Q11 marked as ambiguous or overridden by you above)
 ```
 
 ### Phase 3: Best Practices Gap Analysis
