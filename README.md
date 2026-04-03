@@ -62,6 +62,9 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 ## Repository Structure
 
 ```
+├── docs/
+│   └── migration-guide.md                # Retrofitting existing workspaces with AI customizations
+│
 ├── SKILL.md                              # Bootstrap procedure (Copilot skill entry point)
 ├── CLAUDE.md                             # Instructions for using this repo with Claude Code
 ├── .claude/commands/
@@ -213,16 +216,15 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{STANDARD_PARAMETERS}}` | (multi-line) | Pipeline parameter definitions |
 | `{{PIPELINE_CONVENTIONS}}` | (multi-line) | Pipeline naming/structure conventions |
 
-## Troubleshooting
+## Migration Guide
 
-See the [FAQ](FAQ.md) for solutions to common setup and usage issues, including:
+Already have 50+ modules and wondering whether to start over or add AI customizations incrementally? See the **[Migration Guide](docs/migration-guide.md)** for:
 
-- Agent doesn't find my modules / wrong module picked
-- Placeholder values don't look right after generation
-- Skills not showing up in Copilot
-- Claude Code ignoring `CLAUDE.md` rules
-- How to update generated files after template changes
-- [and more…](FAQ.md)
+- A decision tree: bootstrap from scratch vs retrofit existing workspace
+- Step-by-step: adding agents to an existing workspace
+- How to encode existing conventions so agents don't contradict them
+- Handling mixed naming/tagging patterns across module generations
+- Gradual rollout strategy (start with 1 agent, expand over weeks)
 
 ## Contributing
 
