@@ -18,7 +18,7 @@ applyTo: "{{MODULE_PREFIX}}-*/**/*.tf"
 - All single resources use identifier `"default"` (e.g., `google_storage_bucket.default`)
 - Map-driven resources use `for_each` with descriptive keys
 - Use `count` for boolean on/off features
-- Labels: `merge(var.env_default_labels, var.labels)` — always
+- Labels: `local.safe_labels` — always
 - GCP label keys/values must be lowercase, max 63 chars, alphanumeric + dashes + underscores
 
 ## Naming Pattern
@@ -44,15 +44,9 @@ terraform {
 }
 ```
 
-## State Backend (GCS)
-```hcl
-terraform {
-  backend "gcs" {
-    bucket = "{{STATE_BUCKET}}"
-    prefix = "{{STATE_KEY_PREFIX}}/${local.component}"
-  }
-}
-```
+## State Backend
+Do not define a `terraform { backend ... }` block in reusable modules.
+Backend configuration belongs only in the root module or orchestration layer that calls this module.
 
 ## Label Sanitization
 GCP labels have stricter constraints than AWS tags:
@@ -61,11 +55,12 @@ locals {
   # Keys and values: lowercase, max 63 chars, alphanumeric + dash + underscore
   safe_labels = {
     for k, v in merge(var.env_default_labels, var.labels) :
-    lower(substr(replace(k, "/[^a-z0-9_-]+/", "_"), 0, 63)) =>
-    lower(substr(replace(v, "/[^a-z0-9_-]+/", "_"), 0, 63))
+    lower(substr(regexreplace(k, "[^a-z0-9_-]+", "_"), 0, 63)) =>
+    lower(substr(regexreplace(v, "[^a-z0-9_-]+", "_"), 0, 63))
   }
 }
 ```
 
 ## No hardcoded secrets, project IDs, or credentials in module code.
-Use `data.google_project.current.project_id` to retrieve the project ID at runtime.
+For reusable modules, accept the project ID as an input via `var.project_id`.
+Only use `data.google_project.current.project_id` when the project should be derived from the active provider configuration instead of being passed explicitly.
