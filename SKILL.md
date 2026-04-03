@@ -130,6 +130,8 @@ After collecting all gap analysis classifications, compute an overall maturity s
 
 **For N/A categories:** exclude the category from the total and renormalize the remaining weights so they sum to 100%.
 
+**Rounding:** Keep per-category points to 1 decimal place. Round the overall percentage to the nearest integer.
+
 **Gap severity:**
 - **Critical gap** — Any Missing category, or a Partial status in Security, Testing, CI/CD, or Module Design (weight ≥ 15%)
 - **Moderate gap** — Partial status in any other category (weight < 15%)
