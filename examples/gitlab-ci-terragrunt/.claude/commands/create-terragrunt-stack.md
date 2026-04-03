@@ -1,8 +1,3 @@
----
-name: create-terragrunt-stack
-description: "Create or extend Terragrunt stacks, components, and environments. Use when: adding a new component to a stack, onboarding a new environment/site, creating _envcommon configs, wiring dependencies."
----
-
 # Create Terragrunt Stack/Component
 
 Create or extend Terragrunt configurations following the workspace hierarchy.

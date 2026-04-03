@@ -1,8 +1,3 @@
----
-name: create-terraform-module
-description: "Create a new reusable Terraform module following Globex conventions. Use when: scaffolding a new tf-module-* repo, adding Azure resource modules, creating module boilerplate."
----
-
 # Create Terraform Module
 
 Scaffolds a new `tf-module-{name}` directory following workspace conventions.
