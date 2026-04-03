@@ -178,6 +178,14 @@ When filling templates for non-Azure clouds, use these pre-resolved values:
 | `{{TAG_MERGE_PATTERN}}` | `merge(var.env_default_tags, var.tags)` |
 | `{{AUTH_REQUIREMENTS}}` | OIDC via `aws-actions/configure-aws-credentials@v4` — no static credentials |
 | `{{RESOURCE_IDENTIFIER}}` | `default` |
+| `{{AWS_ACCOUNT_ID}}` | Target AWS account ID (e.g., `123456789012`) |
+| `{{AWS_DEFAULT_REGION}}` | Default AWS region (e.g., `us-east-1`) |
+| `{{STATE_BUCKET}}` | S3 bucket name for Terraform state |
+| `{{STATE_KEY_PREFIX}}` | Key prefix in state bucket (e.g., `terraform/`) |
+| `{{STATE_BUCKET_REGION}}` | Region of the S3 state bucket |
+| `{{LOCK_TABLE}}` | DynamoDB table name for state locking |
+| `{{TERRAFORM_ROLE_NAME}}` | IAM role name for Terraform OIDC auth |
+| `{{NAME_ATTRIBUTE}}` | Resource name attribute (e.g., `name` for most AWS resources) |
 
 **GCP placeholders:**
 
@@ -194,6 +202,12 @@ When filling templates for non-Azure clouds, use these pre-resolved values:
 | `{{TAG_MERGE_PATTERN}}` | `merge(var.env_default_labels, var.labels)` (note: GCP uses `labels`, not `tags`) |
 | `{{AUTH_REQUIREMENTS}}` | Workload Identity Federation via `google-github-actions/auth@v2` — no service account keys |
 | `{{RESOURCE_IDENTIFIER}}` | `default` |
+| `{{GCP_PROJECT_ID}}` | Target GCP project ID (e.g., `my-project-prod`) |
+| `{{GCP_PROJECT_NUMBER}}` | GCP project number (e.g., `123456789`) |
+| `{{STATE_BUCKET}}` | GCS bucket name for Terraform state |
+| `{{STATE_KEY_PREFIX}}` | Key prefix in state bucket (e.g., `terraform/`) |
+| `{{WIF_POOL}}` | Workload Identity Federation pool name |
+| `{{WIF_PROVIDER}}` | Workload Identity Federation provider name |
 
 #### Generation rules:
 1. Only generate orchestration files if the workspace uses Terragrunt/Terramate/etc.
