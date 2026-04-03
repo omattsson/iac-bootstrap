@@ -40,14 +40,14 @@
 
 **Status key:** ✅ Adopted · ⚠️ Partial · ❌ Missing · — N/A
 
-> **Scoring:** Adopted = full points · Partial = half points · Missing = 0 points · N/A = excluded (score percentage computed from applicable categories only, i.e., total points earned ÷ total points possible after removing N/A rows)
+> **Scoring:** Adopted = full points · Partial = half points · Missing = 0 points · N/A = excluded and weight redistributed proportionally
 
 ---
 
 ## Critical Gaps
 
 > Critical gaps carry significant risk or the highest remediation value. Address these first.
-> **Definition:** Any Missing category, or a Partial status in any category with weight ≥ 15%.
+> **Definition:** Any Missing category, or a Partial status in Security, Testing, or CI/CD (weight ≥ 15%).
 
 {{CRITICAL_GAPS_CONTENT}}
 
@@ -56,7 +56,7 @@
 ## Moderate Gaps
 
 > Moderate gaps are worth addressing after critical items are resolved.
-> **Definition:** Partial status in categories with weight < 15%.
+> **Definition:** Partial or Missing status in categories with weight < 15%.
 
 {{MODERATE_GAPS_CONTENT}}
 
