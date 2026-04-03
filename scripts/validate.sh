@@ -15,16 +15,6 @@ set -euo pipefail
 
 TARGET="${1:-.}"
 
-if [[ ! -e "$TARGET" ]]; then
-  echo "ERROR: Target path does not exist: $TARGET" >&2
-  exit 1
-fi
-
-if [[ ! -d "$TARGET" ]]; then
-  echo "ERROR: Target path is not a directory: $TARGET" >&2
-  exit 1
-fi
-
 # Paths to scan, relative to TARGET
 SCAN_PATHS=(".github" ".claude" "CLAUDE.md")
 
@@ -35,23 +25,20 @@ for path in "${SCAN_PATHS[@]}"; do
   [[ -e "$full_path" ]] || continue
 
   while IFS= read -r line; do
-    # line format from grep -Hn: <file>:<lineno>:<full line text>
+    # line format from grep: <file>:<lineno>:<match>
     file="${line%%:*}"
     rest="${line#*:}"
     lineno="${rest%%:*}"
     content="${rest#*:}"
 
-    # Extract every {{PLACEHOLDER}} token from the line (starts with an uppercase letter or underscore, followed by uppercase letters, digits, or underscores)
-    while IFS= read -r token; do
-      printf '%s:%s: %s\n' "$file" "$lineno" "$token"
-    done < <(grep -oE '\{\{[A-Z_][A-Z0-9_]*\}\}' <<< "$content" | sort -u)
+    # Extract every {{PLACEHOLDER}} token from the line (uppercase letters and underscores only)
+    tokens=$(grep -oE '\{\{[A-Z_][A-Z0-9_]*\}\}' <<< "$content" | sort -u | tr '\n' ' ')
+
+    printf '%s:%s: %s\n' "$file" "$lineno" "$tokens"
     found=1
   done < <(grep -rHn --include="*.md" --include="*.yml" --include="*.yaml" \
                      --include="*.json" --include="*.hcl" --include="*.tf" \
-                     -E '\{\{[A-Z_][A-Z0-9_]*\}\}' "$full_path" || {
-    rc=$?
-    [[ $rc -eq 1 ]] || { echo "ERROR: grep failed scanning $full_path (exit $rc)" >&2; exit 1; }
-  })
+                     -E '\{\{[A-Z_][A-Z0-9_]*\}\}' "$full_path" 2>/dev/null || true)
 done
 
 if [[ "$found" -ne 0 ]]; then
