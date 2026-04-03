@@ -274,8 +274,8 @@ def _detect_naming_pattern(workspace: Path) -> Optional[str]:
 def _detect_auth_pattern(workspace: Path) -> Optional[str]:
     """Detect authentication pattern from pipeline files and provider config.
 
-    Checks for OIDC, Managed Identity, Workload Identity Federation, and
-    service principal patterns in CI/CD config and Terraform provider blocks.
+    Checks for OIDC, Managed Identity, and Workload Identity Federation
+    patterns in CI/CD config and Terraform provider blocks.
     """
     # Check GitHub Actions workflow files
     gh_workflows = workspace / ".github" / "workflows"
@@ -332,7 +332,8 @@ def _detect_auth_pattern(workspace: Path) -> Optional[str]:
 def _detect_tag_strategy(workspace: Path) -> Optional[str]:
     """Detect tag/label merge strategy from .tf files.
 
-    Looks for ``merge(var.env_default_tags, var.tags)`` or similar patterns.
+    Looks for ``merge(var.X, var.Y)`` expressions that combine tag or label
+    variables (e.g. ``merge(var.env_default_tags, var.tags)``).
     """
     merge_pattern = re.compile(
         r"merge\(\s*var\.(\w+)\s*,\s*var\.(\w+)\s*\)", re.IGNORECASE
