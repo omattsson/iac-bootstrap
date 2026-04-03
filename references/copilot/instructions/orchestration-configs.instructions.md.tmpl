@@ -1,0 +1,34 @@
+---
+description: "{{ORCHESTRATION_TOOL}} configuration standards. Use when writing or modifying config files for {{ORCHESTRATION_TOOL}} including root configs, shared templates, hierarchy files, and component configs."
+applyTo: "{{ORCHESTRATION_DIR}}/**/*.hcl"
+---
+
+# {{ORCHESTRATION_TOOL}} Configuration Standards
+
+## Hierarchy Files
+{{HIERARCHY_FILES_DESCRIPTION}}
+<!-- Example for Terragrunt:
+- `subscription.hcl` — subscription_id, module_tags, identity config
+- `site.hcl` — location, site_name, maintenance windows
+- `stack.hcl` — stack name, prefix, group prefixes
+- `root.hcl` — remote state, provider generation, global input merge
+-->
+
+## Shared Config Pattern ({{ENVCOMMON_PATTERN}})
+Every shared component config must:
+1. Read hierarchy variables from parent files
+2. Define source URL pointing to the module repo
+3. Declare dependencies with realistic mock outputs
+4. Provide inputs mapping hierarchy variables to module variables
+
+## Component Config Pattern
+```hcl
+{{COMPONENT_CONFIG_PATTERN}}
+```
+
+## Module Sources
+{{MODULE_SOURCE_CONVENTION}}
+Version tags from {{VERSION_TAG_LOCATION}}. Never hardcode versions in component files.
+
+## Dependencies
+{{DEPENDENCY_CONVENTIONS}}

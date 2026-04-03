@@ -1,0 +1,142 @@
+# {{COMPANY_NAME}} Infrastructure Automation
+
+You are working in an infrastructure-as-code workspace for {{COMPANY_NAME}}'s {{CLOUD_PROVIDER}} platform.
+
+## Workspace Structure
+
+| Category | Path | Purpose |
+|----------|------|---------|
+| **Terraform Modules** | `{{MODULE_PREFIX}}-*` | Reusable {{CLOUD_PROVIDER}} resource modules |
+| **Orchestration** | `{{ORCHESTRATION_DIR}}/` | {{ORCHESTRATION_TOOL}} config for all environments |
+| **Pipelines** | `{{PIPELINE_DIR}}/` | {{CI_CD_PLATFORM}} pipeline templates |
+
+## Module Source Convention
+
+{{MODULE_SOURCE_PATTERN}}
+
+Version tags managed in {{VERSION_TAG_LOCATION}}.
+
+## Standard Variable Set
+
+These variables appear across all modules:
+{{STANDARD_VARIABLES}}
+
+## Naming Convention
+
+{{NAMING_PATTERN}}
+
+## Tagging Standard
+
+{{TAG_STRATEGY}}
+
+## Environment Hierarchy
+
+{{ENVIRONMENT_HIERARCHY}}
+
+---
+
+## Coding Standards
+
+### Terraform Files (`{{MODULE_PREFIX}}-*/**/*.tf`)
+
+**File organization:**
+- `main.tf` — provider requirements + data sources
+- `{resource}.tf` — core resources, named by {{CLOUD_PROVIDER}} resource type
+- `locals.tf` — name construction, tag merging, computed values
+- `variables.tf` — module-specific variables
+- `{{COMMON_VARS_FILE}}` — standard cross-module variables
+- `outputs.tf` — module outputs (at minimum: `name` and `id`)
+- `versions.tf` — terraform and provider version constraints
+
+**Resource conventions:**
+- Single resources use identifier `"{{RESOURCE_IDENTIFIER}}"` (e.g., `{{PROVIDER_RESOURCE_EXAMPLE}}`)
+- Map-driven resources use `for_each` with descriptive keys
+- Boolean toggles use `count`
+- Tags: `{{TAG_MERGE_PATTERN}}` — always
+
+**Naming pattern:**
+```hcl
+{{NAMING_PATTERN_HCL}}
+```
+
+**Variable conventions:**
+- Use `optional(type, default)` syntax (Terraform 1.3+) for object attributes
+- Complex descriptions use `<<-EOT` heredoc format
+- All variables need `type`, `description`, and sensible `default` where possible
+
+**Provider versions:**
+```hcl
+{{PROVIDER_VERSION_CONSTRAINTS}}
+```
+
+**No hardcoded secrets, account IDs, or credentials in module code.**
+
+### Test Files (`**/*.tftest.hcl`)
+
+**Required boilerplate in every test:**
+```hcl
+mock_provider "{{PROVIDER_NAME}}" {}
+
+{{DATA_SOURCE_OVERRIDE}}
+```
+
+- All tests use `command = plan` — never `command = apply`
+- Include all `{{COMMON_VARS_FILE}}` variables in the `variables {}` block
+- One test file per concern: `naming.tftest.hcl`, `tags.tftest.hcl`, etc.
+- Run names: `snake_case` descriptive names
+
+### Orchestration Files (`{{ORCHESTRATION_DIR}}/**/*.hcl`)
+
+{{HIERARCHY_FILES_DESCRIPTION}}
+
+**Shared config pattern ({{ENVCOMMON_PATTERN}}):**
+- Read hierarchy variables from parent files
+- Define source URL pointing to the module repo
+- Declare dependencies with realistic mock outputs
+- Provide inputs mapping hierarchy variables to module variables
+
+**Component config pattern:**
+```hcl
+{{COMPONENT_CONFIG_PATTERN}}
+```
+
+Version tags from {{VERSION_TAG_LOCATION}}. Never hardcode versions in component files.
+
+### Pipeline Files
+
+**Two-stage pattern:** Plan stage → Apply stage (on protected branches with approval).
+
+{{AUTH_REQUIREMENTS}}
+
+{{TEMPLATE_REFERENCE_PATTERN}}
+
+---
+
+## Behavioral Rules
+
+### When building or modifying Terraform modules:
+- DO NOT run `terraform apply` or `terraform destroy`
+- DO NOT hardcode secrets, account IDs, or credentials
+- DO NOT change `{{COMMON_VARS_FILE}}` unless the variable is genuinely cross-module
+- DO NOT break backward compatibility without explicit approval
+- ONLY use `command = plan` in tests
+
+### When writing tests:
+- DO NOT use `command = apply`
+- DO NOT create real cloud resources
+- ALWAYS include all required `{{COMMON_VARS_FILE}}` variables
+- ALWAYS use `mock_provider "{{PROVIDER_NAME}}" {}`
+
+### When modifying orchestration configs:
+- DO NOT run apply or destroy without explicit approval
+- DO NOT hardcode account IDs or credentials
+- DO NOT modify root configs without understanding impact on all stacks
+- DO NOT bypass the DRY pattern
+- ALWAYS provide mock_outputs in dependency blocks
+
+### General principles:
+1. **Minimal intervention** — smallest change that fulfills the requirement
+2. **DRY** — common config extracted, variables flow from hierarchy
+3. **No hardcoded secrets** — use secret manager, identity-based auth
+4. **Plan-only tests** — mock providers, no real resources
+5. **Pre-commit hooks** — `terraform_fmt`, `tflint`, validation

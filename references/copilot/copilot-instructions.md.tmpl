@@ -1,0 +1,68 @@
+# Workspace Instructions — {{COMPANY_NAME}} Infrastructure Automation
+
+## Workspace Overview
+
+This workspace contains infrastructure-as-code for {{COMPANY_NAME}}'s {{CLOUD_PROVIDER}} platform.
+
+| Category | Repos/Dirs | Purpose |
+|----------|------------|---------|
+| **Terraform Modules** | `{{MODULE_PREFIX}}-*` | Reusable {{CLOUD_PROVIDER}} resource modules |
+| **Orchestration** | `{{ORCHESTRATION_DIR}}/` | {{ORCHESTRATION_TOOL}} config for all environments |
+| **Pipelines** | `{{PIPELINE_DIR}}/` | {{CI_CD_PLATFORM}} pipeline templates |
+
+## Module Source Convention
+
+{{MODULE_SOURCE_PATTERN}}
+<!-- Example: git::https://github.com/{{ORG}}/{{MODULE_PREFIX}}-{name}?ref={tag} -->
+<!-- Example: git::https://dev.azure.com/{{ORG}}/{{PROJECT}}/_git/{{MODULE_PREFIX}}-{name}?ref={tag} -->
+
+Version tags managed in {{VERSION_TAG_LOCATION}}.
+
+## Standard Variable Set (Cross-Module)
+
+These variables appear across all modules:
+{{STANDARD_VARIABLES}}
+<!-- Example:
+- `prefix` — Resource name prefix
+- `location`/`region` — Cloud region
+- `tags`/`labels` — Resource tags/labels (map(string))
+- `env_default_tags` — Default tags from orchestration layer
+-->
+
+## Naming Convention
+
+{{NAMING_PATTERN}}
+<!-- Example: {prefix}-{resource_abbreviation}-{suffix} -->
+<!-- Example: {env}-{service}-{resource_type} -->
+
+## Tagging/Labeling Standard
+
+{{TAG_STRATEGY}}
+<!-- Example:
+local.tags = merge(var.env_default_tags, var.tags)
+Always merge defaults with resource-specific. Resource-specific wins on conflicts.
+Required tags: environment, product, managed_by = "Terraform"
+-->
+
+## Environment Structure
+
+{{ENVIRONMENT_HIERARCHY}}
+<!-- Example for Terragrunt:
+config/{environment}/{region}/{stack}/{component}/terragrunt.hcl
+- subscription.hcl → Account/subscription ID, module versions
+- site.hcl → Region, location
+- stack.hcl → Stack name, prefix
+- _envcommon/*.hcl → Shared module configs
+-->
+<!-- Example for workspaces:
+environments/{env}/main.tf — per-environment root
+modules/ — shared modules
+-->
+
+## Key Principles
+
+1. **Minimal intervention** — smallest change that fulfills the requirement
+2. **DRY** — common config extracted, variables flow from hierarchy
+3. **No hardcoded secrets** — use secret manager, identity-based auth, or orchestration inputs
+4. **Plan-only tests** — Terraform native tests use `command = plan` with mock providers
+5. **Pre-commit hooks** — `terraform_fmt`, `tflint`, validation

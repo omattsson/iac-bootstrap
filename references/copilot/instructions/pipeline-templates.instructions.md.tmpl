@@ -1,0 +1,21 @@
+---
+description: "{{CI_CD_PLATFORM}} pipeline standards for IaC deployments. Use when creating or modifying pipeline config for Terraform/{{ORCHESTRATION_TOOL}} plan, apply, destroy, or drift detection."
+applyTo: {{PIPELINE_APPLY_TO}}
+---
+
+# {{CI_CD_PLATFORM}} Pipeline Standards
+
+## Two-Stage Pattern
+All deployment pipelines: Plan stage → Apply stage (on protected branches with approval).
+
+## Authentication
+{{AUTH_REQUIREMENTS}}
+
+## Template/Reuse Pattern
+{{TEMPLATE_REFERENCE_PATTERN}}
+
+## Standard Parameters
+{{STANDARD_PARAMETERS_LIST}}
+
+## Conventions
+{{PIPELINE_CONVENTIONS_LIST}}
