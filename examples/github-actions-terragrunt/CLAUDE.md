@@ -7,16 +7,16 @@ You are working in an infrastructure-as-code workspace for Acme's AWS platform.
 | Category | Path | Purpose |
 |----------|------|---------|
 | **Terraform Modules** | `tf-module-*` | Reusable AWS resource modules |
-| **Stacks** | `environments/` | Per-environment Terraform root configs |
-| **Pipelines** | `.github/workflows/` | GitHub Actions CI/CD workflows |
+| **Orchestration** | `infrastructure-config/` | Terragrunt config for all environments |
+| **Pipelines** | `.github/workflows/` | GitHub Actions workflow templates |
 
 ## Module Source Convention
 
 ```
-git::https://github.com/acme/tf-module-{name}.git?ref={tag}
+git::https://github.com/acme-infra/tf-module-{name}?ref={tag}
 ```
 
-Version tags managed in `environments/{environment}/{stack}/versions.tf` → `module_versions` locals.
+Version tags managed in `account.hcl` → `module_tags` local.
 
 ## Standard Variable Set
 
@@ -24,14 +24,15 @@ These variables appear across all modules:
 - `prefix` — Resource name prefix (e.g., `app-use1-dev`)
 - `region` — AWS region (default: `us-east-1`)
 - `tags` — Additional tags (`map(string)`)
-- `env_default_tags` — Default tags from stack inputs
+- `env_default_tags` — Default tags from Terragrunt inputs
+- `account_id` — AWS account ID
 
 ## Naming Convention
 
 `{prefix}-{resource_abbreviation}-{suffix}`
-- S3 bucket: `{prefix}-{suffix}` (globally unique, lowercase, max 63 chars)
-- IAM role: `{prefix}-{suffix}` (max 64 chars)
-- All names lowercase: `lower(regexreplace(var.suffix, "[^0-9a-zA-Z]+", "-"))`
+- S3: `{prefix}-s3-{suffix}` (lowercase, max 63 chars)
+- IAM roles: `{prefix}-role-{suffix}` (max 64 chars)
+- All names sanitized: `regexreplace(var.suffix, "[^0-9A-Za-z]+", "-")`
 - Optional `full_name` override on most modules
 
 ## Tagging Standard
@@ -39,21 +40,17 @@ These variables appear across all modules:
 ```hcl
 local.tags = merge(var.env_default_tags, var.tags)
 ```
-Required tags: `Environment`, `Product`, `ManagedBy = "Terraform"`.
+Required tags: `environment`, `product`, `managed_by = "Terraform"`.
 
-## Stack Hierarchy
+## Terragrunt Hierarchy
 
 ```
-environments/{environment}/{stack}/
-├── main.tf          # Module calls + provider config
-├── variables.tf     # Stack-level variables
-├── outputs.tf       # Stack outputs
-├── backend.tf       # S3 backend config
-└── versions.tf      # Provider + module version pins
+config/{environment}/{region}/{stack}/{component}/terragrunt.hcl
 ```
-
-S3 backend: `acme-terraform-state-{account_id}` / `{environment}/{stack}/terraform.tfstate`  
-DynamoDB lock table: `acme-terraform-locks`
+- `account.hcl` → Account ID, module versions
+- `region.hcl` → AWS region, availability zones
+- `stack.hcl` → Stack name, prefix
+- `_envcommon/*.hcl` → Shared module configs
 
 ---
 
@@ -67,7 +64,7 @@ DynamoDB lock table: `acme-terraform-locks`
 - `locals.tf` — name construction, tag merging, computed values
 - `variables.tf` — module-specific variables
 - `common.variables.tf` — standard cross-module variables
-- `outputs.tf` — module outputs (at minimum: `name` and `id`/`arn`)
+- `outputs.tf` — module outputs (at minimum: `name` and `id`)
 - `versions.tf` — terraform and provider version constraints
 
 **Resource conventions:**
@@ -78,7 +75,7 @@ DynamoDB lock table: `acme-terraform-locks`
 
 **Naming pattern:**
 ```hcl
-local.name = var.full_name != null ? var.full_name : "${var.prefix}-{abbr}-${local.name_suffix}"
+local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-s3-${local.name_suffix}", 0, 63)
 ```
 
 **Provider versions:**
@@ -94,13 +91,12 @@ aws = { source = "hashicorp/aws", version = ">=5.0,<6.0" }
 ```hcl
 mock_provider "aws" {}
 
-override_data {
-  target = data.aws_caller_identity.current
-  values = {
-    account_id = "123456789012"
-    arn        = "arn:aws:iam::123456789012:root"
-    user_id    = "123456789012"
-  }
+variables {
+  prefix           = "test-auto"
+  region           = "us-east-1"
+  tags             = {}
+  env_default_tags = { managed_by = "Terraform" }
+  account_id       = "123456789012"
 }
 ```
 
@@ -108,20 +104,21 @@ override_data {
 - Include all `common.variables.tf` variables in `variables {}` block
 - One test file per concern: `naming.tftest.hcl`, `tags.tftest.hcl`, etc.
 
-### Stack Files (`environments/**/*.tf`)
+### Terragrunt Files (`infrastructure-config/**/*.hcl`)
 
-Hierarchy: `environments/{environment}/{stack}/`
+Hierarchy: account.hcl → region.hcl → stack.hcl → component/terragrunt.hcl
 
-State backend:
-- One S3 key per stack (one deployable unit)
-- DynamoDB for state locking
-- Encryption enabled
+Shared config in `_envcommon/`:
+- Read hierarchy variables from parent files
+- Define source URL pointing to module repo
+- Declare dependencies with realistic mock outputs
+- Map hierarchy variables to module inputs
 
-Module versions pinned in `versions.tf` locals. Never hardcode module refs in `main.tf`.
+Version tags from `account.hcl`. Never hardcode versions in components.
 
 ### Pipelines (`.github/workflows/*.yml`)
 
-Two-stage: Plan → Apply (on protected branches with approval). OIDC-based auth (no long-lived credentials). Provider caching.
+Two-stage: Plan → Apply (on protected branches with environment approval). OIDC-based auth (no long-lived credentials).
 
 ---
 
@@ -133,12 +130,12 @@ Two-stage: Plan → Apply (on protected branches with approval). OIDC-based auth
 - DO NOT break backward compatibility without explicit approval
 - ONLY use `command = plan` in tests
 - ALWAYS use `mock_provider "aws" {}` in tests
-- ALWAYS use OIDC for authentication — never IAM user access keys in pipelines
+- ALWAYS provide `mock_outputs` in Terragrunt dependency blocks
 
 ## Principles
 
 1. **Minimal intervention** — smallest change that fulfills the requirement
-2. **DRY** — shared config in reusable modules, per-environment overrides only in stacks
-3. **No hardcoded secrets** — use OIDC, SSM Parameter Store, or Secrets Manager
+2. **DRY** — common config in `_envcommon`, variables flow from hierarchy
+3. **No hardcoded secrets** — use Secrets Manager, OIDC, or Terragrunt inputs
 4. **Plan-only tests** — mock providers, no real resources
 5. **Pre-commit hooks** — `terraform_fmt`, `tflint`, `checkov`, `terraform_docs`
