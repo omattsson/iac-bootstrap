@@ -215,11 +215,14 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 
 ## Contributing
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines on proposing new templates, best practices, or cloud provider support, as well as template conventions, placeholder naming rules, and the PR checklist.
+
+Quick summary:
 1. Fork the repo
 2. Add/modify templates in `references/`
 3. Update `SKILL.md` if the procedure changes
 4. Test by running the bootstrap against a real workspace
-5. Submit a PR
+5. Submit a PR (see the [PR checklist](CONTRIBUTING.md#pr-checklist))
 
 ## License
 
