@@ -35,7 +35,7 @@ for path in "${SCAN_PATHS[@]}"; do
   [[ -e "$full_path" ]] || continue
 
   while IFS= read -r line; do
-    # line format from grep: <file>:<lineno>:<match>
+    # line format from grep -Hn: <file>:<lineno>:<full line text>
     file="${line%%:*}"
     rest="${line#*:}"
     lineno="${rest%%:*}"
@@ -48,7 +48,10 @@ for path in "${SCAN_PATHS[@]}"; do
     found=1
   done < <(grep -rHn --include="*.md" --include="*.yml" --include="*.yaml" \
                      --include="*.json" --include="*.hcl" --include="*.tf" \
-                     -E '\{\{[A-Z_][A-Z0-9_]*\}\}' "$full_path" 2>/dev/null || true)
+                     -E '\{\{[A-Z_][A-Z0-9_]*\}\}' "$full_path" || {
+    rc=$?
+    [[ $rc -eq 1 ]] || { echo "ERROR: grep failed scanning $full_path (exit $rc)" >&2; exit 1; }
+  })
 done
 
 if [[ "$found" -ne 0 ]]; then
