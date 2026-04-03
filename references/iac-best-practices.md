@@ -340,10 +340,121 @@ Run `terraform fmt -recursive` before every commit. Non-negotiable.
 - Examples in `examples/` directory — at least one basic example
 
 ### Backward Compatibility
-- New variables must have defaults (existing consumers shouldn't break)
-- Use `optional()` for new object attributes
-- Deprecate, don't remove — add `DEPRECATED` prefix to description
-- Breaking changes require a major version bump
+
+Follow these rules so existing consumers don't break when you evolve a module.
+
+#### Adding optional variables (non-breaking)
+
+**New variable** — always provide a default so existing callers don't need to change:
+
+```hcl
+variable "enable_purge_protection" {
+  type        = bool
+  default     = false   # same behavior as before the variable existed
+  description = "Enable soft-delete purge protection. Default: false."
+}
+```
+
+**Existing required variable gaining a default** — preserves current behavior while removing the obligation on callers:
+
+```hcl
+# Before (required — callers must supply it)
+variable "sku_name" {
+  type = string
+}
+
+# After (optional — callers that omit it get "standard")
+variable "sku_name" {
+  type    = string
+  default = "standard"
+}
+```
+
+For new attributes on an existing object variable, use `optional()`:
+
+```hcl
+variable "network_config" {
+  type = object({
+    public_access = optional(bool, false)
+    allowed_cidrs = optional(list(string), [])
+    # New attribute — callers that don't set it get the default
+    bypass_azure_services = optional(bool, false)
+  })
+  default = {}
+}
+```
+
+#### Deprecating variables (keep old, warn)
+
+Never delete a variable in a patch or minor release. Mark it deprecated and keep it working:
+
+```hcl
+# Old name kept for backward compatibility
+variable "vault_sku" {
+  type        = string
+  default     = null
+  description = "DEPRECATED: use `sku_name` instead. Will be removed in v3.0."
+}
+
+# New canonical variable
+variable "sku_name" {
+  type        = string
+  default     = "standard"
+  description = "SKU name for the Key Vault."
+}
+
+locals {
+  # Honor old variable if set, new variable otherwise
+  resolved_sku = var.vault_sku != null ? var.vault_sku : var.sku_name
+}
+```
+
+#### Renaming resources with `moved` blocks
+
+When you rename a resource or change a `for_each` key, add a `moved` block so Terraform doesn't destroy and re-create:
+
+```hcl
+# Renamed resource — add moved block instead of destroying the old one
+moved {
+  from = azurerm_key_vault.kv
+  to   = azurerm_key_vault.default
+}
+
+# Changed for_each key — preserve existing state
+moved {
+  from = azurerm_private_endpoint.default["blob"]
+  to   = azurerm_private_endpoint.default["blob_endpoint"]
+}
+```
+
+Include `moved` blocks in the same commit as the rename. Remove them only after all consumers have applied the change.
+
+#### Semantic versioning for modules
+
+| Change type | Version bump | Example |
+|-------------|-------------|---------|
+| Bug fix, doc update | Patch (`x.y.Z`) | `v1.2.3 → v1.2.4` |
+| New optional variable, new output | Minor (`x.Y.0`) | `v1.2.3 → v1.3.0` |
+| Removed variable, renamed resource without `moved`, changed output type | Major (`X.0.0`) | `v1.2.3 → v2.0.0` |
+
+#### Major version migration guides
+
+When a major bump is unavoidable, publish a `MIGRATION.md` alongside the release tag:
+
+```markdown
+# Migrating from v1 to v2
+
+## Breaking changes
+- Variable `vault_sku` removed — use `sku_name` instead
+- Output `vault_uri` renamed to `key_vault_uri`
+
+## Steps
+1. Replace `vault_sku` with `sku_name` in all module calls
+2. Update any references from `module.kv.vault_uri` → `module.kv.key_vault_uri`
+3. Run `terraform plan` — expect no resource replacements
+```
+
+Pin consumers to the last v1 tag during migration, then bump one environment at a time.
 
 ---
 

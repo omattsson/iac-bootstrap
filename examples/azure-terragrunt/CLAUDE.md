@@ -120,6 +120,97 @@ Two-stage: Plan → Apply (on protected branches with approval). Identity-based 
 
 ---
 
+## Module Maintenance & Backward Compatibility
+
+### Adding optional variables (non-breaking)
+Always provide a default that preserves existing behavior. Use `optional()` for new object attributes:
+
+```hcl
+# New simple variable — default keeps existing behavior for all current callers
+variable "enable_purge_protection" {
+  type        = bool
+  default     = false
+  description = "Enable soft-delete purge protection on the Key Vault."
+}
+
+# New attribute on existing object — optional() so no caller needs to change
+variable "network_config" {
+  type = object({
+    public_access         = optional(bool, false)
+    allowed_cidrs         = optional(list(string), [])
+    bypass_azure_services = optional(bool, false)  # added in v1.4.0
+  })
+  default = {}
+}
+```
+
+### Deprecating variables
+Keep the old variable, add a `DEPRECATED` description, and resolve both in `locals`:
+
+```hcl
+# Before: vault_sku was the original variable name
+variable "vault_sku" {
+  type        = string
+  default     = null
+  description = "DEPRECATED: use `sku_name` instead. Will be removed in v3.0."
+}
+
+variable "sku_name" {
+  type        = string
+  default     = "standard"
+  description = "SKU name for the Key Vault (standard or premium)."
+}
+
+locals {
+  resolved_sku = var.vault_sku != null ? var.vault_sku : var.sku_name
+}
+```
+
+### Renaming resources with `moved` blocks
+Add a `moved` block in the same commit as any resource or `for_each` key rename. Prevents destroy/re-create:
+
+```hcl
+# Renamed resource identifier
+moved {
+  from = azurerm_key_vault.kv
+  to   = azurerm_key_vault.default
+}
+
+# Changed for_each key
+moved {
+  from = azurerm_private_endpoint.default["blob"]
+  to   = azurerm_private_endpoint.default["blob_endpoint"]
+}
+```
+
+### Semantic versioning
+
+| Change | Version bump | Example |
+|--------|-------------|---------|
+| Bug fix, doc update | Patch (`x.y.Z`) | `v1.2.3 → v1.2.4` |
+| New optional variable, new output | Minor (`x.Y.0`) | `v1.2.3 → v1.3.0` |
+| Removed/renamed variable, changed output type | Major (`X.0.0`) | `v1.2.3 → v2.0.0` |
+
+Version tags are pinned per environment in `subscription.hcl`. Roll out: dev → staging → prod.
+
+### Major version migration guides
+Add `MIGRATION.md` at the repo root for every major bump. Example structure:
+
+```markdown
+# Migrating from v1 to v2
+
+## Breaking changes
+- Variable `vault_sku` removed — use `sku_name`
+- Output `vault_uri` renamed to `key_vault_uri`
+
+## Steps
+1. Replace `vault_sku = "standard"` with `sku_name = "standard"` in all Terragrunt inputs
+2. Update references from `module.kv.vault_uri` → `module.kv.key_vault_uri`
+3. Run `terraform plan` — no resource replacements expected
+```
+
+---
+
 ## Behavioral Rules
 
 - DO NOT run `terraform apply` or `terraform destroy` without explicit approval
