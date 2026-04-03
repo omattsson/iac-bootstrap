@@ -86,7 +86,7 @@ resource "{{PROVIDER_RESOURCE}}" "{{RESOURCE_IDENTIFIER}}" {
   name                = local.name
   {{LOCATION_ATTRIBUTE}}
   {{RESOURCE_GROUP_ATTRIBUTE}}
-  tags                = local.tags
+  {{TAG_ATTRIBUTE}}                = {{TAG_LOCAL_REF}}
 
   # Resource-specific configuration...
 }
@@ -123,14 +123,14 @@ run "creates_resource_with_correct_name" {
   }
 }
 
-run "merges_tags_correctly" {
+run "merges_{{TAG_ATTRIBUTE}}_correctly" {
   command = plan
   variables {
-    tags = { extra = "tag" }
+    {{TAG_ATTRIBUTE}} = { extra = "value" }
   }
   assert {
-    condition     = {{PROVIDER_RESOURCE}}.{{RESOURCE_IDENTIFIER}}.tags["extra"] == "tag"
-    error_message = "Custom tags should be merged"
+    condition     = {{PROVIDER_RESOURCE}}.{{RESOURCE_IDENTIFIER}}.{{TAG_ATTRIBUTE}}["extra"] == "value"
+    error_message = "Custom {{TAG_ATTRIBUTE}} should be merged"
   }
 }
 ```

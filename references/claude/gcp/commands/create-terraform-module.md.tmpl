@@ -75,7 +75,7 @@ variable "region" {
 variable "labels" {
   type        = map(string)
   default     = {}
-  description = "Additional resource labels. Merged with env_default_labels (these win on conflict)."
+  description = "Additional resource labels (take precedence over env_default_labels on conflict)."
 }
 
 variable "env_default_labels" {

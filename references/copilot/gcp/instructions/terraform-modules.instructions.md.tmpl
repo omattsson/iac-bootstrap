@@ -61,8 +61,8 @@ locals {
   # Keys and values: lowercase, max 63 chars, alphanumeric + dash + underscore
   safe_labels = {
     for k, v in merge(var.env_default_labels, var.labels) :
-    lower(substr(replace(k, "/[^a-z0-9_-]+/", "_"), 0, 63)) =>
-    lower(substr(replace(v, "/[^a-z0-9_-]+/", "_"), 0, 63))
+    lower(substr(regexreplace(k, "[^a-z0-9_-]+", "_"), 0, 63)) =>
+    lower(substr(regexreplace(v, "[^a-z0-9_-]+", "_"), 0, 63))
   }
 }
 ```

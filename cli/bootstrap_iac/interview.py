@@ -432,10 +432,12 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault(
         "PROVIDER_VERSION_CONSTRAINTS",
         (
-            f'required_providers {{\n'
-            f'  {cloud_defs["provider_name"]} = {{\n'
-            f'    source  = "hashicorp/{cloud_defs["provider_name"]}"\n'
-            f'    version = "{cloud_defs["provider_version_constraints"]}"\n'
+            f'terraform {{\n'
+            f'  required_providers {{\n'
+            f'    {cloud_defs["provider_name"]} = {{\n'
+            f'      source  = "hashicorp/{cloud_defs["provider_name"]}"\n'
+            f'      version = "{cloud_defs["provider_version_constraints"]}"\n'
+            f'    }}\n'
             f'  }}\n'
             f'}}'
         ),
@@ -468,6 +470,14 @@ def build_context(answers: dict) -> dict:
         "tags = " + ctx["TAG_MERGE_PATTERN"]
         if cloud != "GCP"
         else "labels = " + ctx["TAG_MERGE_PATTERN"],
+    )
+    ctx.setdefault(
+        "TAG_ATTRIBUTE",
+        "labels" if cloud == "GCP" else "tags",
+    )
+    ctx.setdefault(
+        "TAG_LOCAL_REF",
+        "local.labels" if cloud == "GCP" else "local.tags",
     )
 
     # ---- Orchestration derived values ----
@@ -629,7 +639,7 @@ def _single_component_pipeline(cicd: str, org: str, module_prefix: str) -> str:
             "    permissions:\n"
             "      id-token: write\n"
             "      contents: read\n"
-            "      environment: production\n"
+            "    environment: production\n"
         ).replace("{org}", org)
     if "Azure DevOps" in cicd:
         return (
@@ -653,6 +663,12 @@ def _single_component_pipeline(cicd: str, org: str, module_prefix: str) -> str:
 def _stack_pipeline(cicd: str, orch: str) -> str:
     tool = _ORCHESTRATION_DEFAULTS.get(orch, _ORCHESTRATION_DEFAULTS["None"])["tool_lower"]
     if "GitHub" in cicd:
+        if tool == "terraform":
+            plan_cmd = "terraform plan"
+            apply_cmd = "terraform apply --auto-approve"
+        else:
+            plan_cmd = f"{tool} run-all plan"
+            apply_cmd = f"{tool} run-all apply --auto-approve"
         return (
             "name: plan-apply-stack\n"
             "on:\n"
@@ -665,7 +681,7 @@ def _stack_pipeline(cicd: str, orch: str) -> str:
             "    runs-on: ubuntu-latest\n"
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
-            f"      - run: {tool} run-all plan\n"
+            f"      - run: {plan_cmd}\n"
             "        working-directory: infrastructure-config/dev/platform\n"
             "  apply:\n"
             "    needs: plan\n"
@@ -674,7 +690,7 @@ def _stack_pipeline(cicd: str, orch: str) -> str:
             "    runs-on: ubuntu-latest\n"
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
-            f"      - run: {tool} run-all apply --auto-approve\n"
+            f"      - run: {apply_cmd}\n"
             "        working-directory: infrastructure-config/dev/platform\n"
         )
     return "# Define your stack-level plan → apply pipeline here"
@@ -683,6 +699,10 @@ def _stack_pipeline(cicd: str, orch: str) -> str:
 def _drift_pipeline(cicd: str, orch: str) -> str:
     tool = _ORCHESTRATION_DEFAULTS.get(orch, _ORCHESTRATION_DEFAULTS["None"])["tool_lower"]
     if "GitHub" in cicd:
+        if tool == "terraform":
+            plan_cmd = "terraform plan --detailed-exitcode"
+        else:
+            plan_cmd = f"{tool} run-all plan --detailed-exitcode"
         return (
             "name: drift-detection\n"
             "on:\n"
@@ -693,7 +713,7 @@ def _drift_pipeline(cicd: str, orch: str) -> str:
             "    runs-on: ubuntu-latest\n"
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
-            f"      - run: {tool} run-all plan --detailed-exitcode\n"
+            f"      - run: {plan_cmd}\n"
             "        working-directory: infrastructure-config\n"
             "        continue-on-error: true\n"
             "      - name: Notify on drift\n"
