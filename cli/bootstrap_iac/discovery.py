@@ -36,6 +36,18 @@ class DiscoveryResult:
     # Directory where pipeline files live
     pipeline_dir: Optional[str] = None
 
+    # Naming pattern inferred from resource name expressions in .tf files
+    naming_pattern: Optional[str] = None
+
+    # State backend type detected from backend blocks in .tf files
+    state_backend: Optional[str] = None
+
+    # Auth pattern detected from pipeline configs or provider blocks
+    auth_pattern: Optional[str] = None
+
+    # Tag/label strategy detected from merge expressions in .tf files
+    tag_strategy: Optional[str] = None
+
     # Whether a .github/copilot-instructions.md already exists
     has_copilot_instructions: bool = False
 
@@ -165,6 +177,177 @@ def _detect_org_from_git(workspace: Path) -> Optional[str]:
     return None
 
 
+def _detect_state_backend(workspace: Path) -> Optional[str]:
+    """Detect state backend from Terraform backend blocks in .tf files."""
+    backend_pattern = re.compile(
+        r'backend\s+"([^"]+)"', re.IGNORECASE
+    )
+    _BACKEND_MAP = {
+        "azurerm": "Azure Blob Storage",
+        "s3": "S3",
+        "gcs": "GCS",
+        "remote": "Terraform Cloud",
+        "consul": "Consul",
+        "http": "HTTP",
+        "pg": "PostgreSQL",
+    }
+    for tf_file in workspace.rglob("*.tf"):
+        try:
+            content = tf_file.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        m = backend_pattern.search(content)
+        if m:
+            backend_type = m.group(1).lower()
+            return _BACKEND_MAP.get(backend_type, backend_type)
+    return None
+
+
+def _detect_naming_pattern(workspace: Path) -> Optional[str]:
+    """Infer resource naming pattern from local name expressions in .tf files.
+
+    Scans for ``name = "..."`` expressions that reference ``var.prefix`` or
+    ``local.`` and attempts to generalise them into a pattern like
+    ``{prefix}-{resource_abbreviation}-{suffix}``.
+    """
+    name_expr = re.compile(
+        r'name\s*=\s*"(\$\{[^}]+\}[^"]*)"', re.IGNORECASE
+    )
+    candidates: list[str] = []
+    for tf_file in workspace.rglob("*.tf"):
+        # Skip test files and example files
+        rel = str(tf_file.relative_to(workspace))
+        if "test" in rel.lower() or "example" in rel.lower():
+            continue
+        try:
+            content = tf_file.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for m in name_expr.finditer(content):
+            expr = m.group(1)
+            if "var.prefix" in expr or "local.prefix" in expr:
+                candidates.append(expr)
+
+    if not candidates:
+        return None
+
+    # Generalise the most common pattern
+    from collections import Counter
+
+    most_common = Counter(candidates).most_common(1)[0][0]
+
+    # Convert interpolation expressions to readable pattern tokens
+    pattern = most_common
+    pattern = re.sub(
+        r"\$\{var\.prefix\}|\$\{local\.prefix\}",
+        "{prefix}",
+        pattern,
+    )
+    pattern = re.sub(
+        r"\$\{local\.resource_abbreviation\}|\$\{local\.abbreviation\}",
+        "{resource_abbreviation}",
+        pattern,
+    )
+    pattern = re.sub(
+        r"\$\{local\.suffix\}|\$\{var\.suffix\}",
+        "{suffix}",
+        pattern,
+    )
+    pattern = re.sub(
+        r"\$\{var\.name\}|\$\{local\.name\}",
+        "{name}",
+        pattern,
+    )
+    pattern = re.sub(
+        r"\$\{local\.\w+\}",
+        "{component}",
+        pattern,
+    )
+    pattern = re.sub(
+        r"\$\{var\.\w+\}",
+        "{var}",
+        pattern,
+    )
+    return pattern
+
+
+def _detect_auth_pattern(workspace: Path) -> Optional[str]:
+    """Detect authentication pattern from pipeline files and provider config.
+
+    Checks for OIDC, Managed Identity, Workload Identity Federation, and
+    service principal patterns in CI/CD config and Terraform provider blocks.
+    """
+    # Check GitHub Actions workflow files
+    gh_workflows = workspace / ".github" / "workflows"
+    if gh_workflows.is_dir():
+        for yml_file in gh_workflows.rglob("*.yml"):
+            try:
+                content = yml_file.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if "id-token: write" in content:
+                if "aws-actions/configure-aws-credentials" in content:
+                    return "IAM Roles via OIDC"
+                if "azure/login" in content:
+                    return "Managed Identity / OIDC"
+                if "google-github-actions/auth" in content:
+                    return "Workload Identity Federation"
+                return "OIDC"
+
+    # Check Azure DevOps pipelines
+    for pattern in ("azure-pipelines.yml", "**/azure-pipelines*.yml"):
+        for yml_file in workspace.glob(pattern):
+            try:
+                content = yml_file.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if "azureSubscription" in content or "serviceConnection" in content:
+                return "Managed Identity / OIDC"
+
+    # Check GitLab CI
+    gitlab_ci = workspace / ".gitlab-ci.yml"
+    if gitlab_ci.exists():
+        try:
+            content = gitlab_ci.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            content = ""
+        if "id_tokens:" in content:
+            return "OIDC"
+
+    # Fall back to scanning provider blocks
+    use_oidc = re.compile(r"use_oidc\s*=\s*true", re.IGNORECASE)
+    use_msi = re.compile(r"use_msi\s*=\s*true", re.IGNORECASE)
+    for tf_file in workspace.rglob("*.tf"):
+        try:
+            content = tf_file.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if use_oidc.search(content):
+            return "Managed Identity / OIDC"
+        if use_msi.search(content):
+            return "Managed Identity / OIDC"
+    return None
+
+
+def _detect_tag_strategy(workspace: Path) -> Optional[str]:
+    """Detect tag/label merge strategy from .tf files.
+
+    Looks for ``merge(var.env_default_tags, var.tags)`` or similar patterns.
+    """
+    merge_pattern = re.compile(
+        r"merge\(\s*var\.(\w+)\s*,\s*var\.(\w+)\s*\)", re.IGNORECASE
+    )
+    for tf_file in workspace.rglob("*.tf"):
+        try:
+            content = tf_file.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        m = merge_pattern.search(content)
+        if m:
+            return f"merge(var.{m.group(1)}, var.{m.group(2)})"
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -181,6 +364,10 @@ def scan_workspace(workspace_path: Path) -> DiscoveryResult:
         workspace_path
     )
     result.ci_cd_platform, result.pipeline_dir = _detect_ci_cd(workspace_path)
+    result.naming_pattern = _detect_naming_pattern(workspace_path)
+    result.state_backend = _detect_state_backend(workspace_path)
+    result.auth_pattern = _detect_auth_pattern(workspace_path)
+    result.tag_strategy = _detect_tag_strategy(workspace_path)
 
     result.has_copilot_instructions = (
         workspace_path / ".github" / "copilot-instructions.md"

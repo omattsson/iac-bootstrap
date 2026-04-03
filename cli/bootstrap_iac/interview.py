@@ -851,9 +851,9 @@ def run_interview(
 
     # 7. Auth pattern
     cloud = answers["CLOUD_PROVIDER"]
-    default_auth = _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
-        "auth_pattern", "OIDC"
-    )
+    default_auth = discovery.auth_pattern or _CLOUD_PROVIDER_DEFAULTS.get(
+        cloud, {}
+    ).get("auth_pattern", "OIDC")
     answers["AUTH_PATTERN"] = _get(
         "AUTH_PATTERN",
         "Authentication pattern",
@@ -861,9 +861,9 @@ def run_interview(
     )
 
     # 8. State backend
-    default_backend = _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
-        "state_backend", "Remote"
-    )
+    default_backend = discovery.state_backend or _CLOUD_PROVIDER_DEFAULTS.get(
+        cloud, {}
+    ).get("state_backend", "Remote")
     answers["STATE_BACKEND"] = _get(
         "STATE_BACKEND",
         "Terraform state backend",
@@ -871,9 +871,9 @@ def run_interview(
     )
 
     # 9. Naming convention
-    default_naming = _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
-        "naming_pattern", "{prefix}-{resource_type}-{suffix}"
-    )
+    default_naming = discovery.naming_pattern or _CLOUD_PROVIDER_DEFAULTS.get(
+        cloud, {}
+    ).get("naming_pattern", "{prefix}-{resource_type}-{suffix}")
     answers["NAMING_PATTERN"] = _get(
         "NAMING_PATTERN",
         "Resource naming pattern",
@@ -881,7 +881,9 @@ def run_interview(
     )
 
     # 10. Tag/label strategy
-    default_tag = _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
+    default_tag = discovery.tag_strategy or _CLOUD_PROVIDER_DEFAULTS.get(
+        cloud, {}
+    ).get(
         "tag_strategy",
         "merge(var.default_tags, var.tags)",
     )

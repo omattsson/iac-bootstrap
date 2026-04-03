@@ -241,13 +241,30 @@ def main(
 
     detected_parts = []
     if discovery.cloud_provider:
-        detected_parts.append(f"cloud={discovery.cloud_provider}")
+        detected_parts.append(("Cloud provider", discovery.cloud_provider))
     if discovery.orchestration_tool:
-        detected_parts.append(f"orchestration={discovery.orchestration_tool}")
+        detected_parts.append(("Orchestration", discovery.orchestration_tool))
     if discovery.ci_cd_platform:
-        detected_parts.append(f"ci_cd={discovery.ci_cd_platform}")
+        detected_parts.append(("CI/CD platform", discovery.ci_cd_platform))
+    if discovery.module_prefix:
+        detected_parts.append(("Module prefix", discovery.module_prefix))
+    if discovery.org_name:
+        detected_parts.append(("Organisation", discovery.org_name))
+    if discovery.naming_pattern:
+        detected_parts.append(("Naming pattern", discovery.naming_pattern))
+    if discovery.state_backend:
+        detected_parts.append(("State backend", discovery.state_backend))
+    if discovery.auth_pattern:
+        detected_parts.append(("Auth pattern", discovery.auth_pattern))
+    if discovery.tag_strategy:
+        detected_parts.append(("Tag strategy", discovery.tag_strategy))
+
     if detected_parts:
-        click.echo(f"  Detected: {', '.join(detected_parts)}")
+        click.echo()
+        click.secho("  Auto-detected values:", bold=True)
+        for label, value in detected_parts:
+            click.echo(f"    • {label}: {value}")
+        click.echo()
 
     # ------------------------------------------------------------------ #
     # Normalise CLI flag values to match interview choices                  #

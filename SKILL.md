@@ -31,22 +31,38 @@ Explore the target workspace to understand existing patterns:
 
 Build a profile of the workspace by reading representative files.
 
+#### Auto-Detection Heuristics
+
+The discovery phase auto-populates interview defaults using the following heuristics. Pre-filled values are presented to the user for confirmation or override; when a heuristic finds no signal the question falls back to a sensible default.
+
+| Interview Question | Detection Method | Signal |
+|--------------------|-----------------|--------|
+| **Cloud provider** | Scan all `.tf` files for `provider "azurerm"`, `provider "aws"`, `provider "google"` blocks (including `required_providers`). Return the provider with the highest match count. | `provider` and `required_providers` blocks |
+| **Module prefix** | Scan top-level directory names for `tf-module-*`, `terraform-{cloud}-*`, or `tf-*-*` patterns; fall back to `modules/` directory. Return the most common prefix. | Directory naming conventions |
+| **Orchestration tool** | Search for `terragrunt.hcl` → Terragrunt, `terramate.tm.hcl` → Terramate, neither → plain Terraform. Also records the top-level orchestration directory. | Orchestration config file presence |
+| **CI/CD platform** | Check for `.github/workflows/` → GitHub Actions, `azure-pipelines*.yml` → Azure DevOps, `.gitlab-ci.yml` → GitLab CI. | Pipeline file locations |
+| **Organisation name** | Parse the git remote URL from `.git/config` — extract the org segment from `https://…/{org}/{repo}` or `git@…:{org}/{repo}`. | Git remote URL |
+| **State backend** | Scan `.tf` files for `backend "azurerm"` → Azure Blob Storage, `backend "s3"` → S3, `backend "gcs"` → GCS, `backend "remote"` → Terraform Cloud, etc. | `backend` block in Terraform config |
+| **Naming pattern** | Search `.tf` files for `name = "${var.prefix}-..."` expressions. Generalise the most common pattern into tokens like `{prefix}-{resource_abbreviation}-{suffix}`. Test and example files are excluded. | `name` attribute interpolation expressions |
+| **Auth pattern** | Check CI/CD files for `id-token: write` + provider login actions (OIDC), `azureSubscription`/`serviceConnection` (Azure MSI), `id_tokens:` (GitLab OIDC). Fall back to scanning provider blocks for `use_oidc = true` or `use_msi = true`. | Pipeline auth config and provider settings |
+| **Tag/label strategy** | Search `.tf` files for `merge(var.env_default_tags, var.tags)` or similar `merge()` expressions combining tag variables. | `merge()` expressions in locals |
+
 ### Phase 2: Interview
 
-Gather what can't be inferred from code:
+Gather what can't be inferred from code. Values auto-detected during Phase 1 are shown as defaults — confirm or override each one:
 
 ```
 Questions:
-1.  Company/org name — used in descriptions and comments
-2.  Cloud provider(s) — Azure, AWS, GCP, or multi-cloud
+1.  Company/org name — used in descriptions and comments (auto: git remote org)
+2.  Cloud provider(s) — Azure, AWS, GCP, or multi-cloud (auto: provider blocks)
 3.  Module source pattern — Git URL pattern for module sourcing
-4.  Module prefix — directory naming (e.g., tf-module-*, terraform-aws-*, modules/)
-5.  Orchestration tool — Terragrunt, Terramate, plain Terraform workspaces, or none
-6.  CI/CD platform — GitHub Actions, Azure DevOps, GitLab CI, Atlantis
-7.  Auth pattern — Managed Identity, OIDC, service principal, IAM roles
-8.  State backend — Azure Blob, S3, GCS, Terraform Cloud
-9.  Naming convention — how resources are named (prefix-type-suffix, etc.)
-10. Tag/label standard — required tags and merge strategy
+4.  Module prefix — directory naming (e.g., tf-module-*, terraform-aws-*, modules/) (auto: directory names)
+5.  Orchestration tool — Terragrunt, Terramate, plain Terraform workspaces, or none (auto: config files)
+6.  CI/CD platform — GitHub Actions, Azure DevOps, GitLab CI, Atlantis (auto: pipeline dirs)
+7.  Auth pattern — Managed Identity, OIDC, service principal, IAM roles (auto: pipeline config)
+8.  State backend — Azure Blob, S3, GCS, Terraform Cloud (auto: backend blocks)
+9.  Naming convention — how resources are named (prefix-type-suffix, etc.) (auto: name expressions)
+10. Tag/label standard — required tags and merge strategy (auto: merge() expressions)
 11. Test framework — native terraform test, Terratest, or both
 12. Standard variables — cross-module variables that all modules receive
 13. Target tool(s) — VS Code Copilot, Claude Code, or both
