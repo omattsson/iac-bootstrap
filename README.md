@@ -240,6 +240,16 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{STANDARD_PARAMETERS}}` | (multi-line) | Pipeline parameter definitions |
 | `{{PIPELINE_CONVENTIONS}}` | (multi-line) | Pipeline naming/structure conventions |
 
+## Agent Value: Before & After Comparison
+
+See [docs/agent-value-comparison.md](docs/agent-value-comparison.md) for side-by-side walkthroughs of common IaC tasks — with and without agent customizations. Covers:
+
+- **Adding a new Terraform module** — 16 manual steps → 3 agent-assisted steps (−81%)
+- **Adding a new environment stack** — 14 steps → 4 steps (−71%)
+- **Debugging a failing Terraform plan** — 9 steps → 4 steps (−56%)
+
+Suitable for team presentations, onboarding docs, or justifying AI tooling investment to leadership.
+
 ## Contributing
 
 1. Fork the repo
