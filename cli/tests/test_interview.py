@@ -17,6 +17,8 @@ def test_build_context_azure_defaults():
     assert "azurerm" in ctx["PROVIDER_BLOCK"]
     assert "env_default_tags" in ctx["STANDARD_VARIABLES"]
     assert "env_default_tags" in ctx["TAG_STRATEGY"]
+    assert "env_default_tags" in ctx["TAG_MERGE_PATTERN"]
+    assert "env_default_tags" in ctx["TAG_MERGE_LOCAL"]
 
 
 def test_build_context_aws_defaults():
@@ -26,6 +28,8 @@ def test_build_context_aws_defaults():
     assert "aws" in ctx["PROVIDER_BLOCK"]
     assert "env_default_tags" in ctx["STANDARD_VARIABLES"]
     assert "env_default_tags" in ctx["TAG_STRATEGY"]
+    assert "env_default_tags" in ctx["TAG_MERGE_PATTERN"]
+    assert "env_default_tags" in ctx["TAG_MERGE_LOCAL"]
 
 
 def test_build_context_gcp_defaults():
@@ -35,6 +39,8 @@ def test_build_context_gcp_defaults():
     assert "google" in ctx["PROVIDER_BLOCK"]
     assert "env_default_labels" in ctx["STANDARD_VARIABLES"]
     assert "env_default_labels" in ctx["TAG_STRATEGY"]
+    assert "env_default_labels" in ctx["TAG_MERGE_PATTERN"]
+    assert "env_default_labels" in ctx["TAG_MERGE_LOCAL"]
 
 
 # ---------------------------------------------------------------------------

@@ -512,10 +512,8 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault(
         "TAG_MERGE_PATTERN",
         "merge(var.env_default_tags, var.tags)"
-        if cloud == "Azure"
-        else "merge(var.default_tags, var.tags)"
-        if cloud == "AWS"
-        else "merge(var.default_labels, var.labels)",
+        if cloud in ("Azure", "AWS")
+        else "merge(var.env_default_labels, var.labels)",
     )
     ctx.setdefault(
         "TAG_MERGE_LOCAL",
@@ -683,6 +681,7 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("STACK_PIPELINE", _stack_pipeline(cicd, orch))
     ctx.setdefault("DRIFT_PIPELINE", _drift_pipeline(cicd, orch))
+    ctx.setdefault("DESTROY_PIPELINE", _destroy_pipeline(cicd, orch))
 
     # ---- Environment hierarchy ----
     ctx.setdefault(
@@ -813,6 +812,55 @@ def _drift_pipeline(cicd: str, orch: str) -> str:
             "        run: echo 'Drift detected — review plan output'\n"
         )
     return "# Define your drift detection pipeline here (scheduled plan run)"
+
+
+def _destroy_pipeline(cicd: str, orch: str) -> str:
+    tool = _ORCHESTRATION_DEFAULTS.get(orch, _ORCHESTRATION_DEFAULTS["None"])["tool_lower"]
+    if "GitHub" in cicd:
+        if tool == "terraform":
+            destroy_cmd = "terraform plan -destroy"
+            apply_cmd = "terraform apply -destroy --auto-approve"
+        else:
+            destroy_cmd = f"{tool} run-all plan -destroy"
+            apply_cmd = f"{tool} run-all apply -destroy --auto-approve"
+        return (
+            "name: destroy-{component}\n"
+            "on:\n"
+            "  workflow_dispatch:\n"
+            "    inputs:\n"
+            "      environment:\n"
+            "        description: 'Target environment'\n"
+            "        required: true\n"
+            "        type: choice\n"
+            "        options: [dev, staging, prod]\n"
+            "      component:\n"
+            "        description: 'Component to destroy'\n"
+            "        required: true\n"
+            "      confirm:\n"
+            "        description: 'Type DESTROY to confirm'\n"
+            "        required: true\n\n"
+            "jobs:\n"
+            "  plan-destroy:\n"
+            "    if: github.event.inputs.confirm == 'DESTROY'\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - uses: actions/checkout@v4\n"
+            f"      - run: {destroy_cmd}\n"
+            "        working-directory: infrastructure-config/${{{{ github.event.inputs.environment }}}}/platform/${{{{ github.event.inputs.component }}}}\n"
+            "  destroy:\n"
+            "    needs: plan-destroy\n"
+            "    environment: ${{{{ github.event.inputs.environment }}}}\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - uses: actions/checkout@v4\n"
+            f"      - run: {apply_cmd}\n"
+            "        working-directory: infrastructure-config/${{{{ github.event.inputs.environment }}}}/platform/${{{{ github.event.inputs.component }}}}\n"
+        )
+    return (
+        "# Define your destroy pipeline here\n"
+        "# Requirements: manual trigger, explicit confirmation, environment protection,\n"
+        "# plan-destroy before apply-destroy, restricted to protected branches"
+    )
 
 
 def _environment_hierarchy(orch: str) -> str:
