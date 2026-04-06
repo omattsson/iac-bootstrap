@@ -2,10 +2,7 @@
 
 import textwrap
 
-import pytest
-
 from bootstrap_iac.discovery import (
-    DiscoveryResult,
     _detect_ci_cd,
     _detect_cloud_provider,
     _detect_module_prefix,
@@ -59,6 +56,20 @@ def test_detect_cloud_from_required_providers(tmp_path):
         }
     """))
     assert _detect_cloud_provider(tmp_path) == "Azure"
+
+
+def test_detect_cloud_from_unquoted_required_providers(tmp_path):
+    (tmp_path / "versions.tf").write_text(textwrap.dedent("""\
+        terraform {
+          required_providers {
+            aws = {
+              source  = "hashicorp/aws"
+              version = "~> 5.0"
+            }
+          }
+        }
+    """))
+    assert _detect_cloud_provider(tmp_path) == "AWS"
 
 
 # ---------------------------------------------------------------------------

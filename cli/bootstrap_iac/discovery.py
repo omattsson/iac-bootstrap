@@ -64,9 +64,9 @@ _PROVIDER_PATTERNS = {
 }
 
 _PROVIDER_REQUIRED_PATTERNS = {
-    "Azure": re.compile(r'"azurerm"\s*=\s*\{', re.IGNORECASE),
-    "AWS": re.compile(r'"aws"\s*=\s*\{', re.IGNORECASE),
-    "GCP": re.compile(r'"google"\s*=\s*\{', re.IGNORECASE),
+    "Azure": re.compile(r'"?azurerm"?\s*=\s*\{', re.IGNORECASE),
+    "AWS": re.compile(r'"?aws"?\s*=\s*\{', re.IGNORECASE),
+    "GCP": re.compile(r'"?google"?\s*=\s*\{', re.IGNORECASE),
 }
 
 
@@ -80,15 +80,20 @@ def _detect_cloud_provider(workspace: Path) -> Optional[str]:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        for provider, pattern in _PROVIDER_PATTERNS.items():
-            if pattern.search(content):
-                counts[provider] += 1
-        for provider, pattern in _PROVIDER_REQUIRED_PATTERNS.items():
-            if pattern.search(content):
-                counts[provider] += 1
+        _match_cloud_provider(content, counts)
     if not any(counts.values()):
         return None
     return max(counts, key=lambda k: counts[k])
+
+
+def _match_cloud_provider(content: str, counts: dict[str, int]) -> None:
+    """Update *counts* with cloud provider signals found in *content*."""
+    for provider, pattern in _PROVIDER_PATTERNS.items():
+        if pattern.search(content):
+            counts[provider] += 1
+    for provider, pattern in _PROVIDER_REQUIRED_PATTERNS.items():
+        if pattern.search(content):
+            counts[provider] += 1
 
 
 def _detect_module_prefix(workspace: Path) -> Optional[str]:
@@ -220,9 +225,17 @@ def _detect_state_backend(workspace: Path) -> Optional[str]:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        for backend_name, pattern in _BACKEND_PATTERNS.items():
-            if pattern.search(content):
-                return backend_name
+        backend = _match_state_backend(content)
+        if backend:
+            return backend
+    return None
+
+
+def _match_state_backend(content: str) -> Optional[str]:
+    """Return matching backend name from *content*, or ``None``."""
+    for backend_name, pattern in _BACKEND_PATTERNS.items():
+        if pattern.search(content):
+            return backend_name
     return None
 
 
@@ -244,10 +257,10 @@ _NAMING_PATTERNS = [
 
 
 def _detect_naming_pattern(workspace: Path) -> Optional[str]:
-    """Infer naming convention from ``locals`` blocks in .tf files.
+    """Infer naming convention from .tf files.
 
     Heuristics:
-    - Look for ``name = "${var.prefix}-...-..."`` patterns in locals blocks
+    - Look for ``name = "${var.prefix}-...-..."`` patterns
     - Look for ``format("%s-...", ...)`` naming expressions
     - Extracts the general shape, not exact expressions
     """
@@ -258,11 +271,48 @@ def _detect_naming_pattern(workspace: Path) -> Optional[str]:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        # Look for locals { ... name = "..." ... }
-        for pattern in _NAMING_PATTERNS:
-            if pattern.search(content):
-                return "{prefix}-{resource_type}-{suffix}"
+        if _match_naming_pattern(content):
+            return "{prefix}-{resource_type}-{suffix}"
     return None
+
+
+def _match_naming_pattern(content: str) -> bool:
+    """Return ``True`` if *content* contains a recognisable naming pattern."""
+    for pattern in _NAMING_PATTERNS:
+        if pattern.search(content):
+            return True
+    return False
+
+
+@dataclass
+class _TfScanResult:
+    """Aggregated results from a single pass over all .tf files."""
+
+    cloud_counts: dict[str, int] = field(
+        default_factory=lambda: {"Azure": 0, "AWS": 0, "GCP": 0}
+    )
+    state_backend: Optional[str] = None
+    naming_pattern: Optional[str] = None
+
+
+def _scan_tf_files(workspace: Path) -> _TfScanResult:
+    """Read every .tf file once and run all detection regexes in one pass."""
+    result = _TfScanResult()
+    for tf_file in workspace.rglob("*.tf"):
+        if ".terraform" in tf_file.parts:
+            continue
+        try:
+            content = tf_file.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        _match_cloud_provider(content, result.cloud_counts)
+        if result.state_backend is None:
+            backend = _match_state_backend(content)
+            if backend:
+                result.state_backend = backend
+        if result.naming_pattern is None and _match_naming_pattern(content):
+            result.naming_pattern = "{prefix}-{resource_type}-{suffix}"
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -284,20 +334,24 @@ def scan_workspace(workspace_path: Path) -> DiscoveryResult:
     orchestration  ``terragrunt.hcl`` / ``terramate.tm.hcl`` / ``Pulumi.yaml``
     ci_cd_platform ``.github/workflows/`` / ``azure-pipelines*.yml`` / etc.
     state_backend  ``backend "azurerm"`` / ``"s3"`` / ``"gcs"`` / ``cloud {}``
-    naming_pattern ``name = "${var.prefix}-..."`` expressions in locals
+    naming_pattern ``name = "${var.prefix}-..."`` expressions in .tf files
     ============== ========================================================
     """
     result = DiscoveryResult(workspace_path=workspace_path)
 
-    result.cloud_provider = _detect_cloud_provider(workspace_path)
+    # Single-pass scan of all .tf files for cloud, backend, and naming
+    tf = _scan_tf_files(workspace_path)
+    if any(tf.cloud_counts.values()):
+        result.cloud_provider = max(tf.cloud_counts, key=lambda k: tf.cloud_counts[k])
+    result.state_backend = tf.state_backend
+    result.naming_pattern = tf.naming_pattern
+
     result.module_prefix = _detect_module_prefix(workspace_path)
     result.org_name = _detect_org_from_git(workspace_path)
     result.orchestration_tool, result.orchestration_dir = _detect_orchestration(
         workspace_path
     )
     result.ci_cd_platform, result.pipeline_dir = _detect_ci_cd(workspace_path)
-    result.state_backend = _detect_state_backend(workspace_path)
-    result.naming_pattern = _detect_naming_pattern(workspace_path)
 
     result.has_copilot_instructions = (
         workspace_path / ".github" / "copilot-instructions.md"
