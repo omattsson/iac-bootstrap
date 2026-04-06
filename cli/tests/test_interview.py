@@ -128,6 +128,23 @@ def test_data_source_override_gcp():
 
 
 # ---------------------------------------------------------------------------
+# build_context — DESTROY_PIPELINE
+# ---------------------------------------------------------------------------
+
+
+def test_destroy_pipeline_github_actions():
+    ctx = build_context({
+        "CLOUD_PROVIDER": "Azure",
+        "CI_CD_PLATFORM": "GitHub Actions",
+        "ORCHESTRATION_TOOL": "Terragrunt",
+    })
+    assert "DESTROY_PIPELINE" in ctx
+    assert "workflow_dispatch" in ctx["DESTROY_PIPELINE"]
+    assert "DESTROY" in ctx["DESTROY_PIPELINE"]
+    assert "terragrunt run-all" in ctx["DESTROY_PIPELINE"]
+
+
+# ---------------------------------------------------------------------------
 # build_context — CI/CD defaults
 # ---------------------------------------------------------------------------
 

@@ -756,10 +756,19 @@ def _stack_pipeline(cicd: str, orch: str) -> str:
     if "GitHub" in cicd:
         if tool == "terraform":
             plan_cmd = "terraform plan"
-            apply_cmd = "terraform apply --auto-approve"
+            apply_cmd = "terraform apply -auto-approve"
+        elif tool == "terragrunt":
+            plan_cmd = "terragrunt run-all plan"
+            apply_cmd = "terragrunt run-all apply -auto-approve"
+        elif tool == "terramate":
+            plan_cmd = "terramate run terraform plan"
+            apply_cmd = "terramate run terraform apply -auto-approve"
+        elif tool == "pulumi":
+            plan_cmd = "pulumi preview"
+            apply_cmd = "pulumi up --yes"
         else:
-            plan_cmd = f"{tool} run-all plan"
-            apply_cmd = f"{tool} run-all apply --auto-approve"
+            plan_cmd = f"{tool} plan"
+            apply_cmd = f"{tool} apply -auto-approve"
         return (
             "name: plan-apply-stack\n"
             "on:\n"
@@ -814,15 +823,28 @@ def _drift_pipeline(cicd: str, orch: str) -> str:
     return "# Define your drift detection pipeline here (scheduled plan run)"
 
 
-def _destroy_pipeline(cicd: str, orch: str) -> str:
+def _destroy_commands(orch: str) -> tuple[str, str]:
     tool = _ORCHESTRATION_DEFAULTS.get(orch, _ORCHESTRATION_DEFAULTS["None"])["tool_lower"]
+    if tool == "terraform":
+        return ("terraform plan -destroy", "terraform apply -destroy -auto-approve")
+    if tool == "terragrunt":
+        return (
+            "terragrunt run-all plan -destroy",
+            "terragrunt run-all apply -destroy -auto-approve",
+        )
+    if tool == "terramate":
+        return (
+            "terramate run terraform plan -destroy",
+            "terramate run terraform apply -destroy -auto-approve",
+        )
+    if tool == "pulumi":
+        return ("pulumi preview --destroy", "pulumi destroy --yes")
+    return ("terraform plan -destroy", "terraform apply -destroy -auto-approve")
+
+
+def _destroy_pipeline(cicd: str, orch: str) -> str:
+    destroy_cmd, apply_cmd = _destroy_commands(orch)
     if "GitHub" in cicd:
-        if tool == "terraform":
-            destroy_cmd = "terraform plan -destroy"
-            apply_cmd = "terraform apply -destroy --auto-approve"
-        else:
-            destroy_cmd = f"{tool} run-all plan -destroy"
-            apply_cmd = f"{tool} run-all apply -destroy --auto-approve"
         return (
             "name: destroy-{component}\n"
             "on:\n"
