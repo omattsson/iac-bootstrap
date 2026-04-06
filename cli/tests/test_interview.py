@@ -72,6 +72,17 @@ def test_build_context_pulumi_defaults():
     assert "pulumi preview" in ctx["PLAN_COMMAND"]
     assert "{stack}" in ctx["PLAN_SINGLE_COMMAND"]
     assert "Pulumi.yaml" in ctx["HIERARCHY_DIAGRAM"]
+    # Pulumi-specific context keys
+    assert ctx["PULUMI_NAMESPACE"] == "project"
+    assert ctx["PULUMI_LANGUAGE"] == "Python"
+    assert ctx["PULUMI_LANGUAGE_LOWER"] == "python"
+    assert ctx["ENTRY_POINT"] == "__main__.py"
+    assert ctx["SHARED_COMPONENTS_DIR"] == "components"
+    assert ctx["SECRET_PROVIDER"] == "default"
+    assert "Pulumi Cloud" in ctx["STATE_BACKEND_PATTERN"]
+    assert "StackReference" in ctx["STACK_REFERENCE_PATTERN"]
+    assert ctx["STACK_CONFIG_PATTERN"] == "Pulumi.{stack}.yaml"
+    assert "pulumi up" in ctx["APPLY_COMMAND"]
 
 
 # ---------------------------------------------------------------------------

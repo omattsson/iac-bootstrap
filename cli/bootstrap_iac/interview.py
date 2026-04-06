@@ -289,6 +289,16 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "plan_single_command": "pulumi preview --stack {stack}",
         "graph_command": "pulumi stack graph",
         "extra_run_flags": "--non-interactive",
+        "apply_command": "pulumi up --stack {stack}",
+        "pulumi_namespace": "project",
+        "pulumi_language": "Python",
+        "pulumi_language_lower": "python",
+        "entry_point": "__main__.py",
+        "shared_components_dir": "components",
+        "secret_provider": "default",
+        "state_backend_pattern": "Pulumi Cloud managed backend",
+        "stack_reference_pattern": "Use pulumi.StackReference('organization/project/{stack}') for cross-stack references",
+        "stack_config_pattern": "Pulumi.{stack}.yaml",
         "envcommon_pattern": "Pulumi.*.yaml",
         "hierarchy_diagram": (
             "infra/\n"
@@ -532,6 +542,21 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("PLAN_SINGLE_COMMAND", orch_defs["plan_single_command"])
     ctx.setdefault("GRAPH_COMMAND", orch_defs["graph_command"])
     ctx.setdefault("EXTRA_RUN_FLAGS", orch_defs["extra_run_flags"])
+
+    # ---- Pulumi-specific derived values ----
+    if orch_key == "Pulumi":
+        ctx.setdefault("APPLY_COMMAND", orch_defs["apply_command"])
+        ctx.setdefault("PULUMI_NAMESPACE", orch_defs["pulumi_namespace"])
+        ctx.setdefault("PULUMI_LANGUAGE", orch_defs["pulumi_language"])
+        ctx.setdefault("PULUMI_LANGUAGE_LOWER", orch_defs["pulumi_language_lower"])
+        ctx.setdefault("ENTRY_POINT", orch_defs["entry_point"])
+        ctx.setdefault("SHARED_COMPONENTS_DIR", orch_defs["shared_components_dir"])
+        ctx.setdefault("SECRET_PROVIDER", orch_defs["secret_provider"])
+        ctx.setdefault("STATE_BACKEND_PATTERN", orch_defs["state_backend_pattern"])
+        ctx.setdefault("STACK_REFERENCE_PATTERN", orch_defs["stack_reference_pattern"])
+        ctx.setdefault("STACK_CONFIG_PATTERN", orch_defs["stack_config_pattern"])
+    else:
+        ctx.setdefault("APPLY_COMMAND", f"{orch_defs['tool_lower']} apply")
     ctx.setdefault("ENVCOMMON_PATTERN", orch_defs["envcommon_pattern"])
     ctx.setdefault("HIERARCHY_DIAGRAM", orch_defs["hierarchy_diagram"])
     ctx.setdefault(

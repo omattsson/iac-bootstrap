@@ -173,7 +173,7 @@ _CICD_CHOICES = click.Choice(
     "--validate",
     "validate_path",
     is_flag=False,
-    flag_value=".",
+    flag_value="",
     is_eager=True,
     default=None,
     help=(
