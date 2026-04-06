@@ -247,6 +247,14 @@ def main(
         detected_parts.append(f"orchestration={discovery.orchestration_tool}")
     if discovery.ci_cd_platform:
         detected_parts.append(f"ci_cd={discovery.ci_cd_platform}")
+    if discovery.module_prefix:
+        detected_parts.append(f"module_prefix={discovery.module_prefix}")
+    if discovery.org_name:
+        detected_parts.append(f"org={discovery.org_name}")
+    if discovery.state_backend:
+        detected_parts.append(f"state_backend={discovery.state_backend}")
+    if discovery.naming_pattern:
+        detected_parts.append(f"naming={discovery.naming_pattern}")
     if detected_parts:
         click.echo(f"  Detected: {', '.join(detected_parts)}")
 

@@ -62,7 +62,7 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "- `tags` — Resource-specific tags (map(string))\n"
             "- `env_default_tags` — Account-wide default tags from orchestration"
         ),
-        "naming_pattern": "{prefix}-{resource_type}-{suffix}",
+        "naming_pattern": "{prefix}-{resource_abbreviation}-{suffix}",
         "tag_strategy": (
             "local.tags = merge(var.env_default_tags, var.tags)\n"
             "Required tags: Environment, Product, ManagedBy = \"Terraform\""
@@ -87,7 +87,7 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "- `labels` — Resource labels (map(string))\n"
             "- `env_default_labels` — Project-wide default labels from orchestration"
         ),
-        "naming_pattern": "{prefix}-{resource_type}-{suffix}",
+        "naming_pattern": "{prefix}-{resource_abbreviation}-{suffix}",
         "tag_strategy": (
             "local.labels = merge(var.env_default_labels, var.labels)\n"
             "Required labels: environment, product, managed_by = \"terraform\""
@@ -993,15 +993,23 @@ def run_interview(
         "ORCHESTRATION_TOOL",
         "Orchestration tool",
         discovery.orchestration_tool or "None",
-        choices=["Terragrunt", "Terramate", "None"],
+        choices=["Terragrunt", "Terramate", "Pulumi", "None"],
     )
 
     # 5. Orchestration directory (only if using an orchestration tool)
     if answers["ORCHESTRATION_TOOL"] != "None":
+        _orch_dir_defaults = {
+            "Terragrunt": "infrastructure-config",
+            "Terramate": "stacks",
+            "Pulumi": ".",
+        }
+        default_orch_dir = discovery.orchestration_dir or _orch_dir_defaults.get(
+            answers["ORCHESTRATION_TOOL"], "infrastructure-config"
+        )
         answers["ORCHESTRATION_DIR"] = _get(
             "ORCHESTRATION_DIR",
             "Directory containing orchestration configs",
-            discovery.orchestration_dir or "infrastructure-config",
+            default_orch_dir,
         )
     else:
         answers["ORCHESTRATION_DIR"] = overrides.get("ORCHESTRATION_DIR", ".")
@@ -1026,8 +1034,9 @@ def run_interview(
     )
 
     # 8. State backend
-    default_backend = _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
-        "state_backend", "Remote"
+    default_backend = (
+        discovery.state_backend
+        or _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get("state_backend", "Remote")
     )
     answers["STATE_BACKEND"] = _get(
         "STATE_BACKEND",
@@ -1036,8 +1045,11 @@ def run_interview(
     )
 
     # 9. Naming convention
-    default_naming = _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
-        "naming_pattern", "{prefix}-{resource_type}-{suffix}"
+    default_naming = (
+        discovery.naming_pattern
+        or _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
+            "naming_pattern", "{prefix}-{resource_abbreviation}-{suffix}"
+        )
     )
     answers["NAMING_PATTERN"] = _get(
         "NAMING_PATTERN",
