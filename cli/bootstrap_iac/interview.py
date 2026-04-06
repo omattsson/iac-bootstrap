@@ -1026,8 +1026,9 @@ def run_interview(
     )
 
     # 8. State backend
-    default_backend = _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
-        "state_backend", "Remote"
+    default_backend = (
+        discovery.state_backend
+        or _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get("state_backend", "Remote")
     )
     answers["STATE_BACKEND"] = _get(
         "STATE_BACKEND",
@@ -1036,8 +1037,11 @@ def run_interview(
     )
 
     # 9. Naming convention
-    default_naming = _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
-        "naming_pattern", "{prefix}-{resource_type}-{suffix}"
+    default_naming = (
+        discovery.naming_pattern
+        or _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
+            "naming_pattern", "{prefix}-{resource_type}-{suffix}"
+        )
     )
     answers["NAMING_PATTERN"] = _get(
         "NAMING_PATTERN",
