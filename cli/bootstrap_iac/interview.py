@@ -993,7 +993,7 @@ def run_interview(
         "ORCHESTRATION_TOOL",
         "Orchestration tool",
         discovery.orchestration_tool or "None",
-        choices=["Terragrunt", "Terramate", "None"],
+        choices=["Terragrunt", "Terramate", "Pulumi", "None"],
     )
 
     # 5. Orchestration directory (only if using an orchestration tool)

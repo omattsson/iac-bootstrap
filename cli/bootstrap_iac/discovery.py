@@ -261,7 +261,7 @@ def _detect_naming_pattern(workspace: Path) -> Optional[str]:
         # Look for locals { ... name = "..." ... }
         for pattern in _NAMING_PATTERNS:
             if pattern.search(content):
-                return "{prefix}-{resource_abbreviation}-{suffix}"
+                return "{prefix}-{resource_type}-{suffix}"
     return None
 
 
