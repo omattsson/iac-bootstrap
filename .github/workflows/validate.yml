@@ -28,6 +28,30 @@ jobs:
       - name: Run template validation
         run: python scripts/validate_templates.py
 
+  cli-tests:
+    name: CLI tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install CLI package
+        run: pip install ./cli[dev]
+
+      - name: Verify entry point
+        run: bootstrap-iac --version
+
+      - name: Run tests
+        run: pytest cli/tests/ -q
+
   markdown-lint:
     name: Markdown lint
     runs-on: ubuntu-latest
