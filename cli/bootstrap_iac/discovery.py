@@ -26,7 +26,7 @@ class DiscoveryResult:
     org_name: Optional[str] = None
 
     # Orchestration tool detected from config files
-    orchestration_tool: Optional[str] = None  # "Terragrunt" | "Terramate" | "Pulumi" | "None"
+    orchestration_tool: Optional[str] = None  # "Terragrunt" | "Terramate" | "Pulumi" | None when not detected
 
     # Directory that holds orchestration config files
     orchestration_dir: Optional[str] = None
@@ -58,20 +58,32 @@ class DiscoveryResult:
 # ---------------------------------------------------------------------------
 
 _PROVIDER_PATTERNS = {
-    "Azure": re.compile(r'provider\s+"azurerm"', re.IGNORECASE),
-    "AWS": re.compile(r'provider\s+"aws"', re.IGNORECASE),
-    "GCP": re.compile(r'provider\s+"google"', re.IGNORECASE),
+    "Azure": re.compile(
+        r'^(?!\s*(?:#|//))\s*provider\s+"azurerm"',
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    "AWS": re.compile(
+        r'^(?!\s*(?:#|//))\s*provider\s+"aws"',
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    "GCP": re.compile(
+        r'^(?!\s*(?:#|//))\s*provider\s+"google"',
+        re.IGNORECASE | re.MULTILINE,
+    ),
 }
 
 _PROVIDER_REQUIRED_PATTERNS = {
     "Azure": re.compile(
-        r'source\s*=\s*"hashicorp/azurerm"', re.IGNORECASE
+        r'^(?!\s*(?:#|//))\s*source\s*=\s*"hashicorp/azurerm"',
+        re.IGNORECASE | re.MULTILINE,
     ),
     "AWS": re.compile(
-        r'source\s*=\s*"hashicorp/aws"', re.IGNORECASE
+        r'^(?!\s*(?:#|//))\s*source\s*=\s*"hashicorp/aws"',
+        re.IGNORECASE | re.MULTILINE,
     ),
     "GCP": re.compile(
-        r'source\s*=\s*"hashicorp/google"', re.IGNORECASE
+        r'^(?!\s*(?:#|//))\s*source\s*=\s*"hashicorp/google"',
+        re.IGNORECASE | re.MULTILINE,
     ),
 }
 
@@ -344,7 +356,8 @@ def scan_workspace(workspace_path: Path) -> DiscoveryResult:
     ============== ========================================================
     Field          Heuristic
     ============== ========================================================
-    cloud_provider ``provider "azurerm"`` / ``"aws"`` / ``"google"`` blocks
+    cloud_provider ``provider "azurerm"`` / ``"aws"`` / ``"google"`` blocks;
+                   ``required_providers`` with ``source = "hashicorp/..."``
     module_prefix  Directory names matching ``tf-module-*``, etc.
     org_name       Git remote URL (``github.com/ORG/REPO``)
     orchestration  ``terragrunt.hcl`` / ``terramate.tm.hcl`` / ``Pulumi.yaml``

@@ -45,6 +45,16 @@ def test_detect_cloud_provider_ignores_dot_terraform(tmp_path):
     assert _detect_cloud_provider(tmp_path) is None
 
 
+def test_detect_cloud_provider_ignores_commented_out(tmp_path):
+    """Commented-out provider blocks should not be detected."""
+    (tmp_path / "main.tf").write_text(textwrap.dedent("""\
+        # provider "aws" {
+        #   region = "us-east-1"
+        # }
+    """))
+    assert _detect_cloud_provider(tmp_path) is None
+
+
 def test_detect_cloud_from_required_providers(tmp_path):
     (tmp_path / "versions.tf").write_text(textwrap.dedent("""\
         terraform {
