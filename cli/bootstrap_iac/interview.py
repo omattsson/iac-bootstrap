@@ -627,19 +627,40 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("RESOURCE_IDENTIFIER", "default")
     ctx.setdefault("COMMON_VARS_FILE", "common.variables.tf")
-    _data_resource_map = {"azurerm": "client_config", "aws": "caller_identity", "google": "client_config"}
-    _provider = ctx.get("PROVIDER_NAME", "azurerm")
-    _data_resource = _data_resource_map.get(_provider, "client_config")
-    ctx.setdefault(
-        "DATA_SOURCE_OVERRIDE",
-        (
+    _data_override_map = {
+        "azurerm": (
             'override_data {\n'
-            '  target = data.{provider}_{resource}.current\n'
+            '  target = data.azurerm_client_config.current\n'
             '  values = {\n'
-            '    id = "/subscriptions/00000000-0000-0000-0000-000000000000"\n'
+            '    subscription_id = "00000000-0000-0000-0000-000000000000"\n'
+            '    tenant_id       = "00000000-0000-0000-0000-000000000000"\n'
             '  }\n'
             '}'
-        ).replace("{provider}", _provider).replace("{resource}", _data_resource),
+        ),
+        "aws": (
+            'override_data {\n'
+            '  target = data.aws_caller_identity.current\n'
+            '  values = {\n'
+            '    account_id = "123456789012"\n'
+            '    arn        = "arn:aws:iam::123456789012:root"\n'
+            '    user_id    = "123456789012"\n'
+            '  }\n'
+            '}'
+        ),
+        "google": (
+            'override_data {\n'
+            '  target = data.google_client_config.current\n'
+            '  values = {\n'
+            '    project = "test-project-123"\n'
+            '    region  = "europe-west1"\n'
+            '  }\n'
+            '}'
+        ),
+    }
+    _provider = ctx.get("PROVIDER_NAME", "azurerm")
+    ctx.setdefault(
+        "DATA_SOURCE_OVERRIDE",
+        _data_override_map.get(_provider, _data_override_map["azurerm"]),
     )
     ctx.setdefault(
         "TEST_STANDARD_VARIABLES",

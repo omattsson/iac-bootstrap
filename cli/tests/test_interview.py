@@ -86,26 +86,32 @@ def test_build_context_pulumi_defaults():
 
 
 # ---------------------------------------------------------------------------
-# build_context — DATA_SOURCE_OVERRIDE {resource} replacement
+# build_context — DATA_SOURCE_OVERRIDE cloud-specific values
 # ---------------------------------------------------------------------------
 
 
-def test_data_source_override_azure_replaces_resource():
+def test_data_source_override_azure():
     ctx = build_context({"CLOUD_PROVIDER": "Azure"})
-    assert "{resource}" not in ctx["DATA_SOURCE_OVERRIDE"]
-    assert "azurerm_client_config" in ctx["DATA_SOURCE_OVERRIDE"]
+    override = ctx["DATA_SOURCE_OVERRIDE"]
+    assert "azurerm_client_config" in override
+    assert "subscription_id" in override
+    assert "tenant_id" in override
 
 
-def test_data_source_override_aws_replaces_resource():
+def test_data_source_override_aws():
     ctx = build_context({"CLOUD_PROVIDER": "AWS"})
-    assert "{resource}" not in ctx["DATA_SOURCE_OVERRIDE"]
-    assert "aws_caller_identity" in ctx["DATA_SOURCE_OVERRIDE"]
+    override = ctx["DATA_SOURCE_OVERRIDE"]
+    assert "aws_caller_identity" in override
+    assert "account_id" in override
+    assert "arn" in override
+    assert "user_id" in override
 
 
-def test_data_source_override_gcp_replaces_resource():
+def test_data_source_override_gcp():
     ctx = build_context({"CLOUD_PROVIDER": "GCP"})
-    assert "{resource}" not in ctx["DATA_SOURCE_OVERRIDE"]
-    assert "google_client_config" in ctx["DATA_SOURCE_OVERRIDE"]
+    override = ctx["DATA_SOURCE_OVERRIDE"]
+    assert "google_client_config" in override
+    assert "project" in override
 
 
 # ---------------------------------------------------------------------------

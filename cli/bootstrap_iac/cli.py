@@ -110,7 +110,7 @@ _CICD_CHOICES = click.Choice(
     "--orchestration",
     type=_ORCH_CHOICES,
     metavar="TOOL",
-    help="Orchestration tool: terragrunt | terramate | none.",
+    help="Orchestration tool: terragrunt | terramate | pulumi | none.",
 )
 @click.option(
     "--orchestration-dir",

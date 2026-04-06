@@ -44,6 +44,7 @@ This repo generates instructions that reference Terraform idioms. When reviewing
 - **`replace()` supports regex** — Terraform's `replace(string, substring, replacement)` supports regex patterns when the `substring` argument is wrapped in forward slashes: `replace(var.name, "/[^a-z0-9-]/", "")`. Do not suggest using `regexreplace()` instead — `replace()` with `/pattern/` is idiomatic and official.
 - **`optional()` with defaults** — `optional(type, default)` in variable type constraints is valid HCL since Terraform 1.3.
 - **`for_each` over `count`** — for feature toggles, both patterns are valid. `count = var.enable_x ? 1 : 0` is a standard pattern.
+- **HCL2 nested quotes in interpolation** — inside `${}` string interpolation, HCL2 opens an expression context where quotes are valid. `"${dirname(find_in_parent_folders("root.hcl"))}/_envcommon/..."` is correct, idiomatic Terragrunt HCL. Do not suggest escaping or restructuring these.
 
 ## VS Code Copilot Domain Knowledge
 
