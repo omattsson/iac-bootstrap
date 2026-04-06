@@ -1,0 +1,90 @@
+---
+name: create-pulumi-stack
+description: "Create or extend Pulumi stacks and programs. Use when: adding resources to an existing stack, creating a new stack, adding ComponentResources, wiring stack references, updating stack config."
+---
+
+# Create Pulumi Stack/Component
+
+Creates or extends Pulumi programs following the workspace project and stack hierarchy.
+
+## When to Use
+- Adding a new resource or component to an existing stack
+- Creating a new Pulumi stack (project + environment config)
+- Adding a shared ComponentResource class used across stacks
+- Wiring cross-stack references via `StackReference`
+- Adding or rotating stack config/secrets
+
+## Hierarchy
+
+```
+{{HIERARCHY_DIAGRAM}}
+```
+
+## Procedure
+
+### Task A: Add a New Resource to an Existing Stack
+
+#### 1. Check for a shared ComponentResource in `{{SHARED_COMPONENTS_DIR}}/`
+If one exists, instantiate it; otherwise create one (see Task C).
+
+#### 2. Add the resource to the stack entry point
+```{{PULUMI_LANGUAGE_LOWER}}
+{{ENVCOMMON_TEMPLATE}}
+```
+
+#### 3. Export any new outputs at the bottom of the entry point
+
+#### 4. Preview changes
+```bash
+{{PLAN_COMMAND}}
+```
+
+### Task B: Create a New Stack
+
+#### 1. Create the stack directory and project file (`Pulumi.yaml`)
+```yaml
+{{STACK_CONFIG_TEMPLATE}}
+```
+
+#### 2. Create stack environment config (`Pulumi.{env}.yaml`)
+```yaml
+{{SITE_CONFIG_TEMPLATE}}
+```
+
+#### 3. Set secrets
+```bash
+pulumi config set --secret --stack {{ENVIRONMENT}} {{PULUMI_NAMESPACE}}:<key> <value>
+```
+
+#### 4. Write the entry point (`{{ENTRY_POINT}}`)
+```{{PULUMI_LANGUAGE_LOWER}}
+{{COMPONENT_CONFIG_TEMPLATE}}
+```
+
+#### 5. Preview and deploy
+```bash
+{{PLAN_COMMAND}}
+{{APPLY_COMMAND}}
+```
+
+### Task C: Add a Shared ComponentResource
+
+```{{PULUMI_LANGUAGE_LOWER}}
+{{COMPONENT_CLASS_PATTERN}}
+```
+
+Place in `{{SHARED_COMPONENTS_DIR}}/` and import from the stack entry point.
+
+## Cross-Stack Reference Pattern
+
+```{{PULUMI_LANGUAGE_LOWER}}
+{{STACK_REFERENCE_PATTERN}}
+```
+
+## Validation Checklist
+1. `{{VALIDATE_COMMAND}}` passes (no type errors / syntax errors)
+2. `{{PLAN_COMMAND}}` shows expected resources, no unintended replacements
+3. All required config keys are set in `Pulumi.{env}.yaml` or as secrets
+4. Stack references handle `None`/`undefined` for plan-time safety
+5. No secrets or account IDs hardcoded in program code
+6. New outputs exported from entry point match expected type

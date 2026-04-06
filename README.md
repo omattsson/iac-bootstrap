@@ -15,7 +15,7 @@ The bootstrap process scans your IaC workspace, interviews you about conventions
 | **Orchestration agent** | `.github/agents/*-stack-manager.agent.md` | Embedded in `CLAUDE.md` |
 | **File-scoped standards** | `.github/instructions/*.instructions.md` | Rules section in `CLAUDE.md` |
 | **Module scaffolding** | `.github/skills/create-terraform-module/SKILL.md` | `.claude/commands/create-terraform-module.md` |
-| **Stack management** | `.github/skills/create-*-stack/SKILL.md` | `.claude/commands/create-orchestration-stack.md` |
+| **Stack management** | `.github/skills/create-*-stack/SKILL.md` | `.claude/commands/create-{tool}-stack.md` |
 | **Pipeline generation** | `.github/skills/create-infra-pipeline/SKILL.md` | `.claude/commands/create-infra-pipeline.md` |
 
 ## Quick Start

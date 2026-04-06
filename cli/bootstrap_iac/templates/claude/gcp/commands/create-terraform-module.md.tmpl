@@ -1,0 +1,174 @@
+# Create Terraform Module — GCP
+
+Scaffold a new `{{MODULE_PREFIX}}-{name}` directory following workspace conventions.
+
+## Usage
+Provide the module name as the argument: `$ARGUMENTS`
+
+If no name is given, ask for:
+- Module name (lowercase, hyphenated)
+- Primary GCP resource type(s)
+- Optional features: {{OPTIONAL_FEATURES}}
+<!-- Example GCP features: private_service_connect, kms_encryption, iam_bindings, vpc_peering -->
+
+## Directory Structure
+
+```
+{{MODULE_PREFIX}}-{name}/
+├── main.tf                    # Provider requirements + data sources
+├── {resource}.tf              # Core resource(s)
+├── locals.tf                  # Name construction, label merging
+├── variables.tf               # Module-specific variables
+├── {{COMMON_VARS_FILE}}       # Standard cross-module variables
+├── outputs.tf                 # Module outputs
+├── versions.tf                # Version constraints
+├── README.md                  # Documentation
+├── .pre-commit-config.yaml    # Validation hooks
+├── .tflint.hcl                # TFLint rules
+├── .terraform-docs.yml        # Doc generation
+├── examples/
+│   └── basic/
+│       ├── main.tf
+│       └── variables.tf
+└── tests/
+    └── {resource}.tftest.hcl  # Native terraform tests
+```
+
+## File Templates
+
+### versions.tf
+```hcl
+terraform {
+  required_version = ">=1.3"
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = ">=5.0,<6.0"
+    }
+  }
+}
+```
+
+### main.tf — Data Sources
+```hcl
+data "google_project" "current" {}
+data "google_client_config" "current" {}
+```
+
+### common.variables.tf — Standard Cross-Module Variables
+```hcl
+variable "prefix" {
+  type        = string
+  description = "Resource name prefix."
+}
+
+variable "project_id" {
+  type        = string
+  description = "GCP project ID."
+}
+
+variable "region" {
+  type        = string
+  description = "GCP region."
+}
+
+variable "labels" {
+  type        = map(string)
+  default     = {}
+  description = "Additional resource labels (take precedence over env_default_labels on conflict)."
+}
+
+variable "env_default_labels" {
+  type        = map(string)
+  default     = {}
+  description = "Default labels from the orchestration layer."
+}
+```
+
+### locals.tf
+```hcl
+locals {
+  {{NAMING_LOCALS}}
+  labels = merge(var.env_default_labels, var.labels)
+}
+```
+
+### Resource file
+```hcl
+resource "{{PROVIDER_RESOURCE}}" "default" {
+  name       = local.name
+  project    = var.project_id
+  {{LOCATION_ATTRIBUTE}}
+
+  labels = local.labels
+}
+```
+
+### outputs.tf
+```hcl
+output "name" {
+  value       = {{PROVIDER_RESOURCE}}.default.name
+  description = "Name of the resource."
+}
+
+output "id" {
+  value       = {{PROVIDER_RESOURCE}}.default.id
+  description = "The ID of the resource."
+}
+
+output "self_link" {
+  value       = {{PROVIDER_RESOURCE}}.default.self_link
+  description = "The self-link URI of the resource."
+}
+```
+
+### Test file
+```hcl
+mock_provider "google" {}
+
+override_data {
+  target = data.google_project.current
+  values = {
+    project_id = "test-project-123"
+    number     = 123456789
+    name       = "test-project"
+  }
+}
+
+variables {
+  prefix             = "test-auto"
+  project_id         = "test-project-123"
+  region             = "europe-west1"
+  labels             = {}
+  env_default_labels = { managed_by = "terraform" }
+}
+
+run "creates_resource_with_correct_name" {
+  command = plan
+  assert {
+    condition     = {{PROVIDER_RESOURCE}}.default.name == "{{EXPECTED_NAME_PATTERN}}"
+    error_message = "Name should follow naming convention"
+  }
+}
+
+run "merges_labels_correctly" {
+  command = plan
+  variables {
+    labels = { extra = "label" }
+  }
+  assert {
+    condition     = {{PROVIDER_RESOURCE}}.default.labels["extra"] == "label"
+    error_message = "Custom labels should be merged"
+  }
+}
+```
+
+## Post-Creation
+
+Run these commands after scaffolding:
+```bash
+cd {{MODULE_PREFIX}}-{name}
+terraform fmt -recursive
+terraform validate
+terraform test
+```

@@ -84,7 +84,7 @@ def _print_validation_results(issues: dict) -> int:
 
 _CLOUD_CHOICES = click.Choice(["azure", "aws", "gcp"], case_sensitive=False)
 _TARGET_CHOICES = click.Choice(["copilot", "claude", "both"], case_sensitive=False)
-_ORCH_CHOICES = click.Choice(["terragrunt", "terramate", "none"], case_sensitive=False)
+_ORCH_CHOICES = click.Choice(["terragrunt", "terramate", "pulumi", "none"], case_sensitive=False)
 _CICD_CHOICES = click.Choice(
     ["github-actions", "azure-devops", "gitlab-ci", "atlantis"],
     case_sensitive=False,
@@ -110,7 +110,7 @@ _CICD_CHOICES = click.Choice(
     "--orchestration",
     type=_ORCH_CHOICES,
     metavar="TOOL",
-    help="Orchestration tool: terragrunt | terramate | none.",
+    help="Orchestration tool: terragrunt | terramate | pulumi | none.",
 )
 @click.option(
     "--orchestration-dir",
@@ -172,7 +172,8 @@ _CICD_CHOICES = click.Choice(
 @click.option(
     "--validate",
     "validate_path",
-    metavar="PATH",
+    is_flag=False,
+    flag_value="",
     is_eager=True,
     default=None,
     help=(
@@ -256,6 +257,7 @@ def main(
     _orch_map = {
         "terragrunt": "Terragrunt",
         "terramate": "Terramate",
+        "pulumi": "Pulumi",
         "none": "None",
     }
     _cicd_map = {

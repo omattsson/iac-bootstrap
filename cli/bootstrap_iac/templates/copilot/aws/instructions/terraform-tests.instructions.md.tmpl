@@ -1,0 +1,43 @@
+---
+description: "Terraform native test conventions for .tftest.hcl files. Use when writing, modifying, or reviewing terraform test files using plan-only assertions and mock providers."
+applyTo: "**/*.tftest.hcl"
+---
+
+# Terraform Native Test Standards — AWS
+
+## Required Boilerplate
+Every test file must include:
+```hcl
+mock_provider "aws" {}
+
+override_data {
+  target = data.aws_caller_identity.current
+  values = {
+    account_id = "123456789012"
+    arn        = "arn:aws:iam::123456789012:root"
+    user_id    = "123456789012"
+  }
+}
+```
+
+## All tests use `command = plan` — never `command = apply`.
+
+## Required Variables
+Include all `{{COMMON_VARS_FILE}}` variables in the `variables {}` block.
+{{VARIABLE_GOTCHAS}}
+<!-- Example: region must be a valid AWS region string (e.g., "us-east-1"), not empty -->
+
+## Standard Test Variables
+```hcl
+variables {
+  prefix           = "test-auto"
+  region           = "us-east-1"
+  tags             = {}
+  env_default_tags = { managed_by = "Terraform" }
+}
+```
+
+## Organization
+- One test file per feature area: `naming.tftest.hcl`, `tags.tftest.hcl`, etc.
+- Run names: `snake_case` descriptive names
+- Group related assertions in the same `run` block

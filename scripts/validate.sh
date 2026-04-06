@@ -26,7 +26,7 @@ if [[ ! -d "$TARGET" ]]; then
 fi
 
 # Paths to scan, relative to TARGET
-SCAN_PATHS=(".github" ".claude" "CLAUDE.md")
+SCAN_PATHS=(".github" ".claude" "CLAUDE.md" "maturity-report.md")
 
 found=0
 

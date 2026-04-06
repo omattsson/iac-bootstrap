@@ -76,7 +76,7 @@ variable "network_config" {
   type = object({
     public_access         = optional(bool, false)
     allowed_cidrs         = optional(list(string), [])
-    bypass_azure_services = optional(bool, false)  # new — callers unaffected
+    bypass_trusted_services = optional(bool, false)  # new — callers unaffected
   })
   default = {}
 }
@@ -107,8 +107,8 @@ Add a `moved` block in the same commit as any resource or `for_each` key rename 
 
 ```hcl
 moved {
-  from = azurerm_resource_group.old_name
-  to   = azurerm_resource_group.default
+  from = {{PROVIDER_NAME}}_resource_type.old_name
+  to   = {{PROVIDER_NAME}}_resource_type.default
 }
 ```
 

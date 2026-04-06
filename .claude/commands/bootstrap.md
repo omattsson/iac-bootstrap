@@ -43,7 +43,7 @@ Read the best practices from the bootstrap repo if available, or use embedded kn
 **For Claude Code**, generate:
 - `CLAUDE.md` — combined workspace instructions, coding standards, and behavioral rules
 - `.claude/commands/create-terraform-module.md` — module scaffolding command
-- `.claude/commands/create-orchestration-stack.md` — stack management command (if applicable)
+- `.claude/commands/create-{tool}-stack.md` — stack management command (if applicable)
 - `.claude/commands/create-infra-pipeline.md` — pipeline generation command
 
 **For VS Code Copilot** (if requested), also generate:

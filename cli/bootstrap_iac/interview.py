@@ -281,6 +281,58 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_location": "versions.tf → `required_providers`",
         "version_tag_example": 'terraform {\n  required_providers {\n    azurerm = {\n      version = ">=4.0.0,<5.0.0"\n    }\n  }\n}',
     },
+    "Pulumi": {
+        "tool_lower": "pulumi",
+        "validate_command": "pulumi preview",
+        "plan_command": "pulumi preview",
+        "plan_all_command": "pulumi preview",
+        "plan_single_command": "pulumi preview --stack {stack}",
+        "graph_command": "pulumi stack graph",
+        "extra_run_flags": "--non-interactive",
+        "apply_command": "pulumi up --stack {stack}",
+        "pulumi_namespace": "project",
+        "pulumi_language": "Python",
+        "pulumi_language_lower": "python",
+        "entry_point": "__main__.py",
+        "shared_components_dir": "components",
+        "secret_provider": "default",
+        "state_backend_pattern": "Pulumi Cloud managed backend",
+        "stack_reference_pattern": "Use pulumi.StackReference('organization/project/{stack}') for cross-stack references",
+        "stack_config_pattern": "Pulumi.{stack}.yaml",
+        "envcommon_pattern": "Pulumi.*.yaml",
+        "hierarchy_diagram": (
+            "infra/\n"
+            "├── Pulumi.yaml               # project definition\n"
+            "├── Pulumi.dev.yaml           # dev stack config\n"
+            "├── Pulumi.prod.yaml          # prod stack config\n"
+            "├── __main__.py               # program entry point\n"
+            "└── components/               # reusable components\n"
+            "    └── {component}.py"
+        ),
+        "hierarchy_files_description": (
+            "- `Pulumi.yaml` — project name, runtime, description\n"
+            "- `Pulumi.{stack}.yaml` — per-stack configuration values\n"
+            "- `__main__.py` — infrastructure program entry point\n"
+            "- `components/` — reusable Pulumi component resources"
+        ),
+        "component_config_pattern": (
+            "class MyComponent(pulumi.ComponentResource):\n"
+            "    def __init__(self, name, opts=None):\n"
+            "        super().__init__('pkg:index:MyComponent', name, {}, opts)"
+        ),
+        "envcommon_template": "# Pulumi.dev.yaml\nconfig:\n  prefix: dev\n  location: westeurope",
+        "mock_outputs_example": "# Use pulumi.StackReference for cross-stack references",
+        "site_config_template": "config:\n  location: westeurope",
+        "stack_config_template": "config:\n  prefix: myapp-dev",
+        "input_flow_diagram": "Pulumi.yaml → Pulumi.{stack}.yaml → __main__.py → components/",
+        "dependency_conventions": (
+            "- Use `pulumi.StackReference` for cross-stack dependencies\n"
+            "- Use `ComponentResource` for logical grouping\n"
+            "- Use `depends_on` for explicit ordering within a stack"
+        ),
+        "version_tag_location": "Pulumi.yaml → description / requirements.txt",
+        "version_tag_example": "# requirements.txt\npulumi>=3.0.0,<4.0.0\npulumi-azure-native>=2.0.0",
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -490,6 +542,21 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("PLAN_SINGLE_COMMAND", orch_defs["plan_single_command"])
     ctx.setdefault("GRAPH_COMMAND", orch_defs["graph_command"])
     ctx.setdefault("EXTRA_RUN_FLAGS", orch_defs["extra_run_flags"])
+
+    # ---- Pulumi-specific derived values ----
+    if orch_key == "Pulumi":
+        ctx.setdefault("APPLY_COMMAND", orch_defs["apply_command"])
+        ctx.setdefault("PULUMI_NAMESPACE", orch_defs["pulumi_namespace"])
+        ctx.setdefault("PULUMI_LANGUAGE", orch_defs["pulumi_language"])
+        ctx.setdefault("PULUMI_LANGUAGE_LOWER", orch_defs["pulumi_language_lower"])
+        ctx.setdefault("ENTRY_POINT", orch_defs["entry_point"])
+        ctx.setdefault("SHARED_COMPONENTS_DIR", orch_defs["shared_components_dir"])
+        ctx.setdefault("SECRET_PROVIDER", orch_defs["secret_provider"])
+        ctx.setdefault("STATE_BACKEND_PATTERN", orch_defs["state_backend_pattern"])
+        ctx.setdefault("STACK_REFERENCE_PATTERN", orch_defs["stack_reference_pattern"])
+        ctx.setdefault("STACK_CONFIG_PATTERN", orch_defs["stack_config_pattern"])
+    else:
+        ctx.setdefault("APPLY_COMMAND", f"{orch_defs['tool_lower']} apply")
     ctx.setdefault("ENVCOMMON_PATTERN", orch_defs["envcommon_pattern"])
     ctx.setdefault("HIERARCHY_DIAGRAM", orch_defs["hierarchy_diagram"])
     ctx.setdefault(
@@ -560,16 +627,41 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("RESOURCE_IDENTIFIER", "default")
     ctx.setdefault("COMMON_VARS_FILE", "common.variables.tf")
-    ctx.setdefault(
-        "DATA_SOURCE_OVERRIDE",
-        (
+    _data_override_map = {
+        "azurerm": (
             'override_data {\n'
-            '  target = data.{provider}_{resource}.current\n'
+            '  target = data.azurerm_subscription.current\n'
             '  values = {\n'
-            '    id = "/subscriptions/00000000-0000-0000-0000-000000000000"\n'
+            '    subscription_id = "00000000-0000-0000-0000-000000000000"\n'
+            '    tenant_id       = "00000000-0000-0000-0000-000000000000"\n'
             '  }\n'
             '}'
-        ).replace("{provider}", ctx.get("PROVIDER_NAME", "azurerm")),
+        ),
+        "aws": (
+            'override_data {\n'
+            '  target = data.aws_caller_identity.current\n'
+            '  values = {\n'
+            '    account_id = "123456789012"\n'
+            '    arn        = "arn:aws:iam::123456789012:root"\n'
+            '    user_id    = "123456789012"\n'
+            '  }\n'
+            '}'
+        ),
+        "google": (
+            'override_data {\n'
+            '  target = data.google_project.current\n'
+            '  values = {\n'
+            '    project_id = "test-project-123"\n'
+            '    number     = "123456789012"\n'
+            '    name       = "test-project-123"\n'
+            '  }\n'
+            '}'
+        ),
+    }
+    _provider = ctx.get("PROVIDER_NAME", "azurerm")
+    ctx.setdefault(
+        "DATA_SOURCE_OVERRIDE",
+        _data_override_map.get(_provider, _data_override_map["azurerm"]),
     )
     ctx.setdefault(
         "TEST_STANDARD_VARIABLES",

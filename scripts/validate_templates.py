@@ -23,6 +23,16 @@ VALID_PLACEHOLDER_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 FRONTMATTER_GLOBS = [
     "references/copilot/agents/*.tmpl",
     "references/copilot/instructions/*.tmpl",
+    "references/copilot/aws/agents/*.tmpl",
+    "references/copilot/aws/instructions/*.tmpl",
+    "references/copilot/gcp/agents/*.tmpl",
+    "references/copilot/gcp/instructions/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/agents/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/instructions/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/aws/agents/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/aws/instructions/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/gcp/agents/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/gcp/instructions/*.tmpl",
 ]
 
 SKILL_MD = REPO_ROOT / "SKILL.md"
@@ -128,12 +138,19 @@ def check_examples_no_placeholders() -> list[str]:
         errors.append("ERROR: No .md files found under examples/ directory.")
         return errors
 
+    # GitHub Actions / Jinja expressions use {{ ... }} with dots or spaces — skip those
+    _ACTIONS_EXPR_RE = re.compile(r"^\s*(vars|github|env|matrix|secrets|inputs|needs|steps|runner|strategy|job)\b")
+
     for path in sorted(example_files):
         rel = path.relative_to(REPO_ROOT)
         text = path.read_text(encoding="utf-8")
         matches = list(PLACEHOLDER_RE.finditer(text))
         if matches:
             for m in matches:
+                inner = m.group(1)
+                # Skip GitHub Actions / templating expressions (contain dots, spaces, etc.)
+                if _ACTIONS_EXPR_RE.match(inner) or "." in inner:
+                    continue
                 line_no = text[: m.start()].count("\n") + 1
                 errors.append(
                     f"{rel}:{line_no}: example file contains unreplaced placeholder '{m.group(0)}'"
@@ -160,10 +177,14 @@ def check_skill_md_template_references() -> list[str]:
         if ref in seen:
             continue
         seen.add(ref)
-        full_path = REFERENCES_DIR / ref
+        # Strip leading references/ prefix since REFERENCES_DIR already points there
+        rel = ref
+        if rel.startswith("references/"):
+            rel = rel[len("references/"):]
+        full_path = REFERENCES_DIR / rel
         if not full_path.exists():
             errors.append(
-                f"SKILL.md references '{ref}' but file does not exist at references/{ref}"
+                f"SKILL.md references '{ref}' but file does not exist at references/{rel}"
             )
 
     return errors

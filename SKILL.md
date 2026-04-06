@@ -100,7 +100,7 @@ After collecting all gap analysis classifications, compute an overall maturity s
 
 **Gap severity:**
 - **Critical gap** — Any Missing category, or a Partial status in Security, Testing, or CI/CD (weight ≥ 15%)
-- **Moderate gap** — Partial or Missing status in any other category, including Module Design (weight < 15%)
+- **Moderate gap** — Partial or Missing status in any category other than Security, Testing, or CI/CD (including Module Design at 15%)
 
 #### Maturity Report Generation
 
@@ -156,7 +156,7 @@ Select the cloud-specific subdirectory first, then fall back to the base templat
 |-------------|---------------|--------------|--------------|
 | `CLAUDE.md` | `claude/CLAUDE.md.tmpl` | `claude/aws/CLAUDE.md.tmpl` | `claude/gcp/CLAUDE.md.tmpl` |
 | `.claude/commands/create-terraform-module.md` | `claude/commands/create-terraform-module.md.tmpl` | `claude/aws/commands/create-terraform-module.md.tmpl` | `claude/gcp/commands/create-terraform-module.md.tmpl` |
-| `.claude/commands/create-orchestration-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` | ← same | ← same |
+| `.claude/commands/create-{tool}-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` | ← same | ← same |
 | `.claude/commands/create-infra-pipeline.md` | `claude/commands/create-infra-pipeline.md.tmpl` | ← same | ← same |
 
 #### Cloud-Specific Placeholder Reference
