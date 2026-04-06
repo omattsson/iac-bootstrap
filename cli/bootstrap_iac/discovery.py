@@ -97,20 +97,11 @@ _PROVIDER_REQUIRED_PATTERNS = {
 
 
 def _detect_cloud_provider(workspace: Path) -> Optional[str]:
-    """Return detected cloud provider from .tf files, or None."""
-    counts: dict[str, int] = {"Azure": 0, "AWS": 0, "GCP": 0}
-    for tf_file in workspace.rglob("*.tf"):
-        if ".terraform" in tf_file.parts or ".terragrunt-cache" in tf_file.parts:
-            continue
-        try:
-            content = tf_file.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            continue
-        content = _strip_block_comments(content)
-        _match_cloud_provider(content, counts)
-    if not any(counts.values()):
+    """Return detected cloud provider using the shared .tf file scanner."""
+    tf = _scan_tf_files(workspace)
+    if not any(tf.cloud_counts.values()):
         return None
-    return max(counts, key=lambda k: counts[k])
+    return max(tf.cloud_counts, key=lambda k: tf.cloud_counts[k])
 
 
 def _match_cloud_provider(content: str, counts: dict[str, int]) -> None:
@@ -250,25 +241,8 @@ _BACKEND_PATTERNS = {
 
 
 def _detect_state_backend(workspace: Path) -> Optional[str]:
-    """Detect Terraform state backend from ``backend`` blocks in .tf files.
-
-    Heuristics:
-    - Scan .tf files for ``backend "azurerm"``, ``backend "s3"``, ``backend "gcs"``
-    - Also check for ``cloud {}`` block (Terraform Cloud / HCP)
-    - Skip ``.terraform/`` and ``.terragrunt-cache/`` directories
-    """
-    for tf_file in workspace.rglob("*.tf"):
-        if ".terraform" in tf_file.parts or ".terragrunt-cache" in tf_file.parts:
-            continue
-        try:
-            content = tf_file.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            continue
-        content = _strip_block_comments(content)
-        backend = _match_state_backend(content)
-        if backend:
-            return backend
-    return None
+    """Detect Terraform state backend using the shared .tf file scanner."""
+    return _scan_tf_files(workspace).state_backend
 
 
 def _match_state_backend(content: str) -> Optional[str]:
@@ -301,24 +275,8 @@ _NAMING_PATTERNS = [
 
 
 def _detect_naming_pattern(workspace: Path) -> Optional[str]:
-    """Infer naming convention from .tf files.
-
-    Heuristics:
-    - Look for ``name = "${var.prefix}-...-..."`` patterns
-    - Look for ``format("%s-...", ...)`` naming expressions
-    - Extracts the general shape, not exact expressions
-    """
-    for tf_file in workspace.rglob("*.tf"):
-        if ".terraform" in tf_file.parts or ".terragrunt-cache" in tf_file.parts:
-            continue
-        try:
-            content = tf_file.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            continue
-        content = _strip_block_comments(content)
-        if _match_naming_pattern(content):
-            return "{prefix}-{resource_abbreviation}-{suffix}"
-    return None
+    """Infer naming convention using the shared .tf file scanner."""
+    return _scan_tf_files(workspace).naming_pattern
 
 
 def _match_naming_pattern(content: str) -> bool:
@@ -343,7 +301,7 @@ class _TfScanResult:
 def _scan_tf_files(workspace: Path) -> _TfScanResult:
     """Read every .tf file once and run all detection regexes in one pass."""
     result = _TfScanResult()
-    for tf_file in workspace.rglob("*.tf"):
+    for tf_file in sorted(workspace.rglob("*.tf")):
         if ".terraform" in tf_file.parts or ".terragrunt-cache" in tf_file.parts:
             continue
         try:
