@@ -41,7 +41,7 @@ EXAMPLES_DIR = REPO_ROOT / "examples"
 
 
 def check_placeholder_syntax() -> list[str]:
-    """Check that all {{...}} tokens in .tmpl files are valid identifiers."""
+    """Check that all {{...}} tokens in .tmpl files are uppercase identifiers."""
     errors: list[str] = []
     tmpl_files = list(REPO_ROOT.rglob("*.tmpl"))
     if not tmpl_files:
