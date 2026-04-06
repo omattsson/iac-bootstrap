@@ -93,7 +93,7 @@ def test_build_context_pulumi_defaults():
 def test_data_source_override_azure():
     ctx = build_context({"CLOUD_PROVIDER": "Azure"})
     override = ctx["DATA_SOURCE_OVERRIDE"]
-    assert "azurerm_client_config" in override
+    assert "azurerm_subscription" in override
     assert "subscription_id" in override
     assert "tenant_id" in override
 
@@ -110,8 +110,9 @@ def test_data_source_override_aws():
 def test_data_source_override_gcp():
     ctx = build_context({"CLOUD_PROVIDER": "GCP"})
     override = ctx["DATA_SOURCE_OVERRIDE"]
-    assert "google_client_config" in override
-    assert "project" in override
+    assert "google_project" in override
+    assert "project_id" in override
+    assert "number" in override
 
 
 # ---------------------------------------------------------------------------

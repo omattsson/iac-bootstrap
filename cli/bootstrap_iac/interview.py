@@ -630,7 +630,7 @@ def build_context(answers: dict) -> dict:
     _data_override_map = {
         "azurerm": (
             'override_data {\n'
-            '  target = data.azurerm_client_config.current\n'
+            '  target = data.azurerm_subscription.current\n'
             '  values = {\n'
             '    subscription_id = "00000000-0000-0000-0000-000000000000"\n'
             '    tenant_id       = "00000000-0000-0000-0000-000000000000"\n'
@@ -649,10 +649,11 @@ def build_context(answers: dict) -> dict:
         ),
         "google": (
             'override_data {\n'
-            '  target = data.google_client_config.current\n'
+            '  target = data.google_project.current\n'
             '  values = {\n'
-            '    project = "test-project-123"\n'
-            '    region  = "europe-west1"\n'
+            '    project_id = "test-project-123"\n'
+            '    number     = "123456789012"\n'
+            '    name       = "test-project-123"\n'
             '  }\n'
             '}'
         ),
