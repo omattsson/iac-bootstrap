@@ -148,21 +148,21 @@ def _detect_orchestration(workspace: Path) -> tuple[Optional[str], Optional[str]
     - Terramate: any ``terramate.tm.hcl`` file
     - Pulumi: a ``Pulumi.yaml`` file
     """
-    for hcl_file in workspace.rglob("terragrunt.hcl"):
+    for hcl_file in sorted(workspace.rglob("terragrunt.hcl")):
         if ".terraform" in hcl_file.parts or ".terragrunt-cache" in hcl_file.parts:
             continue
         rel = hcl_file.parent.relative_to(workspace)
         parts = rel.parts
         orch_dir = parts[0] if parts else "."
         return "Terragrunt", orch_dir
-    for hcl_file in workspace.rglob("terramate.tm.hcl"):
+    for hcl_file in sorted(workspace.rglob("terramate.tm.hcl")):
         if ".terraform" in hcl_file.parts or ".terragrunt-cache" in hcl_file.parts:
             continue
         rel = hcl_file.parent.relative_to(workspace)
         parts = rel.parts
         orch_dir = parts[0] if parts else "."
         return "Terramate", orch_dir
-    for yaml_file in workspace.rglob("Pulumi.yaml"):
+    for yaml_file in sorted(workspace.rglob("Pulumi.yaml")):
         if ".terraform" in yaml_file.parts or ".terragrunt-cache" in yaml_file.parts:
             continue
         rel = yaml_file.parent.relative_to(workspace)
