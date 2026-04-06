@@ -277,7 +277,7 @@ def _match_state_backend(content: str) -> Optional[str]:
     return None
 
 
-# Common naming expressions seen in Terraform locals blocks
+# Common naming expressions seen in Terraform .tf files
 _NAMING_PATTERNS = [
     # ${var.prefix}-<abbreviation>-<suffix> pattern
     re.compile(
