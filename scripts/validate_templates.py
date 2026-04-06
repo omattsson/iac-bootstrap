@@ -29,6 +29,10 @@ FRONTMATTER_GLOBS = [
     "references/copilot/gcp/instructions/*.tmpl",
     "cli/bootstrap_iac/templates/copilot/agents/*.tmpl",
     "cli/bootstrap_iac/templates/copilot/instructions/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/aws/agents/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/aws/instructions/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/gcp/agents/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/gcp/instructions/*.tmpl",
 ]
 
 SKILL_MD = REPO_ROOT / "SKILL.md"

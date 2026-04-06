@@ -62,6 +62,18 @@ def test_build_context_no_orchestration():
     assert ctx["ORCHESTRATION_TOOL_LOWER"] == "terraform"
 
 
+def test_build_context_pulumi_defaults():
+    ctx = build_context({
+        "CLOUD_PROVIDER": "Azure",
+        "ORCHESTRATION_TOOL": "Pulumi",
+    })
+    assert ctx["ORCHESTRATION_TOOL_LOWER"] == "pulumi"
+    assert "pulumi preview" in ctx["VALIDATE_COMMAND"]
+    assert "pulumi preview" in ctx["PLAN_COMMAND"]
+    assert "{stack}" in ctx["PLAN_SINGLE_COMMAND"]
+    assert "Pulumi.yaml" in ctx["HIERARCHY_DIAGRAM"]
+
+
 # ---------------------------------------------------------------------------
 # build_context — DATA_SOURCE_OVERRIDE {resource} replacement
 # ---------------------------------------------------------------------------

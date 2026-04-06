@@ -3,7 +3,10 @@
 import pytest
 from pathlib import Path
 
-from bootstrap_iac.generator import resolve_placeholders, generate_files, get_templates_dir
+from bootstrap_iac.generator import (
+    resolve_placeholders, generate_files, get_templates_dir,
+    _cloud_template, _build_output_specs,
+)
 from bootstrap_iac.interview import build_context
 
 
@@ -334,3 +337,79 @@ def test_get_templates_dir_returns_directory():
     assert tdir.is_dir()
     # Should contain at least the copilot templates
     assert (tdir / "copilot").is_dir() or (tdir / "copilot/copilot-instructions.md.tmpl").exists()
+
+
+# ---------------------------------------------------------------------------
+# _cloud_template — cloud-specific template resolution
+# ---------------------------------------------------------------------------
+
+
+def test_cloud_template_returns_base_for_azure():
+    """Azure uses the base template path (no override directory)."""
+    tdir = get_templates_dir()
+    result = _cloud_template("copilot/copilot-instructions.md.tmpl", "azure", tdir)
+    assert result == "copilot/copilot-instructions.md.tmpl"
+
+
+def test_cloud_template_returns_override_for_aws():
+    """AWS should pick the cloud-specific override when it exists."""
+    tdir = get_templates_dir()
+    base = "copilot/copilot-instructions.md.tmpl"
+    result = _cloud_template(base, "aws", tdir)
+    expected = "copilot/aws/copilot-instructions.md.tmpl"
+    if (tdir / expected).exists():
+        assert result == expected
+    else:
+        assert result == base
+
+
+def test_cloud_template_falls_back_when_no_override(tmp_path):
+    """When no cloud-specific file exists, returns the base path."""
+    (tmp_path / "copilot").mkdir()
+    (tmp_path / "copilot" / "base.tmpl").write_text("base")
+    result = _cloud_template("copilot/base.tmpl", "aws", tmp_path)
+    assert result == "copilot/base.tmpl"
+
+
+# ---------------------------------------------------------------------------
+# _build_output_specs — output path correctness
+# ---------------------------------------------------------------------------
+
+
+def test_build_output_specs_pulumi_uses_tool_specific_paths():
+    """Pulumi orchestration should produce pulumi-specific output paths."""
+    tdir = get_templates_dir()
+    ctx = build_context({
+        "CLOUD_PROVIDER": "Azure",
+        "ORCHESTRATION_TOOL": "Pulumi",
+    })
+    specs = _build_output_specs(ctx, tdir)
+    output_paths = [s.output_rel for s in specs]
+    assert ".github/agents/pulumi-stack-manager.agent.md" in output_paths
+    assert ".claude/commands/create-pulumi-stack.md" in output_paths
+
+
+def test_build_output_specs_terragrunt_uses_tool_specific_paths():
+    """Terragrunt orchestration should produce terragrunt-specific output paths."""
+    tdir = get_templates_dir()
+    ctx = build_context({
+        "CLOUD_PROVIDER": "Azure",
+        "ORCHESTRATION_TOOL": "Terragrunt",
+    })
+    specs = _build_output_specs(ctx, tdir)
+    output_paths = [s.output_rel for s in specs]
+    assert ".github/agents/terragrunt-stack-manager.agent.md" in output_paths
+    assert ".claude/commands/create-terragrunt-stack.md" in output_paths
+
+
+def test_build_output_specs_no_orchestration_omits_stack_files():
+    """Without orchestration, no stack-manager or stack command files."""
+    tdir = get_templates_dir()
+    ctx = build_context({
+        "CLOUD_PROVIDER": "Azure",
+        "ORCHESTRATION_TOOL": "None",
+    })
+    specs = _build_output_specs(ctx, tdir)
+    output_paths = [s.output_rel for s in specs]
+    assert not any("stack-manager" in p for p in output_paths)
+    assert not any("create-" in p and "-stack" in p for p in output_paths)
