@@ -60,11 +60,11 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "- `prefix` — Resource name prefix\n"
             "- `region` — AWS region (e.g. us-east-1)\n"
             "- `tags` — Resource-specific tags (map(string))\n"
-            "- `default_tags` — Account-wide default tags from orchestration"
+            "- `env_default_tags` — Account-wide default tags from orchestration"
         ),
         "naming_pattern": "{prefix}-{resource_type}-{suffix}",
         "tag_strategy": (
-            "local.tags = merge(var.default_tags, var.tags)\n"
+            "local.tags = merge(var.env_default_tags, var.tags)\n"
             "Required tags: Environment, Product, ManagedBy = \"Terraform\""
         ),
         "private_endpoint_pattern": (
@@ -85,11 +85,11 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "- `location` — GCP region or zone\n"
             "- `project` — GCP project ID\n"
             "- `labels` — Resource labels (map(string))\n"
-            "- `default_labels` — Project-wide default labels from orchestration"
+            "- `env_default_labels` — Project-wide default labels from orchestration"
         ),
         "naming_pattern": "{prefix}-{resource_type}-{suffix}",
         "tag_strategy": (
-            "local.labels = merge(var.default_labels, var.labels)\n"
+            "local.labels = merge(var.env_default_labels, var.labels)\n"
             "Required labels: environment, product, managed_by = \"terraform\""
         ),
         "private_endpoint_pattern": (

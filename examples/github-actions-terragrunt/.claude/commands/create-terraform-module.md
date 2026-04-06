@@ -52,7 +52,7 @@ terraform {
 ```hcl
 locals {
   name = "${var.prefix}-${var.suffix}"
-  tags = merge(var.default_tags, var.tags)
+  tags = merge(var.env_default_tags, var.tags)
 }
 ```
 
