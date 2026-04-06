@@ -133,7 +133,19 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 │   ├── maturity-report.md.tmpl           # Maturity assessment report template
 │   │
 │   ├── copilot/                          # VS Code Copilot output templates
-│   │   ├── copilot-instructions.md.tmpl
+│   │   ├── copilot-instructions.md.tmpl  # Base (Azure) workspace instructions
+│   │   ├── aws/                          # AWS overrides for cloud-specific files
+│   │   │   ├── copilot-instructions.md.tmpl
+│   │   │   ├── agents/terraform-module-builder.agent.md.tmpl
+│   │   │   ├── instructions/terraform-modules.instructions.md.tmpl
+│   │   │   ├── instructions/terraform-tests.instructions.md.tmpl
+│   │   │   └── skills/create-terraform-module.skill.md.tmpl
+│   │   ├── gcp/                          # GCP overrides for cloud-specific files
+│   │   │   ├── copilot-instructions.md.tmpl
+│   │   │   ├── agents/terraform-module-builder.agent.md.tmpl
+│   │   │   ├── instructions/terraform-modules.instructions.md.tmpl
+│   │   │   ├── instructions/terraform-tests.instructions.md.tmpl
+│   │   │   └── skills/create-terraform-module.skill.md.tmpl
 │   │   ├── agents/
 │   │   │   ├── infra-architect.agent.md.tmpl
 │   │   │   ├── terraform-module-builder.agent.md.tmpl
@@ -151,7 +163,13 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 │   │       └── pipeline-templates.instructions.md.tmpl
 │   │
 │   └── claude/                           # Claude Code output templates
-│       ├── CLAUDE.md.tmpl                # Combined instructions + rules
+│       ├── CLAUDE.md.tmpl                # Base (Azure) instructions + rules
+│       ├── aws/                          # AWS overrides
+│       │   ├── CLAUDE.md.tmpl
+│       │   └── commands/create-terraform-module.md.tmpl
+│       ├── gcp/                          # GCP overrides
+│       │   ├── CLAUDE.md.tmpl
+│       │   └── commands/create-terraform-module.md.tmpl
 │       └── commands/
 │           ├── create-terraform-module.md.tmpl
 │           ├── create-orchestration-stack.md.tmpl
@@ -180,6 +198,45 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
             ├── create-terraform-module.md
             ├── create-terragrunt-stack.md
             └── create-infra-pipeline.md
+```
+
+## Cloud-Specific Templates
+
+Templates are organized in a fallback hierarchy: **cloud-specific override → base template**.
+
+| Cloud | Override directory | Fallback |
+|-------|--------------------|----------|
+| **Azure** | *(none — base templates are Azure-native)* | `copilot/`, `claude/` |
+| **AWS** | `copilot/aws/`, `claude/aws/` | `copilot/`, `claude/` |
+| **GCP** | `copilot/gcp/`, `claude/gcp/` | `copilot/`, `claude/` |
+
+**Which files have cloud-specific overrides?**
+
+Files that contain cloud-specific provider references, data sources, naming patterns, or test boilerplate have dedicated AWS/GCP variants:
+
+- `copilot-instructions.md.tmpl` — provider names, standard variables, tag/label conventions
+- `agents/terraform-module-builder.agent.md.tmpl` — resource examples, data sources, tag/label merge
+- `instructions/terraform-modules.instructions.md.tmpl` — file layout, provider config, outputs
+- `instructions/terraform-tests.instructions.md.tmpl` — mock data sources, test variables
+- `skills/create-terraform-module.skill.md.tmpl` — full module scaffolding with provider-specific patterns
+- `CLAUDE.md.tmpl` — combined instructions with cloud-specific rules and examples
+- `commands/create-terraform-module.md.tmpl` — module creation command with provider-specific code
+
+**Files that use the base template for all clouds** (cloud-agnostic content):
+
+- `agents/infra-architect.agent.md.tmpl` — planning agent (uses `{{PLACEHOLDER}}` tokens)
+- `agents/terraform-test-writer.agent.md.tmpl` — test patterns (resolved via `{{DATA_SOURCE_OVERRIDE}}`)
+- `agents/*-stack-manager.agent.md.tmpl` — orchestration-specific, not cloud-specific
+- `skills/create-infra-pipeline.skill.md.tmpl` — CI/CD-specific, not cloud-specific
+- `instructions/pipeline-templates.instructions.md.tmpl` — CI/CD platform rules
+- `instructions/orchestration-configs.instructions.md.tmpl` — orchestration tool rules
+
+The CLI handles this automatically via `--cloud`:
+
+```bash
+bootstrap-iac --cloud aws    # Uses aws/ overrides where available
+bootstrap-iac --cloud gcp    # Uses gcp/ overrides where available
+bootstrap-iac --cloud azure  # Uses base templates (Azure-native)
 ```
 
 ## Best Practices Reference

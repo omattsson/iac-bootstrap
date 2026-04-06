@@ -60,11 +60,11 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "- `prefix` — Resource name prefix\n"
             "- `region` — AWS region (e.g. us-east-1)\n"
             "- `tags` — Resource-specific tags (map(string))\n"
-            "- `default_tags` — Account-wide default tags from orchestration"
+            "- `env_default_tags` — Account-wide default tags from orchestration"
         ),
         "naming_pattern": "{prefix}-{resource_type}-{suffix}",
         "tag_strategy": (
-            "local.tags = merge(var.default_tags, var.tags)\n"
+            "local.tags = merge(var.env_default_tags, var.tags)\n"
             "Required tags: Environment, Product, ManagedBy = \"Terraform\""
         ),
         "private_endpoint_pattern": (
@@ -85,11 +85,11 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "- `location` — GCP region or zone\n"
             "- `project` — GCP project ID\n"
             "- `labels` — Resource labels (map(string))\n"
-            "- `default_labels` — Project-wide default labels from orchestration"
+            "- `env_default_labels` — Project-wide default labels from orchestration"
         ),
         "naming_pattern": "{prefix}-{resource_type}-{suffix}",
         "tag_strategy": (
-            "local.labels = merge(var.default_labels, var.labels)\n"
+            "local.labels = merge(var.env_default_labels, var.labels)\n"
             "Required labels: environment, product, managed_by = \"terraform\""
         ),
         "private_endpoint_pattern": (
@@ -504,7 +504,10 @@ def build_context(answers: dict) -> dict:
         ),
     )
     ctx.setdefault("PROVIDER_RESOURCE_EXAMPLE", cloud_defs["provider_resource_example"])
-    ctx.setdefault("PROVIDER_RESOURCE", cloud_defs["provider_resource_example"])
+    ctx.setdefault(
+        "PROVIDER_RESOURCE",
+        cloud_defs["provider_resource_example"].split(".")[0],
+    )
     ctx.setdefault("LOCATION_ATTRIBUTE", cloud_defs["location_attribute"])
     ctx.setdefault("RESOURCE_GROUP_ATTRIBUTE", cloud_defs["resource_group_attribute"])
     ctx.setdefault("PRIVATE_ENDPOINT_PATTERN", cloud_defs["private_endpoint_pattern"])
@@ -512,10 +515,8 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault(
         "TAG_MERGE_PATTERN",
         "merge(var.env_default_tags, var.tags)"
-        if cloud == "Azure"
-        else "merge(var.default_tags, var.tags)"
-        if cloud == "AWS"
-        else "merge(var.default_labels, var.labels)",
+        if cloud in ("Azure", "AWS")
+        else "merge(var.env_default_labels, var.labels)",
     )
     ctx.setdefault(
         "TAG_MERGE_LOCAL",
@@ -683,6 +684,7 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("STACK_PIPELINE", _stack_pipeline(cicd, orch))
     ctx.setdefault("DRIFT_PIPELINE", _drift_pipeline(cicd, orch))
+    ctx.setdefault("DESTROY_PIPELINE", _destroy_pipeline(cicd, orch))
 
     # ---- Environment hierarchy ----
     ctx.setdefault(
@@ -757,10 +759,19 @@ def _stack_pipeline(cicd: str, orch: str) -> str:
     if "GitHub" in cicd:
         if tool == "terraform":
             plan_cmd = "terraform plan"
-            apply_cmd = "terraform apply --auto-approve"
+            apply_cmd = "terraform apply -auto-approve"
+        elif tool == "terragrunt":
+            plan_cmd = "terragrunt run-all plan"
+            apply_cmd = "terragrunt run-all apply -auto-approve"
+        elif tool == "terramate":
+            plan_cmd = "terramate run terraform plan"
+            apply_cmd = "terramate run terraform apply -auto-approve"
+        elif tool == "pulumi":
+            plan_cmd = "pulumi preview"
+            apply_cmd = "pulumi up --yes"
         else:
-            plan_cmd = f"{tool} run-all plan"
-            apply_cmd = f"{tool} run-all apply --auto-approve"
+            plan_cmd = f"{tool} plan"
+            apply_cmd = f"{tool} apply -auto-approve"
         return (
             "name: plan-apply-stack\n"
             "on:\n"
@@ -813,6 +824,68 @@ def _drift_pipeline(cicd: str, orch: str) -> str:
             "        run: echo 'Drift detected — review plan output'\n"
         )
     return "# Define your drift detection pipeline here (scheduled plan run)"
+
+
+def _destroy_commands(orch: str) -> tuple[str, str]:
+    tool = _ORCHESTRATION_DEFAULTS.get(orch, _ORCHESTRATION_DEFAULTS["None"])["tool_lower"]
+    if tool == "terraform":
+        return ("terraform plan -destroy", "terraform apply -destroy -auto-approve")
+    if tool == "terragrunt":
+        return (
+            "terragrunt run-all plan -destroy",
+            "terragrunt run-all apply -destroy -auto-approve",
+        )
+    if tool == "terramate":
+        return (
+            "terramate run terraform plan -destroy",
+            "terramate run terraform apply -destroy -auto-approve",
+        )
+    if tool == "pulumi":
+        return ("pulumi preview --destroy", "pulumi destroy --yes")
+    return ("terraform plan -destroy", "terraform apply -destroy -auto-approve")
+
+
+def _destroy_pipeline(cicd: str, orch: str) -> str:
+    destroy_cmd, apply_cmd = _destroy_commands(orch)
+    if "GitHub" in cicd:
+        return (
+            "name: destroy-{component}\n"
+            "on:\n"
+            "  workflow_dispatch:\n"
+            "    inputs:\n"
+            "      environment:\n"
+            "        description: 'Target environment'\n"
+            "        required: true\n"
+            "        type: choice\n"
+            "        options: [dev, staging, prod]\n"
+            "      component:\n"
+            "        description: 'Component to destroy'\n"
+            "        required: true\n"
+            "      confirm:\n"
+            "        description: 'Type DESTROY to confirm'\n"
+            "        required: true\n\n"
+            "jobs:\n"
+            "  plan-destroy:\n"
+            "    if: github.event.inputs.confirm == 'DESTROY'\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - uses: actions/checkout@v4\n"
+            f"      - run: {destroy_cmd}\n"
+            "        working-directory: infrastructure-config/${{ github.event.inputs.environment }}/platform/${{ github.event.inputs.component }}\n"
+            "  destroy:\n"
+            "    needs: plan-destroy\n"
+            "    environment: ${{ github.event.inputs.environment }}\n"
+            "    runs-on: ubuntu-latest\n"
+            "    steps:\n"
+            "      - uses: actions/checkout@v4\n"
+            f"      - run: {apply_cmd}\n"
+            "        working-directory: infrastructure-config/${{ github.event.inputs.environment }}/platform/${{ github.event.inputs.component }}\n"
+        )
+    return (
+        "# Define your destroy pipeline here\n"
+        "# Requirements: manual trigger, explicit confirmation, environment protection,\n"
+        "# plan-destroy before apply-destroy, restricted to protected branches"
+    )
 
 
 def _environment_hierarchy(orch: str) -> str:

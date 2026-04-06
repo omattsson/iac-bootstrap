@@ -15,6 +15,12 @@ def test_build_context_azure_defaults():
     assert ctx["PROVIDER_NAME"] == "azurerm"
     assert ctx["TAG_ATTRIBUTE"] == "tags"
     assert "azurerm" in ctx["PROVIDER_BLOCK"]
+    assert ctx["PROVIDER_RESOURCE"] == "azurerm_resource_group"
+    assert "." not in ctx["PROVIDER_RESOURCE"]
+    assert "env_default_tags" in ctx["STANDARD_VARIABLES"]
+    assert "env_default_tags" in ctx["TAG_STRATEGY"]
+    assert "env_default_tags" in ctx["TAG_MERGE_PATTERN"]
+    assert "env_default_tags" in ctx["TAG_MERGE_LOCAL"]
 
 
 def test_build_context_aws_defaults():
@@ -22,6 +28,12 @@ def test_build_context_aws_defaults():
     assert ctx["PROVIDER_NAME"] == "aws"
     assert ctx["TAG_ATTRIBUTE"] == "tags"
     assert "aws" in ctx["PROVIDER_BLOCK"]
+    assert ctx["PROVIDER_RESOURCE"] == "aws_s3_bucket"
+    assert "." not in ctx["PROVIDER_RESOURCE"]
+    assert "env_default_tags" in ctx["STANDARD_VARIABLES"]
+    assert "env_default_tags" in ctx["TAG_STRATEGY"]
+    assert "env_default_tags" in ctx["TAG_MERGE_PATTERN"]
+    assert "env_default_tags" in ctx["TAG_MERGE_LOCAL"]
 
 
 def test_build_context_gcp_defaults():
@@ -29,6 +41,12 @@ def test_build_context_gcp_defaults():
     assert ctx["PROVIDER_NAME"] == "google"
     assert ctx["TAG_ATTRIBUTE"] == "labels"
     assert "google" in ctx["PROVIDER_BLOCK"]
+    assert ctx["PROVIDER_RESOURCE"] == "google_storage_bucket"
+    assert "." not in ctx["PROVIDER_RESOURCE"]
+    assert "env_default_labels" in ctx["STANDARD_VARIABLES"]
+    assert "env_default_labels" in ctx["TAG_STRATEGY"]
+    assert "env_default_labels" in ctx["TAG_MERGE_PATTERN"]
+    assert "env_default_labels" in ctx["TAG_MERGE_LOCAL"]
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +131,25 @@ def test_data_source_override_gcp():
     assert "google_project" in override
     assert "project_id" in override
     assert "number" in override
+
+
+# ---------------------------------------------------------------------------
+# build_context — DESTROY_PIPELINE
+# ---------------------------------------------------------------------------
+
+
+def test_destroy_pipeline_github_actions():
+    ctx = build_context({
+        "CLOUD_PROVIDER": "Azure",
+        "CI_CD_PLATFORM": "GitHub Actions",
+        "ORCHESTRATION_TOOL": "Terragrunt",
+    })
+    assert "DESTROY_PIPELINE" in ctx
+    assert "workflow_dispatch" in ctx["DESTROY_PIPELINE"]
+    assert "DESTROY" in ctx["DESTROY_PIPELINE"]
+    assert "terragrunt run-all" in ctx["DESTROY_PIPELINE"]
+    assert "${{ github.event.inputs.environment }}" in ctx["DESTROY_PIPELINE"]
+    assert "${{ github.event.inputs.component }}" in ctx["DESTROY_PIPELINE"]
 
 
 # ---------------------------------------------------------------------------
