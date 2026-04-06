@@ -98,13 +98,14 @@ import (
     "github.com/stretchr/testify/assert"
 )
 
-func Test{{MODULE_PASCAL_CASE}}(t *testing.T) {
+func TestExample(t *testing.T) {
     t.Parallel()
 
     opts := &terraform.Options{
         TerraformDir: "../../",
         Vars: map[string]interface{}{
-            {{TERRATEST_STANDARD_VARS}}
+            "name_prefix": "terratest",
+            "environment": os.Getenv("TEST_ENV"),
         },
     }
 
@@ -135,21 +136,20 @@ from checkov.common.models.enums import CheckCategories, CheckResult
 from checkov.terraform.checks.resource.base_resource_check import BaseResourceCheck
 
 
-class Check{{CHECK_CLASS_NAME}}(BaseResourceCheck):
+class CheckRequireEncryption(BaseResourceCheck):
     def __init__(self):
-        name = "{{CHECK_DESCRIPTION}}"
-        id = "{{CHECK_ID}}"
-        supported_resources = ["{{TERRAFORM_RESOURCE_TYPE}}"]
+        name = "Ensure storage encryption is enabled"
+        id = "CKV_{{COMPANY_SLUG_UPPER}}_001"
+        supported_resources = ["{{PROVIDER_RESOURCE}}"]
         categories = [CheckCategories.GENERAL_SECURITY]
         super().__init__(name=name, id=id, categories=categories,
                          supported_resources=supported_resources)
 
     def scan_resource_conf(self, conf):
-        {{CHECK_LOGIC}}
-        return CheckResult.PASSED
+        return CheckResult.PASSED if conf.get("encryption_enabled", [False])[0] else CheckResult.FAILED
 
 
-check = Check{{CHECK_CLASS_NAME}}()
+check = CheckRequireEncryption()
 ```
 
 ### Running
@@ -184,24 +184,24 @@ Use for plan-time governance evaluated against `terraform show -json` output.
 - Expose violations as a **set named `violations`**
 - Test files: `{policy}_test.rego` co-located with policy file
 
-### Policy Template
+### Policy Template (naming enforcement example)
 
 ```rego
-package {{COMPANY_SLUG}}.{{POLICY_AREA}}
+package {{COMPANY_SLUG}}.naming
 
 import rego.v1
 
 violations contains msg if {
     some resource in input.resource_changes
-    resource.type == "{{TERRAFORM_RESOURCE_TYPE}}"
+    resource.type == "{{PROVIDER_RESOURCE}}"
     resource.change.actions[_] in {"create", "update"}
-    {{VIOLATION_CONDITION}}
-    msg := sprintf("{{ERROR_MESSAGE_TEMPLATE}}", [{{MSG_ARGS}}])
+    not startswith(resource.change.after.name, input.variables.prefix.value)
+    msg := sprintf("%s name '%s' must start with prefix '%s'", [resource.address, resource.change.after.name, input.variables.prefix.value])
 }
 ```
 
 ### Running
 ```bash
 opa eval --input tfplan.json --data policies/ --fail-defined \
-  "data.{{COMPANY_SLUG}}.{{POLICY_AREA}}.violations"
+  "data.{{COMPANY_SLUG}}.naming.violations"
 ```
