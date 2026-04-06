@@ -92,7 +92,7 @@ def _detect_cloud_provider(workspace: Path) -> Optional[str]:
     """Return detected cloud provider from .tf files, or None."""
     counts: dict[str, int] = {"Azure": 0, "AWS": 0, "GCP": 0}
     for tf_file in workspace.rglob("*.tf"):
-        if ".terraform" in tf_file.parts:
+        if ".terraform" in tf_file.parts or ".terragrunt-cache" in tf_file.parts:
             continue
         try:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
@@ -144,19 +144,19 @@ def _detect_orchestration(workspace: Path) -> tuple[Optional[str], Optional[str]
     """Return (tool_name, dir_name) or (None, None).
 
     Heuristics:
-    - Terragrunt: any ``terragrunt.hcl`` file (outside .terraform/)
+    - Terragrunt: any ``terragrunt.hcl`` file (outside .terraform/ and .terragrunt-cache/)
     - Terramate: any ``terramate.tm.hcl`` file
     - Pulumi: a ``Pulumi.yaml`` file
     """
     for hcl_file in workspace.rglob("terragrunt.hcl"):
-        if ".terraform" in hcl_file.parts:
+        if ".terraform" in hcl_file.parts or ".terragrunt-cache" in hcl_file.parts:
             continue
         rel = hcl_file.parent.relative_to(workspace)
         parts = rel.parts
         orch_dir = parts[0] if parts else "."
         return "Terragrunt", orch_dir
     for hcl_file in workspace.rglob("terramate.tm.hcl"):
-        if ".terraform" in hcl_file.parts:
+        if ".terraform" in hcl_file.parts or ".terragrunt-cache" in hcl_file.parts:
             continue
         rel = hcl_file.parent.relative_to(workspace)
         parts = rel.parts
@@ -231,7 +231,7 @@ _BACKEND_PATTERNS = {
         r'^(?!\s*(?:#|//))\s*backend\s+"gcs"',
         re.IGNORECASE | re.MULTILINE,
     ),
-    "Terraform Cloud": re.compile(
+    "Terraform Cloud / Enterprise": re.compile(
         r'^(?!\s*(?:#|//))\s*(?:backend\s+"remote"|cloud\s*\{)',
         re.IGNORECASE | re.MULTILINE,
     ),
@@ -244,10 +244,10 @@ def _detect_state_backend(workspace: Path) -> Optional[str]:
     Heuristics:
     - Scan .tf files for ``backend "azurerm"``, ``backend "s3"``, ``backend "gcs"``
     - Also check for ``cloud {}`` block (Terraform Cloud / HCP)
-    - Skip ``.terraform/`` directories
+    - Skip ``.terraform/`` and ``.terragrunt-cache/`` directories
     """
     for tf_file in workspace.rglob("*.tf"):
-        if ".terraform" in tf_file.parts:
+        if ".terraform" in tf_file.parts or ".terragrunt-cache" in tf_file.parts:
             continue
         try:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
@@ -297,7 +297,7 @@ def _detect_naming_pattern(workspace: Path) -> Optional[str]:
     - Extracts the general shape, not exact expressions
     """
     for tf_file in workspace.rglob("*.tf"):
-        if ".terraform" in tf_file.parts:
+        if ".terraform" in tf_file.parts or ".terragrunt-cache" in tf_file.parts:
             continue
         try:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
@@ -331,7 +331,7 @@ def _scan_tf_files(workspace: Path) -> _TfScanResult:
     """Read every .tf file once and run all detection regexes in one pass."""
     result = _TfScanResult()
     for tf_file in workspace.rglob("*.tf"):
-        if ".terraform" in tf_file.parts:
+        if ".terraform" in tf_file.parts or ".terragrunt-cache" in tf_file.parts:
             continue
         try:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
@@ -366,7 +366,7 @@ def scan_workspace(workspace_path: Path) -> DiscoveryResult:
     org_name       Git remote URL (``github.com/ORG/REPO``)
     orchestration  ``terragrunt.hcl`` / ``terramate.tm.hcl`` / ``Pulumi.yaml``
     ci_cd_platform ``.github/workflows/`` / ``azure-pipelines*.yml`` / etc.
-    state_backend  ``backend "azurerm"`` / ``"s3"`` / ``"gcs"`` / ``cloud {}``
+    state_backend  ``backend "azurerm"`` / ``"s3"`` / ``"gcs"`` / ``cloud {}`` /\n                   ``backend "remote"``
     naming_pattern ``name = "${var.prefix}-..."`` or ``format(...)`` naming
                    expressions in .tf files
     ============== ========================================================

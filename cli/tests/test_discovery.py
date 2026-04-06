@@ -242,7 +242,7 @@ def test_detect_terraform_cloud_backend(tmp_path):
           }
         }
     """))
-    assert _detect_state_backend(tmp_path) == "Terraform Cloud"
+    assert _detect_state_backend(tmp_path) == "Terraform Cloud / Enterprise"
 
 
 def test_detect_state_backend_none(tmp_path):
@@ -280,8 +280,9 @@ def test_detect_naming_pattern_prefix_style(tmp_path):
           name = "${var.prefix}-rg-${var.suffix}"
         }
     """))
-    assert _detect_naming_pattern(tmp_path) is not None
-    assert "prefix" in _detect_naming_pattern(tmp_path)
+    result = _detect_naming_pattern(tmp_path)
+    assert result is not None
+    assert "prefix" in result
 
 
 def test_detect_naming_pattern_format_style(tmp_path):

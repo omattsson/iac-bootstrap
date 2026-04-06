@@ -62,7 +62,7 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "- `tags` — Resource-specific tags (map(string))\n"
             "- `env_default_tags` — Account-wide default tags from orchestration"
         ),
-        "naming_pattern": "{prefix}-{resource_type}-{suffix}",
+        "naming_pattern": "{prefix}-{resource_abbreviation}-{suffix}",
         "tag_strategy": (
             "local.tags = merge(var.env_default_tags, var.tags)\n"
             "Required tags: Environment, Product, ManagedBy = \"Terraform\""
@@ -87,7 +87,7 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "- `labels` — Resource labels (map(string))\n"
             "- `env_default_labels` — Project-wide default labels from orchestration"
         ),
-        "naming_pattern": "{prefix}-{resource_type}-{suffix}",
+        "naming_pattern": "{prefix}-{resource_abbreviation}-{suffix}",
         "tag_strategy": (
             "local.labels = merge(var.env_default_labels, var.labels)\n"
             "Required labels: environment, product, managed_by = \"terraform\""
@@ -1040,7 +1040,7 @@ def run_interview(
     default_naming = (
         discovery.naming_pattern
         or _CLOUD_PROVIDER_DEFAULTS.get(cloud, {}).get(
-            "naming_pattern", "{prefix}-{resource_type}-{suffix}"
+            "naming_pattern", "{prefix}-{resource_abbreviation}-{suffix}"
         )
     )
     answers["NAMING_PATTERN"] = _get(
