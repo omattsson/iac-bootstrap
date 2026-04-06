@@ -504,7 +504,10 @@ def build_context(answers: dict) -> dict:
         ),
     )
     ctx.setdefault("PROVIDER_RESOURCE_EXAMPLE", cloud_defs["provider_resource_example"])
-    ctx.setdefault("PROVIDER_RESOURCE", cloud_defs["provider_resource_example"])
+    ctx.setdefault(
+        "PROVIDER_RESOURCE",
+        cloud_defs["provider_resource_example"].split(".")[0],
+    )
     ctx.setdefault("LOCATION_ATTRIBUTE", cloud_defs["location_attribute"])
     ctx.setdefault("RESOURCE_GROUP_ATTRIBUTE", cloud_defs["resource_group_attribute"])
     ctx.setdefault("PRIVATE_ENDPOINT_PATTERN", cloud_defs["private_endpoint_pattern"])

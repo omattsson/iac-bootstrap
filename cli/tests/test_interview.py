@@ -15,6 +15,8 @@ def test_build_context_azure_defaults():
     assert ctx["PROVIDER_NAME"] == "azurerm"
     assert ctx["TAG_ATTRIBUTE"] == "tags"
     assert "azurerm" in ctx["PROVIDER_BLOCK"]
+    assert ctx["PROVIDER_RESOURCE"] == "azurerm_resource_group"
+    assert "." not in ctx["PROVIDER_RESOURCE"]
     assert "env_default_tags" in ctx["STANDARD_VARIABLES"]
     assert "env_default_tags" in ctx["TAG_STRATEGY"]
     assert "env_default_tags" in ctx["TAG_MERGE_PATTERN"]
@@ -26,6 +28,8 @@ def test_build_context_aws_defaults():
     assert ctx["PROVIDER_NAME"] == "aws"
     assert ctx["TAG_ATTRIBUTE"] == "tags"
     assert "aws" in ctx["PROVIDER_BLOCK"]
+    assert ctx["PROVIDER_RESOURCE"] == "aws_s3_bucket"
+    assert "." not in ctx["PROVIDER_RESOURCE"]
     assert "env_default_tags" in ctx["STANDARD_VARIABLES"]
     assert "env_default_tags" in ctx["TAG_STRATEGY"]
     assert "env_default_tags" in ctx["TAG_MERGE_PATTERN"]
@@ -37,6 +41,8 @@ def test_build_context_gcp_defaults():
     assert ctx["PROVIDER_NAME"] == "google"
     assert ctx["TAG_ATTRIBUTE"] == "labels"
     assert "google" in ctx["PROVIDER_BLOCK"]
+    assert ctx["PROVIDER_RESOURCE"] == "google_storage_bucket"
+    assert "." not in ctx["PROVIDER_RESOURCE"]
     assert "env_default_labels" in ctx["STANDARD_VARIABLES"]
     assert "env_default_labels" in ctx["TAG_STRATEGY"]
     assert "env_default_labels" in ctx["TAG_MERGE_PATTERN"]
