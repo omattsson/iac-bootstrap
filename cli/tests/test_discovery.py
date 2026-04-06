@@ -72,6 +72,18 @@ def test_detect_cloud_from_unquoted_required_providers(tmp_path):
     assert _detect_cloud_provider(tmp_path) == "AWS"
 
 
+def test_detect_cloud_provider_ignores_bare_key_in_locals(tmp_path):
+    """A bare 'aws = { ... }' in locals should not trigger cloud detection."""
+    (tmp_path / "locals.tf").write_text(textwrap.dedent("""\
+        locals {
+          aws = {
+            region = "us-east-1"
+          }
+        }
+    """))
+    assert _detect_cloud_provider(tmp_path) is None
+
+
 # ---------------------------------------------------------------------------
 # Module prefix detection
 # ---------------------------------------------------------------------------
@@ -225,6 +237,18 @@ def test_detect_terraform_cloud_backend(tmp_path):
 
 def test_detect_state_backend_none(tmp_path):
     (tmp_path / "main.tf").write_text("resource \"null_resource\" \"x\" {}\n")
+    assert _detect_state_backend(tmp_path) is None
+
+
+def test_detect_state_backend_ignores_commented_out(tmp_path):
+    """Commented-out backend blocks should not be detected."""
+    (tmp_path / "backend.tf").write_text(textwrap.dedent("""\
+        terraform {
+          # backend "s3" {
+          #   bucket = "old-bucket"
+          # }
+        }
+    """))
     assert _detect_state_backend(tmp_path) is None
 
 

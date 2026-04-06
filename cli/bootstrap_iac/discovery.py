@@ -64,9 +64,15 @@ _PROVIDER_PATTERNS = {
 }
 
 _PROVIDER_REQUIRED_PATTERNS = {
-    "Azure": re.compile(r'"?azurerm"?\s*=\s*\{', re.IGNORECASE),
-    "AWS": re.compile(r'"?aws"?\s*=\s*\{', re.IGNORECASE),
-    "GCP": re.compile(r'"?google"?\s*=\s*\{', re.IGNORECASE),
+    "Azure": re.compile(
+        r'source\s*=\s*"hashicorp/azurerm"', re.IGNORECASE
+    ),
+    "AWS": re.compile(
+        r'source\s*=\s*"hashicorp/aws"', re.IGNORECASE
+    ),
+    "GCP": re.compile(
+        r'source\s*=\s*"hashicorp/google"', re.IGNORECASE
+    ),
 }
 
 
@@ -201,11 +207,21 @@ def _detect_org_from_git(workspace: Path) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 _BACKEND_PATTERNS = {
-    "Azure Blob Storage": re.compile(r'backend\s+"azurerm"', re.IGNORECASE),
-    "S3": re.compile(r'backend\s+"s3"', re.IGNORECASE),
-    "GCS": re.compile(r'backend\s+"gcs"', re.IGNORECASE),
+    "Azure Blob Storage": re.compile(
+        r'^(?!\s*(?:#|//))\s*backend\s+"azurerm"',
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    "S3": re.compile(
+        r'^(?!\s*(?:#|//))\s*backend\s+"s3"',
+        re.IGNORECASE | re.MULTILINE,
+    ),
+    "GCS": re.compile(
+        r'^(?!\s*(?:#|//))\s*backend\s+"gcs"',
+        re.IGNORECASE | re.MULTILINE,
+    ),
     "Terraform Cloud": re.compile(
-        r'backend\s+"remote"|cloud\s*\{', re.IGNORECASE
+        r'^(?!\s*(?:#|//))\s*(?:backend\s+"remote"|cloud\s*\{)',
+        re.IGNORECASE | re.MULTILINE,
     ),
 }
 
