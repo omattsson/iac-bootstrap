@@ -378,7 +378,8 @@ def scan_workspace(workspace_path: Path) -> DiscoveryResult:
     org_name       Git remote URL (``github.com/ORG/REPO``)
     orchestration  ``terragrunt.hcl`` / ``terramate.tm.hcl`` / ``Pulumi.yaml``
     ci_cd_platform ``.github/workflows/`` / ``azure-pipelines*.yml`` / etc.
-    state_backend  ``backend "azurerm"`` / ``"s3"`` / ``"gcs"`` / ``cloud {}`` /\n                   ``backend "remote"``
+    state_backend  ``backend "azurerm"`` / ``"s3"`` / ``"gcs"`` / ``cloud {}`` /
+                   ``backend "remote"``
     naming_pattern ``name = "${var.prefix}-..."`` or ``format(...)`` naming
                    expressions in .tf files
     ============== ========================================================

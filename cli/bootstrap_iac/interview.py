@@ -1000,7 +1000,7 @@ def run_interview(
     if answers["ORCHESTRATION_TOOL"] != "None":
         _orch_dir_defaults = {
             "Terragrunt": "infrastructure-config",
-            "Terramate": "infrastructure-config",
+            "Terramate": "stacks",
             "Pulumi": ".",
         }
         default_orch_dir = discovery.orchestration_dir or _orch_dir_defaults.get(
