@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Valid placeholder: uppercase letters and underscores inside {{ }}
 PLACEHOLDER_RE = re.compile(r"\{\{([^}]*)\}\}")
-VALID_PLACEHOLDER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+VALID_PLACEHOLDER_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 # Files with expected YAML frontmatter
 FRONTMATTER_GLOBS = [
@@ -27,6 +27,8 @@ FRONTMATTER_GLOBS = [
     "references/copilot/aws/instructions/*.tmpl",
     "references/copilot/gcp/agents/*.tmpl",
     "references/copilot/gcp/instructions/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/agents/*.tmpl",
+    "cli/bootstrap_iac/templates/copilot/instructions/*.tmpl",
 ]
 
 SKILL_MD = REPO_ROOT / "SKILL.md"

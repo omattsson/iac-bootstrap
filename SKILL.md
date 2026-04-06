@@ -156,7 +156,7 @@ Select the cloud-specific subdirectory first, then fall back to the base templat
 |-------------|---------------|--------------|--------------|
 | `CLAUDE.md` | `claude/CLAUDE.md.tmpl` | `claude/aws/CLAUDE.md.tmpl` | `claude/gcp/CLAUDE.md.tmpl` |
 | `.claude/commands/create-terraform-module.md` | `claude/commands/create-terraform-module.md.tmpl` | `claude/aws/commands/create-terraform-module.md.tmpl` | `claude/gcp/commands/create-terraform-module.md.tmpl` |
-| `.claude/commands/create-orchestration-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` | ← same | ← same |
+| `.claude/commands/create-{tool}-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` | ← same | ← same |
 | `.claude/commands/create-infra-pipeline.md` | `claude/commands/create-infra-pipeline.md.tmpl` | ← same | ← same |
 
 #### Cloud-Specific Placeholder Reference

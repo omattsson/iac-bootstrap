@@ -47,7 +47,7 @@ func New{{RULE_STRUCT_NAME}}() *{{RULE_STRUCT_NAME}} {
 }
 
 func (r *{{RULE_STRUCT_NAME}}) Name() string {
-    return "{{COMPANY_SLUG}}_{{rule_name}}"
+    return "{{COMPANY_SLUG}}_{rule_name}"
 }
 
 func (r *{{RULE_STRUCT_NAME}}) Enabled() bool { return true }
@@ -57,7 +57,7 @@ func (r *{{RULE_STRUCT_NAME}}) Severity() tflint.Severity {
 }
 
 func (r *{{RULE_STRUCT_NAME}}) Link() string {
-    return "{{DOCS_URL}}/rules/{{COMPANY_SLUG}}_{{rule_name}}"
+    return "{{DOCS_URL}}/rules/{{COMPANY_SLUG}}_{rule_name}"
 }
 
 func (r *{{RULE_STRUCT_NAME}}) Check(runner tflint.Runner) error {
@@ -75,7 +75,7 @@ plugin "{{COMPANY_SLUG}}" {
   source  = "{{TFLINT_PLUGIN_SOURCE}}"
 }
 
-rule "{{COMPANY_SLUG}}_{{rule_name}}" {
+rule "{{COMPANY_SLUG}}_{rule_name}" {
   enabled = true
 }
 ```

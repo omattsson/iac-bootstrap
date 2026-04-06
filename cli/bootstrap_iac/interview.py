@@ -286,7 +286,7 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "validate_command": "pulumi preview",
         "plan_command": "pulumi preview",
         "plan_all_command": "pulumi preview",
-        "plan_single_command": "pulumi preview --stack .",
+        "plan_single_command": "pulumi preview --stack {stack}",
         "graph_command": "pulumi stack graph",
         "extra_run_flags": "--non-interactive",
         "envcommon_pattern": "Pulumi.*.yaml",

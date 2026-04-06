@@ -117,7 +117,7 @@ Exits with code `0` if no placeholders remain, `1` otherwise.
 |------|---------|
 | `CLAUDE.md` | Combined workspace instructions + agents + rules |
 | `.claude/commands/create-terraform-module.md` | Module scaffolding slash command |
-| `.claude/commands/create-orchestration-stack.md` | Stack management slash command (if applicable) |
+| `.claude/commands/create-{tool}-stack.md` | Stack management slash command (if applicable) |
 | `.claude/commands/create-infra-pipeline.md` | Pipeline generation slash command |
 
 ## Supported Combinations
