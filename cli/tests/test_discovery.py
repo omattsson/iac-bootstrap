@@ -163,6 +163,29 @@ def test_detect_pulumi(tmp_path):
     assert orch_dir == "."
 
 
+def test_detect_orchestration_ignores_terragrunt_cache(tmp_path):
+    cache = tmp_path / ".terragrunt-cache" / "abc"
+    cache.mkdir(parents=True)
+    (cache / "terragrunt.hcl").write_text("# cached\n")
+    tool, orch_dir = _detect_orchestration(tmp_path)
+    assert tool is None
+    assert orch_dir is None
+
+
+def test_detect_orchestration_prefers_real_over_cache(tmp_path):
+    # Real config
+    real = tmp_path / "infra" / "dev"
+    real.mkdir(parents=True)
+    (real / "terragrunt.hcl").write_text("# real\n")
+    # Cached copy
+    cache = tmp_path / ".terragrunt-cache" / "abc"
+    cache.mkdir(parents=True)
+    (cache / "terragrunt.hcl").write_text("# cached\n")
+    tool, orch_dir = _detect_orchestration(tmp_path)
+    assert tool == "Terragrunt"
+    assert orch_dir == "infra"
+
+
 def test_detect_orchestration_none(tmp_path):
     (tmp_path / "main.tf").write_text("# no orch\n")
     tool, orch_dir = _detect_orchestration(tmp_path)
@@ -324,6 +347,16 @@ def test_detect_naming_pattern_ignores_commented_out(tmp_path):
     (tmp_path / "locals.tf").write_text(textwrap.dedent("""\
         # name = "${var.prefix}-rg-${var.suffix}"
         // name = format("%s-rg-%s", var.prefix, var.suffix)
+    """))
+    assert _detect_naming_pattern(tmp_path) is None
+
+
+def test_detect_naming_pattern_ignores_block_comment(tmp_path):
+    (tmp_path / "locals.tf").write_text(textwrap.dedent("""\
+        /*
+        name = "${var.prefix}-rg-${var.suffix}"
+        name = format("%s-rg-%s", var.prefix, var.suffix)
+        */
     """))
     assert _detect_naming_pattern(tmp_path) is None
 
