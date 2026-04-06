@@ -57,6 +57,14 @@ class DiscoveryResult:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+_BLOCK_COMMENT_RE = re.compile(r'/\*.*?\*/', re.DOTALL)
+
+
+def _strip_block_comments(content: str) -> str:
+    """Remove ``/* ... */`` block comments from HCL content."""
+    return _BLOCK_COMMENT_RE.sub('', content)
+
+
 _PROVIDER_PATTERNS = {
     "Azure": re.compile(
         r'^(?!\s*(?:#|//))\s*provider\s+"azurerm"',
@@ -98,6 +106,7 @@ def _detect_cloud_provider(workspace: Path) -> Optional[str]:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
+        content = _strip_block_comments(content)
         _match_cloud_provider(content, counts)
     if not any(counts.values()):
         return None
@@ -253,6 +262,7 @@ def _detect_state_backend(workspace: Path) -> Optional[str]:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
+        content = _strip_block_comments(content)
         backend = _match_state_backend(content)
         if backend:
             return backend
@@ -303,6 +313,7 @@ def _detect_naming_pattern(workspace: Path) -> Optional[str]:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
+        content = _strip_block_comments(content)
         if _match_naming_pattern(content):
             return "{prefix}-{resource_abbreviation}-{suffix}"
     return None
@@ -337,6 +348,7 @@ def _scan_tf_files(workspace: Path) -> _TfScanResult:
             content = tf_file.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
+        content = _strip_block_comments(content)
         _match_cloud_provider(content, result.cloud_counts)
         if result.state_backend is None:
             backend = _match_state_backend(content)

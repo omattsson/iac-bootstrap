@@ -55,6 +55,18 @@ def test_detect_cloud_provider_ignores_commented_out(tmp_path):
     assert _detect_cloud_provider(tmp_path) is None
 
 
+def test_detect_cloud_provider_ignores_block_comment(tmp_path):
+    """Provider blocks inside /* ... */ should not be detected."""
+    (tmp_path / "main.tf").write_text(textwrap.dedent("""\
+        /*
+        provider "aws" {
+          region = "us-east-1"
+        }
+        */
+    """))
+    assert _detect_cloud_provider(tmp_path) is None
+
+
 def test_detect_cloud_from_required_providers(tmp_path):
     (tmp_path / "versions.tf").write_text(textwrap.dedent("""\
         terraform {
@@ -258,6 +270,20 @@ def test_detect_state_backend_ignores_commented_out(tmp_path):
           #   bucket = "old-bucket"
           # }
         }
+    """))
+    assert _detect_state_backend(tmp_path) is None
+
+
+def test_detect_state_backend_ignores_block_comment(tmp_path):
+    """Backend blocks inside /* ... */ should not be detected."""
+    (tmp_path / "backend.tf").write_text(textwrap.dedent("""\
+        /*
+        terraform {
+          backend "s3" {
+            bucket = "old-bucket"
+          }
+        }
+        */
     """))
     assert _detect_state_backend(tmp_path) is None
 

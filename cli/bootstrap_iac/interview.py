@@ -998,10 +998,18 @@ def run_interview(
 
     # 5. Orchestration directory (only if using an orchestration tool)
     if answers["ORCHESTRATION_TOOL"] != "None":
+        _orch_dir_defaults = {
+            "Terragrunt": "infrastructure-config",
+            "Terramate": "infrastructure-config",
+            "Pulumi": ".",
+        }
+        default_orch_dir = discovery.orchestration_dir or _orch_dir_defaults.get(
+            answers["ORCHESTRATION_TOOL"], "infrastructure-config"
+        )
         answers["ORCHESTRATION_DIR"] = _get(
             "ORCHESTRATION_DIR",
             "Directory containing orchestration configs",
-            discovery.orchestration_dir or "infrastructure-config",
+            default_orch_dir,
         )
     else:
         answers["ORCHESTRATION_DIR"] = overrides.get("ORCHESTRATION_DIR", ".")
