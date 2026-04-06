@@ -293,6 +293,14 @@ def test_detect_naming_pattern_format_style(tmp_path):
     assert _detect_naming_pattern(tmp_path) is not None
 
 
+def test_detect_naming_pattern_ignores_commented_out(tmp_path):
+    (tmp_path / "locals.tf").write_text(textwrap.dedent("""\
+        # name = "${var.prefix}-rg-${var.suffix}"
+        // name = format("%s-rg-%s", var.prefix, var.suffix)
+    """))
+    assert _detect_naming_pattern(tmp_path) is None
+
+
 def test_detect_naming_pattern_none(tmp_path):
     (tmp_path / "main.tf").write_text("resource \"null_resource\" \"x\" {}\n")
     assert _detect_naming_pattern(tmp_path) is None

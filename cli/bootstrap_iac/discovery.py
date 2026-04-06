@@ -271,15 +271,19 @@ def _match_state_backend(content: str) -> Optional[str]:
 _NAMING_PATTERNS = [
     # ${var.prefix}-<abbreviation>-<suffix> pattern
     re.compile(
-        r'name\s*=\s*"?\$\{var\.prefix\}'
+        r'^(?!\s*(?:#|//))'
+        r'.*name\s*=\s*"?\$\{var\.prefix\}'
         r'[-_]'
         r'.*'
         r'[-_]'
         r'.*"?',
+        re.MULTILINE,
     ),
     # format() based naming
     re.compile(
-        r'name\s*=\s*format\s*\(\s*"[^"]*%s[^"]*%s',
+        r'^(?!\s*(?:#|//))'
+        r'.*name\s*=\s*format\s*\(\s*"[^"]*%s[^"]*%s',
+        re.MULTILINE,
     ),
 ]
 
@@ -300,7 +304,7 @@ def _detect_naming_pattern(workspace: Path) -> Optional[str]:
         except OSError:
             continue
         if _match_naming_pattern(content):
-            return "{prefix}-{resource_type}-{suffix}"
+            return "{prefix}-{resource_abbreviation}-{suffix}"
     return None
 
 
@@ -339,7 +343,7 @@ def _scan_tf_files(workspace: Path) -> _TfScanResult:
             if backend:
                 result.state_backend = backend
         if result.naming_pattern is None and _match_naming_pattern(content):
-            result.naming_pattern = "{prefix}-{resource_type}-{suffix}"
+            result.naming_pattern = "{prefix}-{resource_abbreviation}-{suffix}"
     return result
 
 
