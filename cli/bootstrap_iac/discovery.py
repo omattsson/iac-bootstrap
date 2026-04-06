@@ -367,7 +367,8 @@ def scan_workspace(workspace_path: Path) -> DiscoveryResult:
     orchestration  ``terragrunt.hcl`` / ``terramate.tm.hcl`` / ``Pulumi.yaml``
     ci_cd_platform ``.github/workflows/`` / ``azure-pipelines*.yml`` / etc.
     state_backend  ``backend "azurerm"`` / ``"s3"`` / ``"gcs"`` / ``cloud {}``
-    naming_pattern ``name = "${var.prefix}-..."`` expressions in .tf files
+    naming_pattern ``name = "${var.prefix}-..."`` or ``format(...)`` naming
+                   expressions in .tf files
     ============== ========================================================
     """
     result = DiscoveryResult(workspace_path=workspace_path)
