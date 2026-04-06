@@ -871,15 +871,15 @@ def _destroy_pipeline(cicd: str, orch: str) -> str:
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
             f"      - run: {destroy_cmd}\n"
-            "        working-directory: infrastructure-config/${{{{ github.event.inputs.environment }}}}/platform/${{{{ github.event.inputs.component }}}}\n"
+            "        working-directory: infrastructure-config/${{ github.event.inputs.environment }}/platform/${{ github.event.inputs.component }}\n"
             "  destroy:\n"
             "    needs: plan-destroy\n"
-            "    environment: ${{{{ github.event.inputs.environment }}}}\n"
+            "    environment: ${{ github.event.inputs.environment }}\n"
             "    runs-on: ubuntu-latest\n"
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
             f"      - run: {apply_cmd}\n"
-            "        working-directory: infrastructure-config/${{{{ github.event.inputs.environment }}}}/platform/${{{{ github.event.inputs.component }}}}\n"
+            "        working-directory: infrastructure-config/${{ github.event.inputs.environment }}/platform/${{ github.event.inputs.component }}\n"
         )
     return (
         "# Define your destroy pipeline here\n"

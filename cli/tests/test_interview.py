@@ -148,6 +148,8 @@ def test_destroy_pipeline_github_actions():
     assert "workflow_dispatch" in ctx["DESTROY_PIPELINE"]
     assert "DESTROY" in ctx["DESTROY_PIPELINE"]
     assert "terragrunt run-all" in ctx["DESTROY_PIPELINE"]
+    assert "${{ github.event.inputs.environment }}" in ctx["DESTROY_PIPELINE"]
+    assert "${{ github.event.inputs.component }}" in ctx["DESTROY_PIPELINE"]
 
 
 # ---------------------------------------------------------------------------
