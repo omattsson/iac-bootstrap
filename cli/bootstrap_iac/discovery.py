@@ -172,6 +172,8 @@ def _detect_orchestration(workspace: Path) -> tuple[Optional[str], Optional[str]
         orch_dir = parts[0] if parts else "."
         return "Terramate", orch_dir
     for yaml_file in workspace.rglob("Pulumi.yaml"):
+        if ".terraform" in yaml_file.parts or ".terragrunt-cache" in yaml_file.parts:
+            continue
         rel = yaml_file.parent.relative_to(workspace)
         parts = rel.parts
         orch_dir = parts[0] if parts else "."
