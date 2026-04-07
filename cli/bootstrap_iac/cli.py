@@ -27,9 +27,9 @@ import yaml
 
 from bootstrap_iac import __version__
 from bootstrap_iac.config import (
-    _CICD_MAP,
-    _CLOUD_MAP,
-    _ORCH_MAP,
+    CICD_MAP,
+    CLOUD_MAP,
+    ORCH_MAP,
     find_config,
     load_config,
     write_config,
@@ -91,10 +91,10 @@ def _print_validation_results(issues: dict) -> int:
 # CLI definition
 # ---------------------------------------------------------------------------
 
-_CLOUD_CHOICES = click.Choice(list(_CLOUD_MAP), case_sensitive=False)
+_CLOUD_CHOICES = click.Choice(list(CLOUD_MAP), case_sensitive=False)
 _TARGET_CHOICES = click.Choice(["copilot", "claude", "both"], case_sensitive=False)
-_ORCH_CHOICES = click.Choice(list(_ORCH_MAP), case_sensitive=False)
-_CICD_CHOICES = click.Choice(list(_CICD_MAP), case_sensitive=False)
+_ORCH_CHOICES = click.Choice(list(ORCH_MAP), case_sensitive=False)
+_CICD_CHOICES = click.Choice(list(CICD_MAP), case_sensitive=False)
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -167,7 +167,7 @@ _CICD_CHOICES = click.Choice(list(_CICD_MAP), case_sensitive=False)
     "--overwrite",
     is_flag=True,
     default=False,
-    help="Overwrite existing files (default: skip).",
+    help="Overwrite existing files and config (default: skip).",
 )
 @click.option(
     "--non-interactive",
@@ -308,20 +308,6 @@ def main(
     # ------------------------------------------------------------------ #
     # Normalise CLI flag values to match interview choices                  #
     # ------------------------------------------------------------------ #
-    _cloud_map = {"azure": "Azure", "aws": "AWS", "gcp": "GCP"}
-    _orch_map = {
-        "terragrunt": "Terragrunt",
-        "terramate": "Terramate",
-        "pulumi": "Pulumi",
-        "none": "None",
-    }
-    _cicd_map = {
-        "github-actions": "GitHub Actions",
-        "azure-devops": "Azure DevOps",
-        "gitlab-ci": "GitLab CI",
-        "atlantis": "Atlantis",
-    }
-
     overrides: dict = {}
     # Start with config file values as a base layer
     overrides.update(config_defaults)
@@ -329,15 +315,15 @@ def main(
     if company:
         overrides["COMPANY_NAME"] = company
     if cloud:
-        overrides["CLOUD_PROVIDER"] = _cloud_map.get(cloud.lower(), cloud)
+        overrides["CLOUD_PROVIDER"] = CLOUD_MAP.get(cloud.lower(), cloud)
     if module_prefix:
         overrides["MODULE_PREFIX"] = module_prefix
     if orchestration:
-        overrides["ORCHESTRATION_TOOL"] = _orch_map.get(orchestration.lower(), orchestration)
+        overrides["ORCHESTRATION_TOOL"] = ORCH_MAP.get(orchestration.lower(), orchestration)
     if orchestration_dir:
         overrides["ORCHESTRATION_DIR"] = orchestration_dir
     if ci_cd:
-        overrides["CI_CD_PLATFORM"] = _cicd_map.get(ci_cd.lower(), ci_cd)
+        overrides["CI_CD_PLATFORM"] = CICD_MAP.get(ci_cd.lower(), ci_cd)
     if auth:
         overrides["AUTH_PATTERN"] = auth
     if state_backend:
@@ -389,14 +375,16 @@ def main(
     _print_generated(results, dry_run)
 
     # ------------------------------------------------------------------ #
-    # --save-config: write answers to config file                          #
+    # --save-config: write answers to config file.                         #
+    # The global --overwrite flag also applies to the saved config file.   #
     # ------------------------------------------------------------------ #
     if save_config and not dry_run:
         config_out = cfg_file if cfg_file else (ws_path / ".bootstrap-iac.yaml")
         if config_out.exists() and not overwrite:
             click.secho(
-                f"  ✗  Refusing to overwrite existing config: {config_out}. "
-                "Re-run with --overwrite to replace it.",
+                f"  \u2717  Refusing to overwrite existing config: {config_out}. "
+                "Re-run with --overwrite to replace it; this flag "
+                "applies to both generated files and the saved config.",
                 fg="red",
             )
         else:

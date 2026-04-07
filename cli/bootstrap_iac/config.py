@@ -35,14 +35,14 @@ _KEY_MAP: dict[str, str] = {
 _REVERSE_KEY_MAP: dict[str, str] = {v: k for k, v in _KEY_MAP.items()}
 
 # Values that need normalisation from CLI lowercase to interview title-case
-_CLOUD_MAP: dict[str, str] = {"azure": "Azure", "aws": "AWS", "gcp": "GCP"}
-_ORCH_MAP: dict[str, str] = {
+CLOUD_MAP: dict[str, str] = {"azure": "Azure", "aws": "AWS", "gcp": "GCP"}
+ORCH_MAP: dict[str, str] = {
     "terragrunt": "Terragrunt",
     "terramate": "Terramate",
     "pulumi": "Pulumi",
     "none": "None",
 }
-_CICD_MAP: dict[str, str] = {
+CICD_MAP: dict[str, str] = {
     "github-actions": "GitHub Actions",
     "azure-devops": "Azure DevOps",
     "gitlab-ci": "GitLab CI",
@@ -59,9 +59,9 @@ def _build_lookup(mapping: dict[str, str]) -> dict[str, str]:
     return lookup
 
 
-_CLOUD_LOOKUP = _build_lookup(_CLOUD_MAP)
-_ORCH_LOOKUP = _build_lookup(_ORCH_MAP)
-_CICD_LOOKUP = _build_lookup(_CICD_MAP)
+_CLOUD_LOOKUP = _build_lookup(CLOUD_MAP)
+_ORCH_LOOKUP = _build_lookup(ORCH_MAP)
+_CICD_LOOKUP = _build_lookup(CICD_MAP)
 
 
 def find_config(workspace: Path) -> Optional[Path]:
@@ -111,7 +111,7 @@ def load_config(path: Path) -> dict[str, str]:
             if normalised is None:
                 raise ValueError(
                     f"Config key 'cloud' has unsupported value '{str_val}'. "
-                    f"Supported: {', '.join(_CLOUD_MAP)}"
+                    f"Supported: {', '.join(CLOUD_MAP)}"
                 )
             str_val = normalised
         elif upper_key == "ORCHESTRATION_TOOL":
@@ -119,7 +119,7 @@ def load_config(path: Path) -> dict[str, str]:
             if normalised is None:
                 raise ValueError(
                     f"Config key 'orchestration' has unsupported value '{str_val}'. "
-                    f"Supported: {', '.join(_ORCH_MAP)}"
+                    f"Supported: {', '.join(ORCH_MAP)}"
                 )
             str_val = normalised
         elif upper_key == "CI_CD_PLATFORM":
@@ -127,7 +127,7 @@ def load_config(path: Path) -> dict[str, str]:
             if normalised is None:
                 raise ValueError(
                     f"Config key 'ci_cd' has unsupported value '{str_val}'. "
-                    f"Supported: {', '.join(_CICD_MAP)}"
+                    f"Supported: {', '.join(CICD_MAP)}"
                 )
             str_val = normalised
         elif upper_key == "TARGET":
@@ -153,4 +153,4 @@ def write_config(answers: dict[str, str], path: Path) -> None:
             config[file_key] = value
 
     with open(path, "w", encoding="utf-8") as fh:
-        yaml.safe_dump(config, fh, default_flow_style=False, sort_keys=True, allow_unicode=True)
+        yaml.safe_dump(config, fh, default_flow_style=False, sort_keys=False, allow_unicode=True)

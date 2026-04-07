@@ -85,7 +85,7 @@ Exits with code `0` if no placeholders remain, `1` otherwise.
 | `--workspace PATH` | | IaC workspace to scan (default: `.`) |
 | `--output-dir PATH` | | Where to write files (default: `--workspace`) |
 | `--dry-run` | | Preview without writing |
-| `--overwrite` | | Overwrite existing files (default: skip) |
+| `--overwrite` | | Overwrite existing files and config (default: skip) |
 | `--non-interactive` | | Never prompt — use defaults + flags only |
 | `--validate PATH` | | Check for unreplaced placeholders |
 | `--config PATH` | | Path to `.bootstrap-iac.yaml` config file (auto-detected if omitted) |
