@@ -6,6 +6,7 @@ Checks:
   2. Agent and instruction .tmpl files: YAML frontmatter is present and valid.
   3. Example files: no remaining {{...}} tokens.
   4. Templates referenced in SKILL.md all exist on disk.
+  5. references/ and cli/bootstrap_iac/templates/ contain identical .tmpl files.
 """
 
 import re
