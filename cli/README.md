@@ -148,14 +148,14 @@ for deterministic re-generation without re-answering prompts:
 
 ```yaml
 company: Acme Corp
-cloud: azure
+cloud: Azure
 module_prefix: tf-module
-orchestration: terragrunt
+orchestration: Terragrunt
 orchestration_dir: infrastructure-config
-ci_cd: github-actions
+ci_cd: GitHub Actions
 auth: workload-identity
 state_backend: azurerm
-naming: "${var.prefix}-${var.resource_type}-${local.suffix}"
+naming: "{prefix}-{resource_abbreviation}-{suffix}"
 tag_strategy: merge(var.env_default_tags, var.tags)
 org: acme
 target: both

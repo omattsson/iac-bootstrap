@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from bootstrap_iac.config import find_config, load_config, save_config
+from bootstrap_iac.config import find_config, load_config, write_config
 
 
 # ---------------------------------------------------------------------------
@@ -146,11 +146,11 @@ def test_load_config_all_fields(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# save_config
+# write_config
 # ---------------------------------------------------------------------------
 
 
-def test_save_config_roundtrip(tmp_path):
+def test_write_config_roundtrip(tmp_path):
     answers = {
         "COMPANY_NAME": "Acme Corp",
         "CLOUD_PROVIDER": "Azure",
@@ -160,13 +160,13 @@ def test_save_config_roundtrip(tmp_path):
         "CI_CD_PLATFORM": "GitHub Actions",
         "AUTH_PATTERN": "OIDC",
         "STATE_BACKEND": "azurerm",
-        "NAMING_PATTERN": "{prefix}-{resource}-{suffix}",
+        "NAMING_PATTERN": "{prefix}-{resource_abbreviation}-{suffix}",
         "TAG_STRATEGY": "merge(var.env_default_tags, var.tags)",
         "ORG": "acme",
         "TARGET": "both",
     }
     out = tmp_path / ".bootstrap-iac.yaml"
-    save_config(answers, out)
+    write_config(answers, out)
 
     assert out.exists()
     content = yaml.safe_load(out.read_text())
@@ -178,7 +178,7 @@ def test_save_config_roundtrip(tmp_path):
     assert content["target"] == "both"
 
 
-def test_save_config_skips_empty_values(tmp_path):
+def test_write_config_skips_empty_values(tmp_path):
     answers = {
         "COMPANY_NAME": "Acme",
         "CLOUD_PROVIDER": "",
@@ -186,7 +186,7 @@ def test_save_config_skips_empty_values(tmp_path):
         "ORG": "acme",
     }
     out = tmp_path / ".bootstrap-iac.yaml"
-    save_config(answers, out)
+    write_config(answers, out)
 
     content = yaml.safe_load(out.read_text())
     assert "company" in content
@@ -196,7 +196,7 @@ def test_save_config_skips_empty_values(tmp_path):
 
 
 def test_save_then_load_roundtrip(tmp_path):
-    """save_config output can be loaded back via load_config."""
+    """write_config output can be loaded back via load_config."""
     answers = {
         "COMPANY_NAME": "RoundTrip Inc",
         "CLOUD_PROVIDER": "GCP",
@@ -207,7 +207,7 @@ def test_save_then_load_roundtrip(tmp_path):
         "TARGET": "claude",
     }
     out = tmp_path / ".bootstrap-iac.yaml"
-    save_config(answers, out)
+    write_config(answers, out)
 
     loaded = load_config(out)
     assert loaded["COMPANY_NAME"] == "RoundTrip Inc"
@@ -260,15 +260,22 @@ def test_cli_flag_overrides_config(tmp_path):
     cfg = ws / ".bootstrap-iac.yaml"
     cfg.write_text("company: ConfigCorp\ncloud: azure\ntarget: both\n")
 
+    out_dir = tmp_path / "out"
     result = cli_runner.invoke(main, [
         "--workspace", str(ws),
-        "--output-dir", str(tmp_path / "out"),
+        "--output-dir", str(out_dir),
         "--company", "FlagCorp",
         "--target", "copilot",
         "--non-interactive",
     ])
     assert result.exit_code == 0
-    # FlagCorp should be used, not ConfigCorp
+    # --target copilot overrides config target=both → only .github/, no CLAUDE.md
+    assert (out_dir / ".github").is_dir()
+    assert not (out_dir / "CLAUDE.md").exists()
+    # --company FlagCorp overrides config company=ConfigCorp
+    copilot_instructions = (out_dir / ".github" / "copilot-instructions.md").read_text()
+    assert "FlagCorp" in copilot_instructions
+    assert "ConfigCorp" not in copilot_instructions
 
 
 def test_cli_explicit_config_path(tmp_path):

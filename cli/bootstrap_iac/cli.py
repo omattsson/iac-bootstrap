@@ -23,9 +23,10 @@ from pathlib import Path
 from typing import Optional
 
 import click
+import yaml
 
 from bootstrap_iac import __version__
-from bootstrap_iac.config import find_config, load_config, save_config as write_config
+from bootstrap_iac.config import find_config, load_config, write_config
 from bootstrap_iac.discovery import scan_workspace
 from bootstrap_iac.generator import generate_files, get_templates_dir
 from bootstrap_iac.interview import build_context, run_interview
@@ -263,7 +264,11 @@ def main(
 
     if cfg_file:
         click.echo(f"  Loading config: {cfg_file}")
-        config_defaults = load_config(cfg_file)
+        try:
+            config_defaults = load_config(cfg_file)
+        except (yaml.YAMLError, ValueError) as exc:
+            click.secho(f"  ✗  Invalid config file: {exc}", fg="red")
+            sys.exit(1)
 
     # ------------------------------------------------------------------ #
     # Phase 1: Discovery                                                   #
@@ -354,14 +359,6 @@ def main(
     resolved_target = answers.get("TARGET", "both")
 
     # ------------------------------------------------------------------ #
-    # --save-config: write answers to .bootstrap-iac.yaml                   #
-    # ------------------------------------------------------------------ #
-    if save_config and not dry_run:
-        config_out = ws_path / ".bootstrap-iac.yaml"
-        write_config(answers, config_out)
-        click.echo(f"  Saved config: {config_out}")
-
-    # ------------------------------------------------------------------ #
     # Phase 3: Build full context                                           #
     # ------------------------------------------------------------------ #
     context = build_context(answers)
@@ -383,6 +380,14 @@ def main(
     )
 
     _print_generated(results, dry_run)
+
+    # ------------------------------------------------------------------ #
+    # --save-config: write answers to .bootstrap-iac.yaml                   #
+    # ------------------------------------------------------------------ #
+    if save_config and not dry_run:
+        config_out = ws_path / ".bootstrap-iac.yaml"
+        write_config(answers, config_out)
+        click.echo(f"  Saved config: {config_out}")
 
     # ------------------------------------------------------------------ #
     # Summary                                                               #

@@ -76,7 +76,20 @@ def load_config(path: Path) -> dict[str, str]:
         upper_key = _KEY_MAP.get(file_key)
         if upper_key is None:
             continue  # ignore unknown keys
-        str_val = str(value)
+
+        if value is None:
+            continue  # treat YAML null as unset
+
+        if isinstance(value, str):
+            str_val = value.strip()
+            if not str_val:
+                continue  # treat empty/whitespace-only strings as unset
+        elif isinstance(value, (bool, int, float)):
+            str_val = str(value)
+        else:
+            raise ValueError(
+                f"Config key '{file_key}' must be a YAML scalar, got {type(value).__name__}"
+            )
 
         # Normalise known enum values
         if upper_key == "CLOUD_PROVIDER":
@@ -85,13 +98,15 @@ def load_config(path: Path) -> dict[str, str]:
             str_val = _ORCH_MAP.get(str_val.lower(), str_val)
         elif upper_key == "CI_CD_PLATFORM":
             str_val = _CICD_MAP.get(str_val.lower(), str_val)
+        elif upper_key == "TARGET":
+            str_val = str_val.lower()
 
         overrides[upper_key] = str_val
 
     return overrides
 
 
-def save_config(answers: dict[str, str], path: Path) -> None:
+def write_config(answers: dict[str, str], path: Path) -> None:
     """Write interview answers to a YAML config file."""
     config: dict[str, str] = {}
     for upper_key, file_key in sorted(_REVERSE_KEY_MAP.items(), key=lambda x: x[1]):
@@ -100,4 +115,4 @@ def save_config(answers: dict[str, str], path: Path) -> None:
             config[file_key] = value
 
     with open(path, "w", encoding="utf-8") as fh:
-        yaml.dump(config, fh, default_flow_style=False, sort_keys=True, allow_unicode=True)
+        yaml.safe_dump(config, fh, default_flow_style=False, sort_keys=True, allow_unicode=True)
