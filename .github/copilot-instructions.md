@@ -12,7 +12,7 @@ This repo is a **meta-tool**: it generates AI agent customization files (for VS 
 | `references/` | **Read-only** `.tmpl` template files with `{{PLACEHOLDER}}` syntax. Never modify these. |
 | `cli/bootstrap_iac/` | Python CLI package: `cli.py` (Click entrypoint), `interview.py` (context builder), `generator.py` (template engine), `discovery.py` (workspace scanner), `validator.py` (output checker). |
 | `cli/bootstrap_iac/templates/` | Bundled copy of templates shipped with the CLI package. Must stay in sync with `references/`. |
-| `scripts/validate_templates.py` | CI validator: checks placeholder syntax, YAML frontmatter, example cleanliness, and SKILL.md references. |
+| `scripts/validate_templates.py` | CI validator: checks placeholder syntax, YAML frontmatter, example cleanliness, SKILL.md references, and references/cli template sync. |
 | `examples/` | Fully-resolved example outputs (no `{{PLACEHOLDER}}` tokens should remain). |
 
 ## Key Conventions
@@ -64,9 +64,9 @@ When reviewing generated Copilot customization files:
 ## CI Pipeline
 
 The GitHub Actions workflow (`.github/workflows/validate.yml`) runs:
-1. **Template validation** (`scripts/validate_templates.py`) — 4 checks: placeholder syntax, YAML frontmatter, example cleanliness, SKILL.md references.
-2. **Markdown lint** — only on `README.md`, `SKILL.md`, `CLAUDE.md`.
-3. **CodeQL** — default security scanning.
+1. **Template validation** (`scripts/validate_templates.py`) — 5 checks: placeholder syntax, YAML frontmatter, example cleanliness, SKILL.md references, and references/cli template sync.
+2. **CLI tests** — installs the CLI package, verifies the entry point, and runs `pytest cli/tests/`.
+3. **Markdown lint** — only on `README.md`, `SKILL.md`, `CLAUDE.md`.
 
 ## Review Guidelines
 

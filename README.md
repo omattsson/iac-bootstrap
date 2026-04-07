@@ -176,28 +176,42 @@ cp ~/git/iac-bootstrap/.claude/commands/bootstrap.md .claude/commands/
 │           └── create-infra-pipeline.md.tmpl
 │
 └── examples/
-    └── azure-terragrunt/                 # Complete example for Azure + Terragrunt
-        ├── .github/                      # Copilot output
-        │   ├── copilot-instructions.md
-        │   ├── agents/
-        │   │   ├── infra-architect.agent.md
-        │   │   ├── terraform-module-builder.agent.md
-        │   │   ├── terraform-test-writer.agent.md
-        │   │   └── terragrunt-stack-manager.agent.md
-        │   ├── skills/
-        │   │   ├── create-terraform-module/SKILL.md
-        │   │   ├── create-terragrunt-stack/SKILL.md
-        │   │   └── create-infra-pipeline/SKILL.md
-        │   └── instructions/
-        │       ├── terraform-modules.instructions.md
-        │       ├── terraform-tests.instructions.md
-        │       ├── terragrunt-configs.instructions.md
-        │       └── pipeline-templates.instructions.md
-        ├── CLAUDE.md                     # Claude Code output
-        └── .claude/commands/
-            ├── create-terraform-module.md
-            ├── create-terragrunt-stack.md
-            └── create-infra-pipeline.md
+    ├── azure-terragrunt/                 # Complete example for Azure + Terragrunt
+    │   ├── .github/                      # Copilot output
+    │   │   ├── copilot-instructions.md
+    │   │   ├── agents/
+    │   │   │   ├── infra-architect.agent.md
+    │   │   │   ├── orchestration-coordinator.agent.md
+    │   │   │   ├── terraform-module-builder.agent.md
+    │   │   │   ├── terraform-test-writer.agent.md
+    │   │   │   └── terragrunt-stack-manager.agent.md
+    │   │   ├── skills/
+    │   │   │   ├── create-terraform-module/SKILL.md
+    │   │   │   ├── create-terragrunt-stack/SKILL.md
+    │   │   │   └── create-infra-pipeline/SKILL.md
+    │   │   └── instructions/
+    │   │       ├── checkov.instructions.md
+    │   │       ├── opa.instructions.md
+    │   │       ├── pipeline-templates.instructions.md
+    │   │       ├── terraform-modules.instructions.md
+    │   │       ├── terraform-tests.instructions.md
+    │   │       ├── terragrunt-configs.instructions.md
+    │   │       ├── terratest.instructions.md
+    │   │       └── tflint.instructions.md
+    │   ├── maturity-report.md            # IaC maturity assessment
+    │   ├── CLAUDE.md                     # Claude Code output
+    │   └── .claude/commands/
+    │       ├── coordinate-module-rollout.md
+    │       ├── create-terraform-module.md
+    │       ├── create-terragrunt-stack.md
+    │       └── create-infra-pipeline.md
+    ├── aws-github-actions/               # AWS + GitHub Actions (Claude only)
+    ├── aws-terraform/                    # AWS + plain Terraform
+    ├── azure-pulumi/                     # Azure + Pulumi
+    ├── azure-terramate/                  # Azure + Terramate
+    ├── gcp-github-actions/               # GCP + GitHub Actions
+    ├── github-actions-terragrunt/        # GitHub Actions + Terragrunt
+    └── gitlab-ci-terragrunt/             # GitLab CI + Terragrunt
 ```
 
 ## Cloud-Specific Templates
