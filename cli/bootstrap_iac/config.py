@@ -50,6 +50,20 @@ _CICD_MAP: dict[str, str] = {
 }
 
 
+def _build_lookup(mapping: dict[str, str]) -> dict[str, str]:
+    """Build a case-insensitive lookup accepting both slug keys and display values."""
+    lookup: dict[str, str] = {}
+    for slug, display in mapping.items():
+        lookup[slug.lower()] = display
+        lookup[display.lower()] = display
+    return lookup
+
+
+_CLOUD_LOOKUP = _build_lookup(_CLOUD_MAP)
+_ORCH_LOOKUP = _build_lookup(_ORCH_MAP)
+_CICD_LOOKUP = _build_lookup(_CICD_MAP)
+
+
 def find_config(workspace: Path) -> Optional[Path]:
     """Return the first config file found in *workspace*, or ``None``."""
     for name in CONFIG_FILENAMES:
@@ -91,15 +105,39 @@ def load_config(path: Path) -> dict[str, str]:
                 f"Config key '{file_key}' must be a YAML scalar, got {type(value).__name__}"
             )
 
-        # Normalise known enum values
+        # Normalise and validate known enum values
         if upper_key == "CLOUD_PROVIDER":
-            str_val = _CLOUD_MAP.get(str_val.lower(), str_val)
+            normalised = _CLOUD_LOOKUP.get(str_val.lower())
+            if normalised is None:
+                raise ValueError(
+                    f"Config key 'cloud' has unsupported value '{str_val}'. "
+                    f"Supported: {', '.join(_CLOUD_MAP)}"
+                )
+            str_val = normalised
         elif upper_key == "ORCHESTRATION_TOOL":
-            str_val = _ORCH_MAP.get(str_val.lower(), str_val)
+            normalised = _ORCH_LOOKUP.get(str_val.lower())
+            if normalised is None:
+                raise ValueError(
+                    f"Config key 'orchestration' has unsupported value '{str_val}'. "
+                    f"Supported: {', '.join(_ORCH_MAP)}"
+                )
+            str_val = normalised
         elif upper_key == "CI_CD_PLATFORM":
-            str_val = _CICD_MAP.get(str_val.lower(), str_val)
+            normalised = _CICD_LOOKUP.get(str_val.lower())
+            if normalised is None:
+                raise ValueError(
+                    f"Config key 'ci_cd' has unsupported value '{str_val}'. "
+                    f"Supported: {', '.join(_CICD_MAP)}"
+                )
+            str_val = normalised
         elif upper_key == "TARGET":
-            str_val = str_val.lower()
+            lower = str_val.lower()
+            if lower not in ("copilot", "claude", "both"):
+                raise ValueError(
+                    f"Config key 'target' has unsupported value '{str_val}'. "
+                    f"Supported: copilot, claude, both"
+                )
+            str_val = lower
 
         overrides[upper_key] = str_val
 

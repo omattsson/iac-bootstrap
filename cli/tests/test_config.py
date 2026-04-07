@@ -114,6 +114,34 @@ def test_load_config_rejects_non_mapping(tmp_path):
         load_config(cfg)
 
 
+def test_load_config_rejects_invalid_cloud(tmp_path):
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("cloud: digitalocean\n")
+    with pytest.raises(ValueError, match="unsupported value 'digitalocean'"):
+        load_config(cfg)
+
+
+def test_load_config_rejects_invalid_orchestration(tmp_path):
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("orchestration: spacelift\n")
+    with pytest.raises(ValueError, match="unsupported value 'spacelift'"):
+        load_config(cfg)
+
+
+def test_load_config_rejects_invalid_cicd(tmp_path):
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("ci_cd: jenkins\n")
+    with pytest.raises(ValueError, match="unsupported value 'jenkins'"):
+        load_config(cfg)
+
+
+def test_load_config_rejects_invalid_target(tmp_path):
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("target: vscode\n")
+    with pytest.raises(ValueError, match="unsupported value 'vscode'"):
+        load_config(cfg)
+
+
 def test_load_config_all_fields(tmp_path):
     cfg = tmp_path / ".bootstrap-iac.yaml"
     cfg.write_text(
@@ -244,14 +272,21 @@ def test_cli_loads_config_file(tmp_path):
         "org: configcorp\n"
         "target: copilot\n"
     )
+    out_dir = tmp_path / "out"
     result = cli_runner.invoke(main, [
         "--workspace", str(ws),
-        "--output-dir", str(tmp_path / "out"),
+        "--output-dir", str(out_dir),
         "--non-interactive",
     ])
     assert result.exit_code == 0
     assert "Loading config" in result.output
-    assert "ConfigCorp" in result.output or (tmp_path / "out" / ".github").exists()
+
+    copilot_instructions = out_dir / ".github" / "copilot-instructions.md"
+    assert copilot_instructions.is_file()
+
+    rendered = copilot_instructions.read_text()
+    assert "ConfigCorp" in rendered
+    assert "Azure" in rendered
 
 
 def test_cli_flag_overrides_config(tmp_path):
