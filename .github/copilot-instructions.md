@@ -64,9 +64,9 @@ When reviewing generated Copilot customization files:
 ## CI Pipeline
 
 The GitHub Actions workflow (`.github/workflows/validate.yml`) runs:
-1. **Template validation** (`scripts/validate_templates.py`) — 4 checks: placeholder syntax, YAML frontmatter, example cleanliness, SKILL.md references.
-2. **Markdown lint** — only on `README.md`, `SKILL.md`, `CLAUDE.md`.
-3. **CodeQL** — default security scanning.
+1. **Template validation** (`scripts/validate_templates.py`) — 5 checks: placeholder syntax, YAML frontmatter, example cleanliness, SKILL.md references, and references/cli template sync.
+2. **CLI tests** — installs the CLI package, verifies the entry point, and runs `pytest cli/tests/`.
+3. **Markdown lint** — only on `README.md`, `SKILL.md`, `CLAUDE.md`.
 
 ## Review Guidelines
 
