@@ -12,7 +12,7 @@ This repo is a **meta-tool**: it generates AI agent customization files (for VS 
 | `references/` | **Read-only** `.tmpl` template files with `{{PLACEHOLDER}}` syntax. Never modify these. |
 | `cli/bootstrap_iac/` | Python CLI package: `cli.py` (Click entrypoint), `interview.py` (context builder), `generator.py` (template engine), `discovery.py` (workspace scanner), `validator.py` (output checker). |
 | `cli/bootstrap_iac/templates/` | Bundled copy of templates shipped with the CLI package. Must stay in sync with `references/`. |
-| `scripts/validate_templates.py` | CI validator: checks placeholder syntax, YAML frontmatter, example cleanliness, and SKILL.md references. |
+| `scripts/validate_templates.py` | CI validator: checks placeholder syntax, YAML frontmatter, example cleanliness, SKILL.md references, and references/cli template sync. |
 | `examples/` | Fully-resolved example outputs (no `{{PLACEHOLDER}}` tokens should remain). |
 
 ## Key Conventions
