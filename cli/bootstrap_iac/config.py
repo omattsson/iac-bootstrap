@@ -31,7 +31,7 @@ _KEY_MAP: dict[str, str] = {
     "target": "TARGET",
 }
 
-# Reverse mapping for save_config
+# Reverse mapping for write_config
 _REVERSE_KEY_MAP: dict[str, str] = {v: k for k, v in _KEY_MAP.items()}
 
 # Values that need normalisation from CLI lowercase to interview title-case

@@ -26,7 +26,14 @@ import click
 import yaml
 
 from bootstrap_iac import __version__
-from bootstrap_iac.config import find_config, load_config, write_config
+from bootstrap_iac.config import (
+    _CICD_MAP,
+    _CLOUD_MAP,
+    _ORCH_MAP,
+    find_config,
+    load_config,
+    write_config,
+)
 from bootstrap_iac.discovery import scan_workspace
 from bootstrap_iac.generator import generate_files, get_templates_dir
 from bootstrap_iac.interview import build_context, run_interview
@@ -84,13 +91,10 @@ def _print_validation_results(issues: dict) -> int:
 # CLI definition
 # ---------------------------------------------------------------------------
 
-_CLOUD_CHOICES = click.Choice(["azure", "aws", "gcp"], case_sensitive=False)
+_CLOUD_CHOICES = click.Choice(list(_CLOUD_MAP), case_sensitive=False)
 _TARGET_CHOICES = click.Choice(["copilot", "claude", "both"], case_sensitive=False)
-_ORCH_CHOICES = click.Choice(["terragrunt", "terramate", "pulumi", "none"], case_sensitive=False)
-_CICD_CHOICES = click.Choice(
-    ["github-actions", "azure-devops", "gitlab-ci", "atlantis"],
-    case_sensitive=False,
-)
+_ORCH_CHOICES = click.Choice(list(_ORCH_MAP), case_sensitive=False)
+_CICD_CHOICES = click.Choice(list(_CICD_MAP), case_sensitive=False)
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -269,6 +273,9 @@ def main(
         except (yaml.YAMLError, ValueError) as exc:
             click.secho(f"  ✗  Invalid config file: {exc}", fg="red")
             sys.exit(1)
+        except OSError as exc:
+            click.secho(f"  ✗  Unable to read config file: {exc}", fg="red")
+            sys.exit(1)
 
     # ------------------------------------------------------------------ #
     # Phase 1: Discovery                                                   #
@@ -382,12 +389,19 @@ def main(
     _print_generated(results, dry_run)
 
     # ------------------------------------------------------------------ #
-    # --save-config: write answers to .bootstrap-iac.yaml                   #
+    # --save-config: write answers to config file                          #
     # ------------------------------------------------------------------ #
     if save_config and not dry_run:
-        config_out = ws_path / ".bootstrap-iac.yaml"
-        write_config(answers, config_out)
-        click.echo(f"  Saved config: {config_out}")
+        config_out = cfg_file if cfg_file else (ws_path / ".bootstrap-iac.yaml")
+        if config_out.exists() and not overwrite:
+            click.secho(
+                f"  ✗  Refusing to overwrite existing config: {config_out}. "
+                "Re-run with --overwrite to replace it.",
+                fg="red",
+            )
+        else:
+            write_config(answers, config_out)
+            click.echo(f"  Saved config: {config_out}")
 
     # ------------------------------------------------------------------ #
     # Summary                                                               #

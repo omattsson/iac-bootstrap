@@ -7,6 +7,9 @@ from pathlib import Path
 import pytest
 import yaml
 
+from click.testing import CliRunner
+
+from bootstrap_iac.cli import main
 from bootstrap_iac.config import find_config, load_config, write_config
 
 
@@ -248,9 +251,6 @@ def test_save_then_load_roundtrip(tmp_path):
 # CLI integration (config file loading via CliRunner)
 # ---------------------------------------------------------------------------
 
-from click.testing import CliRunner
-from bootstrap_iac.cli import main
-
 cli_runner = CliRunner()
 
 
@@ -383,3 +383,69 @@ def test_cli_save_config_not_written_on_dry_run(tmp_path):
     ])
     assert result.exit_code == 0
     assert not (ws / ".bootstrap-iac.yaml").exists()
+
+
+def test_cli_save_config_refuses_overwrite(tmp_path):
+    """--save-config without --overwrite refuses to overwrite existing config."""
+    ws = _make_workspace(tmp_path)
+    cfg = ws / ".bootstrap-iac.yaml"
+    cfg.write_text("company: Original\n")
+    result = cli_runner.invoke(main, [
+        "--workspace", str(ws),
+        "--company", "NewCorp",
+        "--cloud", "azure",
+        "--orchestration", "none",
+        "--ci-cd", "github-actions",
+        "--target", "copilot",
+        "--non-interactive",
+        "--save-config",
+    ])
+    assert result.exit_code == 0
+    assert "Refusing to overwrite" in result.output
+    # Original config should be unchanged
+    assert yaml.safe_load(cfg.read_text())["company"] == "Original"
+
+
+def test_cli_save_config_overwrites_with_flag(tmp_path):
+    """--save-config with --overwrite replaces existing config."""
+    ws = _make_workspace(tmp_path)
+    cfg = ws / ".bootstrap-iac.yaml"
+    cfg.write_text("company: Original\n")
+    result = cli_runner.invoke(main, [
+        "--workspace", str(ws),
+        "--company", "NewCorp",
+        "--cloud", "azure",
+        "--orchestration", "none",
+        "--ci-cd", "github-actions",
+        "--target", "copilot",
+        "--non-interactive",
+        "--save-config",
+        "--overwrite",
+    ])
+    assert result.exit_code == 0
+    assert "Saved config" in result.output
+    assert yaml.safe_load(cfg.read_text())["company"] == "NewCorp"
+
+
+def test_cli_save_config_writes_to_detected_yml(tmp_path):
+    """--save-config writes back to detected .yml file, not creating a new .yaml."""
+    ws = _make_workspace(tmp_path)
+    cfg = ws / ".bootstrap-iac.yml"
+    cfg.write_text("company: Original\n")
+    result = cli_runner.invoke(main, [
+        "--workspace", str(ws),
+        "--company", "YmlCorp",
+        "--cloud", "aws",
+        "--orchestration", "none",
+        "--ci-cd", "github-actions",
+        "--target", "copilot",
+        "--non-interactive",
+        "--save-config",
+        "--overwrite",
+    ])
+    assert result.exit_code == 0
+    assert "Saved config" in result.output
+    # Should have written to .yml, not created .yaml
+    assert cfg.exists()
+    assert not (ws / ".bootstrap-iac.yaml").exists()
+    assert yaml.safe_load(cfg.read_text())["company"] == "YmlCorp"
