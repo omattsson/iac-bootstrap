@@ -157,6 +157,11 @@ auth: workload-identity
 state_backend: azurerm
 naming: "{prefix}-{resource_abbreviation}-{suffix}"
 tag_strategy: merge(var.env_default_tags, var.tags)
+standard_variables: |
+  - `prefix` — Resource name prefix
+  - `location` — Azure region
+  - `resource_group_name` — Target resource group
+  - `tags` — Resource-specific tags (map(string))
 org: acme
 target: both
 ```

@@ -27,6 +27,7 @@ _KEY_MAP: dict[str, str] = {
     "state_backend": "STATE_BACKEND",
     "naming": "NAMING_PATTERN",
     "tag_strategy": "TAG_STRATEGY",
+    "standard_variables": "STANDARD_VARIABLES",
     "org": "ORG",
     "target": "TARGET",
 }

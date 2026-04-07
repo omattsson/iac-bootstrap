@@ -158,6 +158,7 @@ def test_load_config_all_fields(tmp_path):
         "state_backend: S3\n"
         "naming: prefix-type-suffix\n"
         "tag_strategy: merge tags\n"
+        "standard_variables: prefix, location, tags\n"
         "org: testorg\n"
         "target: copilot\n"
     )
@@ -172,6 +173,7 @@ def test_load_config_all_fields(tmp_path):
     assert result["STATE_BACKEND"] == "S3"
     assert result["NAMING_PATTERN"] == "prefix-type-suffix"
     assert result["TAG_STRATEGY"] == "merge tags"
+    assert result["STANDARD_VARIABLES"] == "prefix, location, tags"
     assert result["ORG"] == "testorg"
     assert result["TARGET"] == "copilot"
 
@@ -193,6 +195,7 @@ def test_write_config_roundtrip(tmp_path):
         "STATE_BACKEND": "azurerm",
         "NAMING_PATTERN": "{prefix}-{resource_abbreviation}-{suffix}",
         "TAG_STRATEGY": "merge(var.env_default_tags, var.tags)",
+        "STANDARD_VARIABLES": "- prefix\n- location\n- tags",
         "ORG": "acme",
         "TARGET": "both",
     }
