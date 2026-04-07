@@ -25,6 +25,7 @@ from typing import Optional
 import click
 
 from bootstrap_iac import __version__
+from bootstrap_iac.config import find_config, load_config, save_config as write_config
 from bootstrap_iac.discovery import scan_workspace
 from bootstrap_iac.generator import generate_files, get_templates_dir
 from bootstrap_iac.interview import build_context, run_interview
@@ -181,6 +182,22 @@ _CICD_CHOICES = click.Choice(
         "{{PLACEHOLDER}} tokens. Exits 1 if any are found."
     ),
 )
+@click.option(
+    "--config",
+    "config_path",
+    metavar="PATH",
+    default=None,
+    help=(
+        "Path to a .bootstrap-iac.yaml config file. "
+        "Auto-detected in workspace root if not specified."
+    ),
+)
+@click.option(
+    "--save-config",
+    is_flag=True,
+    default=False,
+    help="Write interview answers to .bootstrap-iac.yaml in the workspace after generation.",
+)
 def main(
     company: Optional[str],
     cloud: Optional[str],
@@ -200,6 +217,8 @@ def main(
     overwrite: bool,
     non_interactive: bool,
     validate_path: Optional[str],
+    config_path: Optional[str],
+    save_config: bool,
 ) -> None:
     """Bootstrap AI agent customisations for a Terraform IaC workspace.
 
@@ -229,6 +248,22 @@ def main(
     # ------------------------------------------------------------------ #
     ws_path = Path(workspace_dir).resolve()
     out_path = Path(output_dir).resolve() if output_dir else ws_path
+
+    # ------------------------------------------------------------------ #
+    # Load config file (defaults that CLI flags override)                   #
+    # ------------------------------------------------------------------ #
+    config_defaults: dict = {}
+    if config_path:
+        cfg_file = Path(config_path).resolve()
+        if not cfg_file.is_file():
+            click.secho(f"  ✗  Config file not found: {cfg_file}", fg="red")
+            sys.exit(1)
+    else:
+        cfg_file = find_config(ws_path)
+
+    if cfg_file:
+        click.echo(f"  Loading config: {cfg_file}")
+        config_defaults = load_config(cfg_file)
 
     # ------------------------------------------------------------------ #
     # Phase 1: Discovery                                                   #
@@ -276,6 +311,9 @@ def main(
     }
 
     overrides: dict = {}
+    # Start with config file values as a base layer
+    overrides.update(config_defaults)
+    # CLI flags override config file values
     if company:
         overrides["COMPANY_NAME"] = company
     if cloud:
@@ -314,6 +352,14 @@ def main(
     )
 
     resolved_target = answers.get("TARGET", "both")
+
+    # ------------------------------------------------------------------ #
+    # --save-config: write answers to .bootstrap-iac.yaml                   #
+    # ------------------------------------------------------------------ #
+    if save_config and not dry_run:
+        config_out = ws_path / ".bootstrap-iac.yaml"
+        write_config(answers, config_out)
+        click.echo(f"  Saved config: {config_out}")
 
     # ------------------------------------------------------------------ #
     # Phase 3: Build full context                                           #
