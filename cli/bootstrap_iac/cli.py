@@ -201,7 +201,10 @@ _CICD_CHOICES = click.Choice(list(CICD_MAP), case_sensitive=False)
     "--save-config",
     is_flag=True,
     default=False,
-    help="Write interview answers to .bootstrap-iac.yaml in the workspace after generation.",
+    help=(
+        "Write interview answers after generation. Saves back to --config PATH "
+        "when provided; otherwise writes .bootstrap-iac.yaml in the workspace."
+    ),
 )
 def main(
     company: Optional[str],

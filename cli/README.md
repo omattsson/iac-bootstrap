@@ -89,7 +89,7 @@ Exits with code `0` if no placeholders remain, `1` otherwise.
 | `--non-interactive` | | Never prompt — use defaults + flags only |
 | `--validate PATH` | | Check for unreplaced placeholders |
 | `--config PATH` | | Path to `.bootstrap-iac.yaml` config file (auto-detected if omitted) |
-| `--save-config` | | Write interview answers to `.bootstrap-iac.yaml` after generation |
+| `--save-config` | | Write interview answers after generation (to `--config` path or workspace) |
 | `--version` | `-V` | Show version and exit |
 | `--help` | `-h` | Show help and exit |
 
