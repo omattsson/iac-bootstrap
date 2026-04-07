@@ -6,6 +6,7 @@ Checks:
   2. Agent and instruction .tmpl files: YAML frontmatter is present and valid.
   3. Example files: no remaining {{...}} tokens.
   4. Templates referenced in SKILL.md all exist on disk.
+  5. references/ and cli/bootstrap_iac/templates/ contain identical .tmpl files.
 """
 
 import re
@@ -190,6 +191,42 @@ def check_skill_md_template_references() -> list[str]:
     return errors
 
 
+TEMPLATES_DIR = REPO_ROOT / "cli" / "bootstrap_iac" / "templates"
+
+
+def check_template_sync() -> list[str]:
+    """Verify that references/ and cli/bootstrap_iac/templates/ are in sync."""
+    errors: list[str] = []
+
+    ref_templates = {
+        str(p.relative_to(REFERENCES_DIR))
+        for p in REFERENCES_DIR.rglob("*.tmpl")
+    }
+    cli_templates = {
+        str(p.relative_to(TEMPLATES_DIR))
+        for p in TEMPLATES_DIR.rglob("*.tmpl")
+    }
+
+    only_in_references = sorted(ref_templates - cli_templates)
+    only_in_cli = sorted(cli_templates - ref_templates)
+
+    for f in only_in_references:
+        errors.append(f"references/{f} exists but cli/bootstrap_iac/templates/{f} is missing")
+    for f in only_in_cli:
+        errors.append(f"cli/bootstrap_iac/templates/{f} exists but references/{f} is missing")
+
+    # Check content matches for files present in both locations
+    for rel in sorted(ref_templates & cli_templates):
+        ref_content = (REFERENCES_DIR / rel).read_text(encoding="utf-8")
+        cli_content = (TEMPLATES_DIR / rel).read_text(encoding="utf-8")
+        if ref_content != cli_content:
+            errors.append(
+                f"{rel}: content differs between references/ and cli/bootstrap_iac/templates/"
+            )
+
+    return errors
+
+
 def main() -> int:
     all_errors: list[tuple[str, list[str]]] = []
 
@@ -198,6 +235,7 @@ def main() -> int:
         ("YAML frontmatter in agent/instruction templates", check_yaml_frontmatter),
         ("No remaining placeholders in example files", check_examples_no_placeholders),
         ("Template files referenced in SKILL.md exist", check_skill_md_template_references),
+        ("references/ and cli/templates/ in sync", check_template_sync),
     ]
 
     for label, fn in checks:

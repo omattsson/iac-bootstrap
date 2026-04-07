@@ -73,7 +73,7 @@ Exits with code `0` if no placeholders remain, `1` otherwise.
 | `--company NAME` | | Company / organisation name |
 | `--cloud PROVIDER` | | Primary cloud: `azure` \| `aws` \| `gcp` |
 | `--module-prefix PREFIX` | | Module directory prefix (e.g. `tf-module`) |
-| `--orchestration TOOL` | | `terragrunt` \| `terramate` \| `none` |
+| `--orchestration TOOL` | | `terragrunt` \| `terramate` \| `pulumi` \| `none` |
 | `--orchestration-dir DIR` | | Directory containing orchestration configs |
 | `--ci-cd PLATFORM` | | `github-actions` \| `azure-devops` \| `gitlab-ci` \| `atlantis` |
 | `--auth PATTERN` | | Authentication pattern description |
@@ -124,9 +124,9 @@ Exits with code `0` if no placeholders remain, `1` otherwise.
 
 | Cloud | Orchestration | CI/CD |
 |-------|--------------|-------|
-| Azure | Terragrunt, Terramate, None | GitHub Actions, Azure DevOps, GitLab CI, Atlantis |
-| AWS | Terragrunt, Terramate, None | GitHub Actions, Azure DevOps, GitLab CI, Atlantis |
-| GCP | Terragrunt, Terramate, None | GitHub Actions, Azure DevOps, GitLab CI, Atlantis |
+| Azure | Terragrunt, Terramate, Pulumi, None | GitHub Actions, Azure DevOps, GitLab CI, Atlantis |
+| AWS | Terragrunt, Terramate, Pulumi, None | GitHub Actions, Azure DevOps, GitLab CI, Atlantis |
+| GCP | Terragrunt, Terramate, Pulumi, None | GitHub Actions, Azure DevOps, GitLab CI, Atlantis |
 
 ## Development
 
