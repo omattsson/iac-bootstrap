@@ -12,6 +12,7 @@ license = { text = "MIT" }
 keywords = ["terraform", "iac", "ai", "copilot", "claude", "bootstrap"]
 dependencies = [
     "click>=8.0",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]

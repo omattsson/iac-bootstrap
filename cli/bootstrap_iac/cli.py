@@ -23,8 +23,17 @@ from pathlib import Path
 from typing import Optional
 
 import click
+import yaml
 
 from bootstrap_iac import __version__
+from bootstrap_iac.config import (
+    CICD_MAP,
+    CLOUD_MAP,
+    ORCH_MAP,
+    find_config,
+    load_config,
+    write_config,
+)
 from bootstrap_iac.discovery import scan_workspace
 from bootstrap_iac.generator import generate_files, get_templates_dir
 from bootstrap_iac.interview import build_context, run_interview
@@ -82,13 +91,10 @@ def _print_validation_results(issues: dict) -> int:
 # CLI definition
 # ---------------------------------------------------------------------------
 
-_CLOUD_CHOICES = click.Choice(["azure", "aws", "gcp"], case_sensitive=False)
+_CLOUD_CHOICES = click.Choice(list(CLOUD_MAP), case_sensitive=False)
 _TARGET_CHOICES = click.Choice(["copilot", "claude", "both"], case_sensitive=False)
-_ORCH_CHOICES = click.Choice(["terragrunt", "terramate", "pulumi", "none"], case_sensitive=False)
-_CICD_CHOICES = click.Choice(
-    ["github-actions", "azure-devops", "gitlab-ci", "atlantis"],
-    case_sensitive=False,
-)
+_ORCH_CHOICES = click.Choice(list(ORCH_MAP), case_sensitive=False)
+_CICD_CHOICES = click.Choice(list(CICD_MAP), case_sensitive=False)
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -161,7 +167,7 @@ _CICD_CHOICES = click.Choice(
     "--overwrite",
     is_flag=True,
     default=False,
-    help="Overwrite existing files (default: skip).",
+    help="Overwrite existing files and config (default: skip).",
 )
 @click.option(
     "--non-interactive",
@@ -179,6 +185,25 @@ _CICD_CHOICES = click.Choice(
     help=(
         "Check files in PATH (or --workspace if omitted) for unreplaced "
         "{{PLACEHOLDER}} tokens. Exits 1 if any are found."
+    ),
+)
+@click.option(
+    "--config",
+    "config_path",
+    metavar="PATH",
+    default=None,
+    help=(
+        "Path to a .bootstrap-iac.yaml config file. "
+        "Auto-detected in workspace root if not specified."
+    ),
+)
+@click.option(
+    "--save-config",
+    is_flag=True,
+    default=False,
+    help=(
+        "Write interview answers after generation. Saves back to --config PATH "
+        "when provided; otherwise writes .bootstrap-iac.yaml in the workspace."
     ),
 )
 def main(
@@ -200,6 +225,8 @@ def main(
     overwrite: bool,
     non_interactive: bool,
     validate_path: Optional[str],
+    config_path: Optional[str],
+    save_config: bool,
 ) -> None:
     """Bootstrap AI agent customisations for a Terraform IaC workspace.
 
@@ -229,6 +256,29 @@ def main(
     # ------------------------------------------------------------------ #
     ws_path = Path(workspace_dir).resolve()
     out_path = Path(output_dir).resolve() if output_dir else ws_path
+
+    # ------------------------------------------------------------------ #
+    # Load config file (defaults that CLI flags override)                   #
+    # ------------------------------------------------------------------ #
+    config_defaults: dict = {}
+    if config_path:
+        cfg_file = Path(config_path).resolve()
+        if not cfg_file.is_file():
+            click.secho(f"  ✗  Config file not found: {cfg_file}", fg="red")
+            sys.exit(1)
+    else:
+        cfg_file = find_config(ws_path)
+
+    if cfg_file:
+        click.echo(f"  Loading config: {cfg_file}")
+        try:
+            config_defaults = load_config(cfg_file)
+        except (yaml.YAMLError, ValueError) as exc:
+            click.secho(f"  ✗  Invalid config file: {exc}", fg="red")
+            sys.exit(1)
+        except OSError as exc:
+            click.secho(f"  ✗  Unable to read config file: {exc}", fg="red")
+            sys.exit(1)
 
     # ------------------------------------------------------------------ #
     # Phase 1: Discovery                                                   #
@@ -261,33 +311,22 @@ def main(
     # ------------------------------------------------------------------ #
     # Normalise CLI flag values to match interview choices                  #
     # ------------------------------------------------------------------ #
-    _cloud_map = {"azure": "Azure", "aws": "AWS", "gcp": "GCP"}
-    _orch_map = {
-        "terragrunt": "Terragrunt",
-        "terramate": "Terramate",
-        "pulumi": "Pulumi",
-        "none": "None",
-    }
-    _cicd_map = {
-        "github-actions": "GitHub Actions",
-        "azure-devops": "Azure DevOps",
-        "gitlab-ci": "GitLab CI",
-        "atlantis": "Atlantis",
-    }
-
     overrides: dict = {}
+    # Start with config file values as a base layer
+    overrides.update(config_defaults)
+    # CLI flags override config file values
     if company:
         overrides["COMPANY_NAME"] = company
     if cloud:
-        overrides["CLOUD_PROVIDER"] = _cloud_map.get(cloud.lower(), cloud)
+        overrides["CLOUD_PROVIDER"] = CLOUD_MAP.get(cloud.lower(), cloud)
     if module_prefix:
         overrides["MODULE_PREFIX"] = module_prefix
     if orchestration:
-        overrides["ORCHESTRATION_TOOL"] = _orch_map.get(orchestration.lower(), orchestration)
+        overrides["ORCHESTRATION_TOOL"] = ORCH_MAP.get(orchestration.lower(), orchestration)
     if orchestration_dir:
         overrides["ORCHESTRATION_DIR"] = orchestration_dir
     if ci_cd:
-        overrides["CI_CD_PLATFORM"] = _cicd_map.get(ci_cd.lower(), ci_cd)
+        overrides["CI_CD_PLATFORM"] = CICD_MAP.get(ci_cd.lower(), ci_cd)
     if auth:
         overrides["AUTH_PATTERN"] = auth
     if state_backend:
@@ -337,6 +376,23 @@ def main(
     )
 
     _print_generated(results, dry_run)
+
+    # ------------------------------------------------------------------ #
+    # --save-config: write answers to config file.                         #
+    # The global --overwrite flag also applies to the saved config file.   #
+    # ------------------------------------------------------------------ #
+    if save_config and not dry_run:
+        config_out = cfg_file if cfg_file else (ws_path / ".bootstrap-iac.yaml")
+        if config_out.exists() and not overwrite:
+            click.secho(
+                f"  \u2717  Refusing to overwrite existing config: {config_out}. "
+                "Re-run with --overwrite to replace it; this flag "
+                "applies to both generated files and the saved config.",
+                fg="red",
+            )
+        else:
+            write_config(answers, config_out)
+            click.echo(f"  Saved config: {config_out}")
 
     # ------------------------------------------------------------------ #
     # Summary                                                               #

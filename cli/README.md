@@ -85,9 +85,11 @@ Exits with code `0` if no placeholders remain, `1` otherwise.
 | `--workspace PATH` | | IaC workspace to scan (default: `.`) |
 | `--output-dir PATH` | | Where to write files (default: `--workspace`) |
 | `--dry-run` | | Preview without writing |
-| `--overwrite` | | Overwrite existing files (default: skip) |
+| `--overwrite` | | Overwrite existing files and config (default: skip) |
 | `--non-interactive` | | Never prompt — use defaults + flags only |
 | `--validate PATH` | | Check for unreplaced placeholders |
+| `--config PATH` | | Path to `.bootstrap-iac.yaml` config file (auto-detected if omitted) |
+| `--save-config` | | Write interview answers after generation (to `--config` path or workspace) |
 | `--version` | `-V` | Show version and exit |
 | `--help` | `-h` | Show help and exit |
 
@@ -138,6 +140,39 @@ pip install -e "./cli[dev]"
 cd cli
 pytest
 ```
+
+## Config File
+
+Commit a `.bootstrap-iac.yaml` (or `.bootstrap-iac.yml`) in your workspace root
+for deterministic re-generation without re-answering prompts:
+
+```yaml
+company: Acme Corp
+cloud: Azure
+module_prefix: tf-module
+orchestration: Terragrunt
+orchestration_dir: infrastructure-config
+ci_cd: GitHub Actions
+auth: workload-identity
+state_backend: azurerm
+naming: "{prefix}-{resource_abbreviation}-{suffix}"
+tag_strategy: merge(var.env_default_tags, var.tags)
+standard_variables: |
+  - `prefix` — Resource name prefix
+  - `location` — Azure region
+  - `resource_group_name` — Target resource group
+  - `tags` — Resource-specific tags (map(string))
+org: acme
+target: both
+```
+
+**Behaviour:**
+
+- Auto-detected in the workspace root (or specify with `--config path`)
+- Config values serve as defaults — CLI flags override them
+- Interactive prompts skip values already provided by config
+- `bootstrap-iac --non-interactive` with a config file requires zero flags
+- Generate a config from your answers: `bootstrap-iac --save-config`
 
 ## Environment Variables
 
