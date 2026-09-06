@@ -418,6 +418,87 @@ def test_generate_files_preserves_existing_file_mode(tmp_path):
     assert stat.S_IMODE(existing.stat().st_mode) == 0o750
 
 
+def test_generate_files_rolls_back_after_publish_failure(tmp_path, monkeypatch):
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    (templates_dir / "first.tmpl").write_text("new first")
+    (templates_dir / "second.tmpl").write_text("new second")
+    output_dir = tmp_path / "output"
+    (output_dir / "first.md").parent.mkdir(parents=True)
+    (output_dir / "first.md").write_text("old first")
+    (output_dir / "second.md").write_text("old second")
+    monkeypatch.setattr(
+        generator_module,
+        "_build_output_specs",
+        lambda context, templates_dir: [
+            OutputSpec("first.tmpl", "first.md", "copilot"),
+            OutputSpec("second.tmpl", "second.md", "copilot"),
+        ],
+    )
+    original_replace = Path.replace
+    replace_calls = 0
+
+    def fail_on_second_replace(path, target):
+        nonlocal replace_calls
+        replace_calls += 1
+        if replace_calls == 2:
+            raise OSError("simulated publish failure")
+        return original_replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", fail_on_second_replace)
+
+    with pytest.raises(GenerationError, match="stage or publish"):
+        generate_files(
+            {},
+            output_dir,
+            target="copilot",
+            skip_existing=False,
+            templates_dir=templates_dir,
+        )
+
+    assert (output_dir / "first.md").read_text() == "old first"
+    assert (output_dir / "second.md").read_text() == "old second"
+
+
+def test_generate_files_reports_rollback_failure(tmp_path, monkeypatch):
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    (templates_dir / "first.tmpl").write_text("new first")
+    (templates_dir / "second.tmpl").write_text("new second")
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    (output_dir / "first.md").write_text("old first")
+    (output_dir / "second.md").write_text("old second")
+    monkeypatch.setattr(
+        generator_module,
+        "_build_output_specs",
+        lambda context, templates_dir: [
+            OutputSpec("first.tmpl", "first.md", "copilot"),
+            OutputSpec("second.tmpl", "second.md", "copilot"),
+        ],
+    )
+    original_replace = Path.replace
+    replace_calls = 0
+
+    def fail_during_publish_and_rollback(path, target):
+        nonlocal replace_calls
+        replace_calls += 1
+        if replace_calls in (2, 3):
+            raise OSError("simulated replace failure")
+        return original_replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", fail_during_publish_and_rollback)
+
+    with pytest.raises(GenerationError, match="Rollback errors"):
+        generate_files(
+            {},
+            output_dir,
+            target="copilot",
+            skip_existing=False,
+            templates_dir=templates_dir,
+        )
+
+
 def test_generate_files_with_orchestration_creates_extra_files(tmp_path):
     """With orchestration enabled, additional files should be generated."""
     answers = {

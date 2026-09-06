@@ -398,7 +398,7 @@ def generate_files(
                 backup_path.replace(output_path)
             except OSError as rollback_exc:
                 rollback_errors.append(f"restore {output_path}: {rollback_exc}")
-        message = f"Unable to publish generated files: {exc}"
+        message = f"Unable to stage or publish generated files: {exc}"
         if rollback_errors:
             message += "\nRollback errors:\n- " + "\n- ".join(rollback_errors)
         raise GenerationError(message) from exc
