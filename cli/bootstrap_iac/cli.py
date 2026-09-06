@@ -35,7 +35,7 @@ from bootstrap_iac.config import (
     write_config,
 )
 from bootstrap_iac.discovery import scan_workspace
-from bootstrap_iac.generator import generate_files, get_templates_dir
+from bootstrap_iac.generator import GenerationError, generate_files, get_templates_dir
 from bootstrap_iac.interview import build_context, run_interview
 from bootstrap_iac.validator import validate_directory, validate_file
 
@@ -367,13 +367,17 @@ def main(
     else:
         click.echo(f"\n  Writing to: {out_path}")
 
-    results = generate_files(
-        context,
-        out_path,
-        target=resolved_target,
-        dry_run=dry_run,
-        skip_existing=not overwrite,
-    )
+    try:
+        results = generate_files(
+            context,
+            out_path,
+            target=resolved_target,
+            dry_run=dry_run,
+            skip_existing=not overwrite,
+        )
+    except GenerationError as exc:
+        click.secho(f"\n  ✗  {exc}", fg="red", err=True)
+        sys.exit(1)
 
     _print_generated(results, dry_run)
 

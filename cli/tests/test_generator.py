@@ -1,10 +1,13 @@
 """Tests for bootstrap_iac.generator."""
 
 import pytest
+import stat
+import os
 from pathlib import Path
 
+import bootstrap_iac.generator as generator_module
 from bootstrap_iac.generator import (
-    resolve_placeholders, generate_files, get_templates_dir,
+    GenerationError, OutputSpec, resolve_placeholders, generate_files, get_templates_dir,
     _cloud_template, _build_output_specs,
 )
 from bootstrap_iac.interview import build_context
@@ -185,6 +188,89 @@ def test_generate_files_dry_run(tmp_path):
     assert len(results) > 0
 
 
+def test_generate_files_fails_when_template_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        generator_module,
+        "_build_output_specs",
+        lambda context, templates_dir: [
+            OutputSpec("missing.tmpl", "generated.md", "copilot")
+        ],
+    )
+
+    with pytest.raises(GenerationError, match="missing template"):
+        generate_files({}, tmp_path / "output", target="copilot", templates_dir=tmp_path)
+
+    assert not (tmp_path / "output").exists()
+
+
+def test_generate_files_skips_existing_before_template_preflight(tmp_path, monkeypatch):
+    output_dir = tmp_path / "output"
+    existing = output_dir / "generated.md"
+    existing.parent.mkdir(parents=True)
+    existing.write_text("original")
+    monkeypatch.setattr(
+        generator_module,
+        "_build_output_specs",
+        lambda context, templates_dir: [
+            OutputSpec("missing.tmpl", "generated.md", "copilot")
+        ],
+    )
+
+    results = generate_files({}, output_dir, target="copilot", templates_dir=tmp_path)
+
+    assert results[0].skipped
+    assert existing.read_text() == "original"
+
+
+def test_generate_files_fails_on_unresolved_placeholders_without_writing(
+    tmp_path, monkeypatch
+):
+    template = tmp_path / "template.tmpl"
+    template.write_text("Company: {{COMPANY_NAME}}")
+    monkeypatch.setattr(
+        generator_module,
+        "_build_output_specs",
+        lambda context, templates_dir: [
+            OutputSpec("template.tmpl", "generated.md", "copilot")
+        ],
+    )
+
+    with pytest.raises(GenerationError, match="COMPANY_NAME"):
+        generate_files({}, tmp_path / "output", target="copilot", templates_dir=tmp_path)
+
+    assert not (tmp_path / "output").exists()
+
+
+def test_generate_files_preflight_failure_preserves_existing_output(
+    tmp_path, monkeypatch
+):
+    template = tmp_path / "template.tmpl"
+    template.write_text("Company: {{COMPANY_NAME}}")
+    output_dir = tmp_path / "output"
+    existing = output_dir / "existing.md"
+    existing.parent.mkdir(parents=True)
+    existing.write_text("original")
+    monkeypatch.setattr(
+        generator_module,
+        "_build_output_specs",
+        lambda context, templates_dir: [
+            OutputSpec("template.tmpl", "generated.md", "copilot"),
+            OutputSpec("missing.tmpl", "another.md", "copilot"),
+        ],
+    )
+
+    with pytest.raises(GenerationError):
+        generate_files(
+            {"COMPANY_NAME": "Acme"},
+            output_dir,
+            target="copilot",
+            templates_dir=tmp_path,
+        )
+
+    assert existing.read_text() == "original"
+    assert not (output_dir / "generated.md").exists()
+
+
 def test_generate_files_writes_copilot(tmp_path):
     answers = {
         "COMPANY_NAME": "Contoso",
@@ -304,6 +390,134 @@ def test_generate_files_overwrite(tmp_path):
     new_content = existing.read_text()
     assert "old content" not in new_content
     assert "OverwriteTest" in new_content
+
+
+def test_generate_files_preserves_existing_file_mode(tmp_path):
+    existing = tmp_path / ".github" / "copilot-instructions.md"
+    existing.parent.mkdir(parents=True)
+    existing.write_text("# old content")
+    os.chmod(existing, 0o750)
+
+    answers = {
+        "COMPANY_NAME": "ModeTest",
+        "CLOUD_PROVIDER": "Azure",
+        "MODULE_PREFIX": "tf",
+        "ORCHESTRATION_TOOL": "None",
+        "ORCHESTRATION_DIR": ".",
+        "CI_CD_PLATFORM": "GitHub Actions",
+        "AUTH_PATTERN": "",
+        "STATE_BACKEND": "",
+        "NAMING_PATTERN": "",
+        "TAG_STRATEGY": "",
+        "STANDARD_VARIABLES": "",
+        "TARGET": "copilot",
+        "ORG": "mode",
+    }
+    generate_files(build_context(answers), tmp_path, target="copilot", skip_existing=False)
+
+    assert stat.S_IMODE(existing.stat().st_mode) == 0o750
+
+
+def test_generate_files_rolls_back_after_publish_failure(tmp_path, monkeypatch):
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    (templates_dir / "first.tmpl").write_text("new first")
+    (templates_dir / "second.tmpl").write_text("new second")
+    output_dir = tmp_path / "output"
+    (output_dir / "first.md").parent.mkdir(parents=True)
+    (output_dir / "first.md").write_text("old first")
+    (output_dir / "second.md").write_text("old second")
+    monkeypatch.setattr(
+        generator_module,
+        "_build_output_specs",
+        lambda context, templates_dir: [
+            OutputSpec("first.tmpl", "first.md", "copilot"),
+            OutputSpec("second.tmpl", "second.md", "copilot"),
+        ],
+    )
+    original_replace = Path.replace
+    replace_calls = 0
+
+    def fail_on_second_replace(path, target):
+        nonlocal replace_calls
+        replace_calls += 1
+        if replace_calls == 2:
+            raise OSError("simulated publish failure")
+        return original_replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", fail_on_second_replace)
+
+    with pytest.raises(GenerationError, match="stage or publish"):
+        generate_files(
+            {},
+            output_dir,
+            target="copilot",
+            skip_existing=False,
+            templates_dir=templates_dir,
+        )
+
+    assert (output_dir / "first.md").read_text() == "old first"
+    assert (output_dir / "second.md").read_text() == "old second"
+    assert replace_calls == 3
+
+
+def test_generate_files_reports_rollback_failure(tmp_path, monkeypatch):
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    (templates_dir / "first.tmpl").write_text("new first")
+    (templates_dir / "second.tmpl").write_text("new second")
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    (output_dir / "first.md").write_text("old first")
+    (output_dir / "second.md").write_text("old second")
+    monkeypatch.setattr(
+        generator_module,
+        "_build_output_specs",
+        lambda context, templates_dir: [
+            OutputSpec("first.tmpl", "first.md", "copilot"),
+            OutputSpec("second.tmpl", "second.md", "copilot"),
+        ],
+    )
+    original_replace = Path.replace
+    replace_calls = 0
+
+    def fail_during_publish_and_rollback(path, target):
+        nonlocal replace_calls
+        replace_calls += 1
+        if replace_calls in (2, 3):
+            raise OSError("simulated replace failure")
+        return original_replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", fail_during_publish_and_rollback)
+
+    with pytest.raises(GenerationError, match="Rollback errors") as exc_info:
+        generate_files(
+            {},
+            output_dir,
+            target="copilot",
+            skip_existing=False,
+            templates_dir=templates_dir,
+        )
+
+    staging_dir = Path(
+        str(exc_info.value).split("Recoverable staging directory: ", 1)[1]
+    )
+    assert staging_dir.is_dir()
+
+
+def test_generate_files_reports_invalid_utf8_template(tmp_path, monkeypatch):
+    template = tmp_path / "invalid.tmpl"
+    template.write_bytes(b"\xff")
+    monkeypatch.setattr(
+        generator_module,
+        "_build_output_specs",
+        lambda context, templates_dir: [
+            OutputSpec("invalid.tmpl", "generated.md", "copilot")
+        ],
+    )
+
+    with pytest.raises(GenerationError, match="unable to read template.*generated.md"):
+        generate_files({}, tmp_path / "output", target="copilot", templates_dir=tmp_path)
 
 
 def test_generate_files_with_orchestration_creates_extra_files(tmp_path):

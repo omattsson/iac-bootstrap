@@ -7,6 +7,7 @@ all ``{{PLACEHOLDER}}`` tokens in the templates.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -475,11 +476,23 @@ def build_context(answers: dict) -> dict:
     orch = answers.get("ORCHESTRATION_TOOL", "None")
     cicd = answers.get("CI_CD_PLATFORM", "GitHub Actions")
     org = answers.get("ORG", answers.get("COMPANY_NAME", "myorg"))
+    company_name = answers.get("COMPANY_NAME", "MyOrg")
     module_prefix = answers.get("MODULE_PREFIX", "tf-module")
     auth = answers.get("AUTH_PATTERN", "")
 
+    company_slug = re.sub(r"[^a-z0-9]+", "_", company_name.lower()).strip("_")
+    ctx.setdefault("COMPANY_SLUG", company_slug or "myorg")
+    ctx.setdefault("COMPANY_SLUG_UPPER", ctx["COMPANY_SLUG"].upper().replace("-", "_"))
+
     # ---- Cloud provider derived values -----
     cloud_defs = _CLOUD_PROVIDER_DEFAULTS.get(cloud, _CLOUD_PROVIDER_DEFAULTS["Azure"])
+    default_region = {"AWS": "us-east-1", "GCP": "europe-west1"}.get(
+        cloud, "westeurope"
+    )
+    ctx.setdefault("DEFAULT_REGION", default_region)
+    ctx.setdefault("LOCATION", default_region)
+    ctx.setdefault("ENVIRONMENT", "dev")
+    ctx.setdefault("PREFIX", "myapp-dev")
     ctx.setdefault("PROVIDER_NAME", cloud_defs["provider_name"])
     ctx.setdefault(
         "PROVIDER_VERSION_CONSTRAINTS",
@@ -510,6 +523,9 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("LOCATION_ATTRIBUTE", cloud_defs["location_attribute"])
     ctx.setdefault("RESOURCE_GROUP_ATTRIBUTE", cloud_defs["resource_group_attribute"])
+    name_attribute = "bucket" if cloud == "AWS" else "name"
+    ctx.setdefault("NAME_ATTRIBUTE", name_attribute)
+    ctx.setdefault("NAMING_ATTRIBUTE", f"{name_attribute} = local.name")
     ctx.setdefault("PRIVATE_ENDPOINT_PATTERN", cloud_defs["private_endpoint_pattern"])
     ctx.setdefault("STANDARD_VARIABLES", cloud_defs["standard_variables"])
     ctx.setdefault(
@@ -565,6 +581,7 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("COMPONENT_CONFIG_PATTERN", orch_defs["component_config_pattern"])
     ctx.setdefault("COMPONENT_CONFIG_TEMPLATE", orch_defs["component_config_pattern"])
+    ctx.setdefault("COMPONENT_CLASS_PATTERN", orch_defs["component_config_pattern"])
     ctx.setdefault("ENVCOMMON_TEMPLATE", orch_defs["envcommon_template"])
     ctx.setdefault("MOCK_OUTPUTS_EXAMPLE", orch_defs["mock_outputs_example"])
     ctx.setdefault("SITE_CONFIG_TEMPLATE", orch_defs["site_config_template"])
@@ -611,6 +628,17 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("MODULE_SOURCE_CONVENTION", ctx["MODULE_SOURCE_PATTERN"])
     ctx.setdefault("ORG", org)
     ctx.setdefault("PROJECT", org)
+    ctx.setdefault("AWS_ACCOUNT_ID", "<AWS_ACCOUNT_ID>")
+    ctx.setdefault("AWS_DEFAULT_REGION", "<AWS_DEFAULT_REGION>")
+    ctx.setdefault("TERRAFORM_ROLE_NAME", "<TERRAFORM_ROLE_NAME>")
+    ctx.setdefault("STATE_BUCKET", "<STATE_BUCKET>")
+    ctx.setdefault("STATE_BUCKET_REGION", "<STATE_BUCKET_REGION>")
+    ctx.setdefault("STATE_KEY_PREFIX", "<STATE_KEY_PREFIX>")
+    ctx.setdefault("LOCK_TABLE", "<LOCK_TABLE>")
+    ctx.setdefault("GCP_PROJECT_ID", "<GCP_PROJECT_ID>")
+    ctx.setdefault("GCP_PROJECT_NUMBER", "<GCP_PROJECT_NUMBER>")
+    ctx.setdefault("WIF_POOL", "<WIF_POOL>")
+    ctx.setdefault("WIF_PROVIDER", "<WIF_PROVIDER>")
 
     # ---- Naming & testing derived ----
     ctx.setdefault(
