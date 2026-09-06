@@ -8,11 +8,19 @@ to an output directory.
 from __future__ import annotations
 
 import re
+import stat
+import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 _PLACEHOLDER_RE = re.compile(r"\{\{([A-Z][A-Z0-9_]*)\}\}")
+
+
+class GenerationError(RuntimeError):
+    """Raised when generated output cannot be safely prepared or published."""
+
 
 # ---------------------------------------------------------------------------
 # Templates directory discovery
@@ -293,36 +301,108 @@ def generate_files(
     tdir = templates_dir or get_templates_dir()
     specs = _build_output_specs(context, tdir)
     results: list[GeneratedFile] = []
+    preparation_errors: list[str] = []
 
     for spec in specs:
         if target not in ("both",) and spec.target != target:
             continue
 
         tmpl_path = tdir / spec.template_rel
-        if not tmpl_path.exists():
+        out_path = output_dir / spec.output_rel
+        if skip_existing and out_path.exists():
+            results.append(
+                GeneratedFile(
+                    output_path=out_path,
+                    template_path=tmpl_path,
+                    content="",
+                    skipped=True,
+                    skip_reason="already exists",
+                )
+            )
             continue
 
-        raw = tmpl_path.read_text(encoding="utf-8")
-        filled = resolve_placeholders(raw, context)
-        out_path = output_dir / spec.output_rel
+        if not tmpl_path.exists():
+            preparation_errors.append(
+                f"missing template {tmpl_path} for {output_dir / spec.output_rel}"
+            )
+            continue
 
-        skipped = False
-        skip_reason = ""
-        if skip_existing and out_path.exists():
-            skipped = True
-            skip_reason = "already exists"
+        try:
+            raw = tmpl_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            preparation_errors.append(f"unable to read template {tmpl_path}: {exc}")
+            continue
+        filled = resolve_placeholders(raw, context)
+        unresolved = sorted(set(_PLACEHOLDER_RE.findall(filled)))
+        if unresolved:
+            preparation_errors.append(
+                f"unresolved placeholder(s) for {out_path}: {', '.join(unresolved)}"
+            )
 
         gf = GeneratedFile(
             output_path=out_path,
             template_path=tmpl_path,
             content=filled,
-            skipped=skipped,
-            skip_reason=skip_reason,
         )
         results.append(gf)
 
-        if not dry_run and not skipped:
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(filled, encoding="utf-8")
+    if preparation_errors:
+        raise GenerationError("Generation preflight failed:\n- " + "\n- ".join(preparation_errors))
+
+    if dry_run:
+        return results
+
+    files_to_write = [result for result in results if not result.skipped]
+    if not files_to_write:
+        return results
+
+    try:
+        output_dir.parent.mkdir(parents=True, exist_ok=True)
+        staging_dir = Path(
+            tempfile.mkdtemp(prefix="bootstrap-iac-", dir=output_dir.parent)
+        )
+    except OSError as exc:
+        raise GenerationError(f"Unable to create staging directory: {exc}") from exc
+
+    backups: dict[Path, Path] = {}
+    published: list[Path] = []
+    try:
+        for result in files_to_write:
+            staged_path = staging_dir / result.output_path.relative_to(output_dir)
+            staged_path.parent.mkdir(parents=True, exist_ok=True)
+            staged_path.write_text(result.content, encoding="utf-8")
+
+        for result in files_to_write:
+            output_path = result.output_path
+            staged_path = staging_dir / output_path.relative_to(output_dir)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if output_path.exists():
+                backup_path = staging_dir / ".backups" / output_path.relative_to(output_dir)
+                backup_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(output_path, backup_path)
+                backups[output_path] = backup_path
+                staged_path.chmod(stat.S_IMODE(output_path.stat().st_mode))
+
+            staged_path.replace(output_path)
+            published.append(output_path)
+    except (OSError, ValueError) as exc:
+        rollback_errors: list[str] = []
+        for output_path in reversed(published):
+            try:
+                output_path.unlink()
+            except OSError as rollback_exc:
+                rollback_errors.append(f"remove {output_path}: {rollback_exc}")
+        for output_path, backup_path in backups.items():
+            try:
+                backup_path.replace(output_path)
+            except OSError as rollback_exc:
+                rollback_errors.append(f"restore {output_path}: {rollback_exc}")
+        message = f"Unable to publish generated files: {exc}"
+        if rollback_errors:
+            message += "\nRollback errors:\n- " + "\n- ".join(rollback_errors)
+        raise GenerationError(message) from exc
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
 
     return results
