@@ -34,6 +34,11 @@ def test_build_context_company_slug_sanitizes_names():
 def test_build_context_aws_defaults():
     ctx = build_context({"CLOUD_PROVIDER": "AWS", "COMPANY_NAME": "TestCo"})
     assert ctx["PROVIDER_NAME"] == "aws"
+    assert ctx["NAME_ATTRIBUTE"] == "name"
+    assert ctx["NAMING_ATTRIBUTE"] == "name = local.name"
+    assert ctx["AWS_ACCOUNT_ID"] == "123456789012"
+    assert ctx["AWS_DEFAULT_REGION"] == "us-east-1"
+    assert ctx["TERRAFORM_ROLE_NAME"] == "TerraformDeployRole"
     assert ctx["TAG_ATTRIBUTE"] == "tags"
     assert "aws" in ctx["PROVIDER_BLOCK"]
     assert ctx["PROVIDER_RESOURCE"] == "aws_s3_bucket"

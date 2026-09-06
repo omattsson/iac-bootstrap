@@ -516,6 +516,8 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("LOCATION_ATTRIBUTE", cloud_defs["location_attribute"])
     ctx.setdefault("RESOURCE_GROUP_ATTRIBUTE", cloud_defs["resource_group_attribute"])
+    ctx.setdefault("NAME_ATTRIBUTE", "name")
+    ctx.setdefault("NAMING_ATTRIBUTE", "name = local.name")
     ctx.setdefault("PRIVATE_ENDPOINT_PATTERN", cloud_defs["private_endpoint_pattern"])
     ctx.setdefault("STANDARD_VARIABLES", cloud_defs["standard_variables"])
     ctx.setdefault(
@@ -617,6 +619,9 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("MODULE_SOURCE_CONVENTION", ctx["MODULE_SOURCE_PATTERN"])
     ctx.setdefault("ORG", org)
     ctx.setdefault("PROJECT", org)
+    ctx.setdefault("AWS_ACCOUNT_ID", "123456789012")
+    ctx.setdefault("AWS_DEFAULT_REGION", "us-east-1")
+    ctx.setdefault("TERRAFORM_ROLE_NAME", "TerraformDeployRole")
 
     # ---- Naming & testing derived ----
     ctx.setdefault(
