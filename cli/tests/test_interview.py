@@ -39,6 +39,10 @@ def test_build_context_aws_defaults():
     assert ctx["AWS_ACCOUNT_ID"] == "123456789012"
     assert ctx["AWS_DEFAULT_REGION"] == "us-east-1"
     assert ctx["TERRAFORM_ROLE_NAME"] == "TerraformDeployRole"
+    assert ctx["STATE_BUCKET"] == "terraform-state-example"
+    assert ctx["STATE_BUCKET_REGION"] == "us-east-1"
+    assert ctx["STATE_KEY_PREFIX"] == "terraform/"
+    assert ctx["LOCK_TABLE"] == "terraform-state-locks"
     assert ctx["TAG_ATTRIBUTE"] == "tags"
     assert "aws" in ctx["PROVIDER_BLOCK"]
     assert ctx["PROVIDER_RESOURCE"] == "aws_s3_bucket"
@@ -55,6 +59,10 @@ def test_build_context_gcp_defaults():
     assert ctx["TAG_ATTRIBUTE"] == "labels"
     assert "google" in ctx["PROVIDER_BLOCK"]
     assert ctx["PROVIDER_RESOURCE"] == "google_storage_bucket"
+    assert ctx["GCP_PROJECT_ID"] == "test-project-123"
+    assert ctx["GCP_PROJECT_NUMBER"] == "123456789"
+    assert ctx["WIF_POOL"] == "terraform-pool"
+    assert ctx["WIF_PROVIDER"] == "github-provider"
     assert "." not in ctx["PROVIDER_RESOURCE"]
     assert "env_default_labels" in ctx["STANDARD_VARIABLES"]
     assert "env_default_labels" in ctx["TAG_STRATEGY"]

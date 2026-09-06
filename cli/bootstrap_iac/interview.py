@@ -486,6 +486,13 @@ def build_context(answers: dict) -> dict:
 
     # ---- Cloud provider derived values -----
     cloud_defs = _CLOUD_PROVIDER_DEFAULTS.get(cloud, _CLOUD_PROVIDER_DEFAULTS["Azure"])
+    default_region = {"AWS": "us-east-1", "GCP": "europe-west1"}.get(
+        cloud, "westeurope"
+    )
+    ctx.setdefault("DEFAULT_REGION", default_region)
+    ctx.setdefault("LOCATION", default_region)
+    ctx.setdefault("ENVIRONMENT", "dev")
+    ctx.setdefault("PREFIX", "myapp-dev")
     ctx.setdefault("PROVIDER_NAME", cloud_defs["provider_name"])
     ctx.setdefault(
         "PROVIDER_VERSION_CONSTRAINTS",
@@ -573,6 +580,7 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("COMPONENT_CONFIG_PATTERN", orch_defs["component_config_pattern"])
     ctx.setdefault("COMPONENT_CONFIG_TEMPLATE", orch_defs["component_config_pattern"])
+    ctx.setdefault("COMPONENT_CLASS_PATTERN", orch_defs["component_config_pattern"])
     ctx.setdefault("ENVCOMMON_TEMPLATE", orch_defs["envcommon_template"])
     ctx.setdefault("MOCK_OUTPUTS_EXAMPLE", orch_defs["mock_outputs_example"])
     ctx.setdefault("SITE_CONFIG_TEMPLATE", orch_defs["site_config_template"])
@@ -622,6 +630,14 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("AWS_ACCOUNT_ID", "123456789012")
     ctx.setdefault("AWS_DEFAULT_REGION", "us-east-1")
     ctx.setdefault("TERRAFORM_ROLE_NAME", "TerraformDeployRole")
+    ctx.setdefault("STATE_BUCKET", "terraform-state-example")
+    ctx.setdefault("STATE_BUCKET_REGION", "us-east-1")
+    ctx.setdefault("STATE_KEY_PREFIX", "terraform/")
+    ctx.setdefault("LOCK_TABLE", "terraform-state-locks")
+    ctx.setdefault("GCP_PROJECT_ID", "test-project-123")
+    ctx.setdefault("GCP_PROJECT_NUMBER", "123456789")
+    ctx.setdefault("WIF_POOL", "terraform-pool")
+    ctx.setdefault("WIF_PROVIDER", "github-provider")
 
     # ---- Naming & testing derived ----
     ctx.setdefault(
