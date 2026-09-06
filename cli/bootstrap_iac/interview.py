@@ -7,6 +7,7 @@ all ``{{PLACEHOLDER}}`` tokens in the templates.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -475,8 +476,13 @@ def build_context(answers: dict) -> dict:
     orch = answers.get("ORCHESTRATION_TOOL", "None")
     cicd = answers.get("CI_CD_PLATFORM", "GitHub Actions")
     org = answers.get("ORG", answers.get("COMPANY_NAME", "myorg"))
+    company_name = answers.get("COMPANY_NAME", "MyOrg")
     module_prefix = answers.get("MODULE_PREFIX", "tf-module")
     auth = answers.get("AUTH_PATTERN", "")
+
+    company_slug = re.sub(r"[^a-z0-9]+", "-", company_name.lower()).strip("-")
+    ctx.setdefault("COMPANY_SLUG", company_slug or "myorg")
+    ctx.setdefault("COMPANY_SLUG_UPPER", ctx["COMPANY_SLUG"].upper().replace("-", "_"))
 
     # ---- Cloud provider derived values -----
     cloud_defs = _CLOUD_PROVIDER_DEFAULTS.get(cloud, _CLOUD_PROVIDER_DEFAULTS["Azure"])

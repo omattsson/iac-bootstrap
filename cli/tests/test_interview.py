@@ -12,6 +12,8 @@ from bootstrap_iac.interview import build_context
 
 def test_build_context_azure_defaults():
     ctx = build_context({"CLOUD_PROVIDER": "Azure", "COMPANY_NAME": "TestCo"})
+    assert ctx["COMPANY_SLUG"] == "testco"
+    assert ctx["COMPANY_SLUG_UPPER"] == "TESTCO"
     assert ctx["PROVIDER_NAME"] == "azurerm"
     assert ctx["TAG_ATTRIBUTE"] == "tags"
     assert "azurerm" in ctx["PROVIDER_BLOCK"]
@@ -21,6 +23,12 @@ def test_build_context_azure_defaults():
     assert "env_default_tags" in ctx["TAG_STRATEGY"]
     assert "env_default_tags" in ctx["TAG_MERGE_PATTERN"]
     assert "env_default_tags" in ctx["TAG_MERGE_LOCAL"]
+
+
+def test_build_context_company_slug_sanitizes_names():
+    ctx = build_context({"CLOUD_PROVIDER": "Azure", "COMPANY_NAME": "Acme & Co."})
+    assert ctx["COMPANY_SLUG"] == "acme-co"
+    assert ctx["COMPANY_SLUG_UPPER"] == "ACME_CO"
 
 
 def test_build_context_aws_defaults():
