@@ -329,14 +329,17 @@ def generate_files(
 
         try:
             raw = tmpl_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            preparation_errors.append(f"unable to read template {tmpl_path}: {exc}")
+        except (OSError, UnicodeError) as exc:
+            preparation_errors.append(
+                f"unable to read template {tmpl_path} for {out_path}: {exc}"
+            )
             continue
         filled = resolve_placeholders(raw, context)
         unresolved = sorted(set(_PLACEHOLDER_RE.findall(filled)))
         if unresolved:
             preparation_errors.append(
-                f"unresolved placeholder(s) for {out_path}: {', '.join(unresolved)}"
+                f"unresolved placeholder(s) in {tmpl_path} for {out_path}: "
+                f"{', '.join(unresolved)}"
             )
 
         gf = GeneratedFile(
@@ -366,6 +369,7 @@ def generate_files(
 
     backups: dict[Path, Path] = {}
     published: list[Path] = []
+    retain_staging = False
     try:
         for result in files_to_write:
             staged_path = staging_dir / result.output_path.relative_to(output_dir)
@@ -376,16 +380,18 @@ def generate_files(
             output_path = result.output_path
             staged_path = staging_dir / output_path.relative_to(output_dir)
             output_path.parent.mkdir(parents=True, exist_ok=True)
+            backup_path: Optional[Path] = None
 
             if output_path.exists():
                 backup_path = staging_dir / ".backups" / output_path.relative_to(output_dir)
                 backup_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(output_path, backup_path)
-                backups[output_path] = backup_path
                 staged_path.chmod(stat.S_IMODE(output_path.stat().st_mode))
 
             staged_path.replace(output_path)
             published.append(output_path)
+            if backup_path is not None:
+                backups[output_path] = backup_path
     except (OSError, ValueError) as exc:
         rollback_errors: list[str] = []
         for output_path in reversed(published):
@@ -393,16 +399,25 @@ def generate_files(
                 output_path.unlink()
             except OSError as rollback_exc:
                 rollback_errors.append(f"remove {output_path}: {rollback_exc}")
-        for output_path, backup_path in backups.items():
+        for output_path in published:
+            backup_path = backups.get(output_path)
+            if backup_path is None:
+                continue
             try:
                 backup_path.replace(output_path)
             except OSError as rollback_exc:
                 rollback_errors.append(f"restore {output_path}: {rollback_exc}")
         message = f"Unable to stage or publish generated files: {exc}"
         if rollback_errors:
-            message += "\nRollback errors:\n- " + "\n- ".join(rollback_errors)
+            retain_staging = True
+            message += (
+                "\nRollback errors:\n- "
+                + "\n- ".join(rollback_errors)
+                + f"\nRecoverable staging directory: {staging_dir}"
+            )
         raise GenerationError(message) from exc
     finally:
-        shutil.rmtree(staging_dir, ignore_errors=True)
+        if not retain_staging:
+            shutil.rmtree(staging_dir, ignore_errors=True)
 
     return results

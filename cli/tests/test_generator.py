@@ -458,6 +458,7 @@ def test_generate_files_rolls_back_after_publish_failure(tmp_path, monkeypatch):
 
     assert (output_dir / "first.md").read_text() == "old first"
     assert (output_dir / "second.md").read_text() == "old second"
+    assert replace_calls == 3
 
 
 def test_generate_files_reports_rollback_failure(tmp_path, monkeypatch):
@@ -489,7 +490,7 @@ def test_generate_files_reports_rollback_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Path, "replace", fail_during_publish_and_rollback)
 
-    with pytest.raises(GenerationError, match="Rollback errors"):
+    with pytest.raises(GenerationError, match="Rollback errors") as exc_info:
         generate_files(
             {},
             output_dir,
@@ -497,6 +498,26 @@ def test_generate_files_reports_rollback_failure(tmp_path, monkeypatch):
             skip_existing=False,
             templates_dir=templates_dir,
         )
+
+    staging_dir = Path(
+        str(exc_info.value).split("Recoverable staging directory: ", 1)[1]
+    )
+    assert staging_dir.is_dir()
+
+
+def test_generate_files_reports_invalid_utf8_template(tmp_path, monkeypatch):
+    template = tmp_path / "invalid.tmpl"
+    template.write_bytes(b"\xff")
+    monkeypatch.setattr(
+        generator_module,
+        "_build_output_specs",
+        lambda context, templates_dir: [
+            OutputSpec("invalid.tmpl", "generated.md", "copilot")
+        ],
+    )
+
+    with pytest.raises(GenerationError, match="unable to read template.*generated.md"):
+        generate_files({}, tmp_path / "output", target="copilot", templates_dir=tmp_path)
 
 
 def test_generate_files_with_orchestration_creates_extra_files(tmp_path):
