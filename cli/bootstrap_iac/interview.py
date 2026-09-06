@@ -480,7 +480,7 @@ def build_context(answers: dict) -> dict:
     module_prefix = answers.get("MODULE_PREFIX", "tf-module")
     auth = answers.get("AUTH_PATTERN", "")
 
-    company_slug = re.sub(r"[^a-z0-9]+", "-", company_name.lower()).strip("-")
+    company_slug = re.sub(r"[^a-z0-9]+", "_", company_name.lower()).strip("_")
     ctx.setdefault("COMPANY_SLUG", company_slug or "myorg")
     ctx.setdefault("COMPANY_SLUG_UPPER", ctx["COMPANY_SLUG"].upper().replace("-", "_"))
 
@@ -523,8 +523,9 @@ def build_context(answers: dict) -> dict:
     )
     ctx.setdefault("LOCATION_ATTRIBUTE", cloud_defs["location_attribute"])
     ctx.setdefault("RESOURCE_GROUP_ATTRIBUTE", cloud_defs["resource_group_attribute"])
-    ctx.setdefault("NAME_ATTRIBUTE", "name")
-    ctx.setdefault("NAMING_ATTRIBUTE", "name = local.name")
+    name_attribute = "bucket" if cloud == "AWS" else "name"
+    ctx.setdefault("NAME_ATTRIBUTE", name_attribute)
+    ctx.setdefault("NAMING_ATTRIBUTE", f"{name_attribute} = local.name")
     ctx.setdefault("PRIVATE_ENDPOINT_PATTERN", cloud_defs["private_endpoint_pattern"])
     ctx.setdefault("STANDARD_VARIABLES", cloud_defs["standard_variables"])
     ctx.setdefault(
@@ -627,17 +628,17 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("MODULE_SOURCE_CONVENTION", ctx["MODULE_SOURCE_PATTERN"])
     ctx.setdefault("ORG", org)
     ctx.setdefault("PROJECT", org)
-    ctx.setdefault("AWS_ACCOUNT_ID", "123456789012")
-    ctx.setdefault("AWS_DEFAULT_REGION", "us-east-1")
-    ctx.setdefault("TERRAFORM_ROLE_NAME", "TerraformDeployRole")
-    ctx.setdefault("STATE_BUCKET", "terraform-state-example")
-    ctx.setdefault("STATE_BUCKET_REGION", "us-east-1")
-    ctx.setdefault("STATE_KEY_PREFIX", "terraform/")
-    ctx.setdefault("LOCK_TABLE", "terraform-state-locks")
-    ctx.setdefault("GCP_PROJECT_ID", "test-project-123")
-    ctx.setdefault("GCP_PROJECT_NUMBER", "123456789")
-    ctx.setdefault("WIF_POOL", "terraform-pool")
-    ctx.setdefault("WIF_PROVIDER", "github-provider")
+    ctx.setdefault("AWS_ACCOUNT_ID", "<AWS_ACCOUNT_ID>")
+    ctx.setdefault("AWS_DEFAULT_REGION", "<AWS_DEFAULT_REGION>")
+    ctx.setdefault("TERRAFORM_ROLE_NAME", "<TERRAFORM_ROLE_NAME>")
+    ctx.setdefault("STATE_BUCKET", "<STATE_BUCKET>")
+    ctx.setdefault("STATE_BUCKET_REGION", "<STATE_BUCKET_REGION>")
+    ctx.setdefault("STATE_KEY_PREFIX", "<STATE_KEY_PREFIX>")
+    ctx.setdefault("LOCK_TABLE", "<LOCK_TABLE>")
+    ctx.setdefault("GCP_PROJECT_ID", "<GCP_PROJECT_ID>")
+    ctx.setdefault("GCP_PROJECT_NUMBER", "<GCP_PROJECT_NUMBER>")
+    ctx.setdefault("WIF_POOL", "<WIF_POOL>")
+    ctx.setdefault("WIF_PROVIDER", "<WIF_PROVIDER>")
 
     # ---- Naming & testing derived ----
     ctx.setdefault(

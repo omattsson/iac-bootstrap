@@ -360,9 +360,9 @@ def generate_files(
         return results
 
     try:
-        output_dir.parent.mkdir(parents=True, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
         staging_dir = Path(
-            tempfile.mkdtemp(prefix="bootstrap-iac-", dir=output_dir.parent)
+            tempfile.mkdtemp(prefix=".bootstrap-iac-", dir=output_dir)
         )
     except OSError as exc:
         raise GenerationError(f"Unable to create staging directory: {exc}") from exc

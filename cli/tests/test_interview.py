@@ -27,22 +27,22 @@ def test_build_context_azure_defaults():
 
 def test_build_context_company_slug_sanitizes_names():
     ctx = build_context({"CLOUD_PROVIDER": "Azure", "COMPANY_NAME": "Acme & Co."})
-    assert ctx["COMPANY_SLUG"] == "acme-co"
+    assert ctx["COMPANY_SLUG"] == "acme_co"
     assert ctx["COMPANY_SLUG_UPPER"] == "ACME_CO"
 
 
 def test_build_context_aws_defaults():
     ctx = build_context({"CLOUD_PROVIDER": "AWS", "COMPANY_NAME": "TestCo"})
     assert ctx["PROVIDER_NAME"] == "aws"
-    assert ctx["NAME_ATTRIBUTE"] == "name"
-    assert ctx["NAMING_ATTRIBUTE"] == "name = local.name"
-    assert ctx["AWS_ACCOUNT_ID"] == "123456789012"
-    assert ctx["AWS_DEFAULT_REGION"] == "us-east-1"
-    assert ctx["TERRAFORM_ROLE_NAME"] == "TerraformDeployRole"
-    assert ctx["STATE_BUCKET"] == "terraform-state-example"
-    assert ctx["STATE_BUCKET_REGION"] == "us-east-1"
-    assert ctx["STATE_KEY_PREFIX"] == "terraform/"
-    assert ctx["LOCK_TABLE"] == "terraform-state-locks"
+    assert ctx["NAME_ATTRIBUTE"] == "bucket"
+    assert ctx["NAMING_ATTRIBUTE"] == "bucket = local.name"
+    assert ctx["AWS_ACCOUNT_ID"] == "<AWS_ACCOUNT_ID>"
+    assert ctx["AWS_DEFAULT_REGION"] == "<AWS_DEFAULT_REGION>"
+    assert ctx["TERRAFORM_ROLE_NAME"] == "<TERRAFORM_ROLE_NAME>"
+    assert ctx["STATE_BUCKET"] == "<STATE_BUCKET>"
+    assert ctx["STATE_BUCKET_REGION"] == "<STATE_BUCKET_REGION>"
+    assert ctx["STATE_KEY_PREFIX"] == "<STATE_KEY_PREFIX>"
+    assert ctx["LOCK_TABLE"] == "<LOCK_TABLE>"
     assert ctx["TAG_ATTRIBUTE"] == "tags"
     assert "aws" in ctx["PROVIDER_BLOCK"]
     assert ctx["PROVIDER_RESOURCE"] == "aws_s3_bucket"
@@ -59,10 +59,10 @@ def test_build_context_gcp_defaults():
     assert ctx["TAG_ATTRIBUTE"] == "labels"
     assert "google" in ctx["PROVIDER_BLOCK"]
     assert ctx["PROVIDER_RESOURCE"] == "google_storage_bucket"
-    assert ctx["GCP_PROJECT_ID"] == "test-project-123"
-    assert ctx["GCP_PROJECT_NUMBER"] == "123456789"
-    assert ctx["WIF_POOL"] == "terraform-pool"
-    assert ctx["WIF_PROVIDER"] == "github-provider"
+    assert ctx["GCP_PROJECT_ID"] == "<GCP_PROJECT_ID>"
+    assert ctx["GCP_PROJECT_NUMBER"] == "<GCP_PROJECT_NUMBER>"
+    assert ctx["WIF_POOL"] == "<WIF_POOL>"
+    assert ctx["WIF_PROVIDER"] == "<WIF_PROVIDER>"
     assert "." not in ctx["PROVIDER_RESOURCE"]
     assert "env_default_labels" in ctx["STANDARD_VARIABLES"]
     assert "env_default_labels" in ctx["TAG_STRATEGY"]
