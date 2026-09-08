@@ -206,3 +206,20 @@ def test_validate_directory_reports_unscannable_subdir(tmp_path):
         assert any(p.name == "locked_dir" for p in report.read_errors)
     finally:
         locked_dir.chmod(0o755)
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="symlink creation needs privileges on Windows"
+)
+def test_validate_directory_reports_symlink_loop(tmp_path):
+    """A symlink loop is recorded, not silently dropped by is_file()."""
+    (tmp_path / "ok.md").write_text("{{COMPANY_NAME}}")
+    loop = tmp_path / "loop.md"
+    try:
+        loop.symlink_to("loop.md")  # points at itself -> ELOOP on resolution
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks not supported here")
+    report = validate_directory(tmp_path)
+    assert not report.ok
+    assert set(p.name for p in report.placeholders) == {"ok.md"}
+    assert any(p.name == "loop.md" for p in report.read_errors)

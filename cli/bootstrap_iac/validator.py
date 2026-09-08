@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import os
 import re
+import stat as stat_module
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -117,7 +118,21 @@ def validate_directory(path: Path) -> DirectoryReport:
         files.extend(base / name for name in filenames)
 
     for file_path in sorted(files):
-        if not file_path.is_file():
+        # Classify the entry with an explicit stat rather than Path.is_file(),
+        # which suppresses most OS errors (for example a symlink loop) and
+        # returns False, which would silently drop the entry instead of
+        # recording it.
+        try:
+            st = os.stat(file_path)
+        except FileNotFoundError:
+            # A dangling symlink or an entry that vanished after the walk; skip.
+            continue
+        except OSError as exc:
+            read_errors[file_path] = exc.strerror or str(exc)
+            continue
+        if not stat_module.S_ISREG(st.st_mode):
+            # Not a regular file (for example a FIFO or socket); nothing to
+            # read, and reading some of these would block.
             continue
         try:
             unreplaced = validate_file(file_path)
@@ -125,12 +140,11 @@ def validate_directory(path: Path) -> DirectoryReport:
             read_errors[file_path] = exc.reason
             continue
         except FileNotFoundError:
-            # The entry vanished between the walk and the read (a race); skip it.
+            # The entry vanished between the stat and the read (a race); skip it.
             continue
         except OSError as exc:
-            # A stat/read problem that is not a plain "missing" (for example a
-            # symlink loop or too-long name). Record it rather than aborting the
-            # whole scan with a traceback.
+            # A read problem that is not a plain "missing". Record it rather
+            # than aborting the whole scan with a traceback.
             read_errors[file_path] = exc.strerror or str(exc)
             continue
         if unreplaced:
