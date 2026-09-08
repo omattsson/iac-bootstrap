@@ -35,9 +35,9 @@ class DirectoryReport:
     """Outcome of scanning a directory.
 
     ``placeholders`` maps each file with unreplaced tokens to its findings.
-    ``read_errors`` maps each file that could not be read to the OS error
-    reason. The two are kept apart so a permissions problem is never mistaken
-    for a clean file.
+    ``read_errors`` maps each path that could not be read — a file, or a
+    directory that could not be scanned — to the OS error reason. The two are
+    kept apart so a permissions problem is never mistaken for a clean file.
     """
 
     placeholders: dict[Path, list[str]] = field(default_factory=dict)

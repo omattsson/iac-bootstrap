@@ -100,7 +100,7 @@ def _print_validation_results(report: DirectoryReport) -> int:
 
     if report.read_errors:
         click.secho(
-            f"\n  ✗  Could not read {len(report.read_errors)} file(s):\n",
+            f"\n  ✗  Could not read {len(report.read_errors)} path(s):\n",
             fg="red",
             bold=True,
             err=True,
@@ -293,6 +293,17 @@ def main(
 
         if stat.S_ISDIR(st.st_mode):
             report = validate_directory(scan_path)
+        elif not stat.S_ISREG(st.st_mode):
+            # Not a directory and not a regular file (for example a FIFO,
+            # socket, or device). There is nothing to validate, and reading
+            # some of these would block, so refuse it explicitly.
+            click.secho(
+                f"  ✗  Not a regular file: {scan_path}",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            sys.exit(2)
         else:
             try:
                 found = validate_file(scan_path)

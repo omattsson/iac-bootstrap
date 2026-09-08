@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -104,6 +105,30 @@ def test_validate_unreadable_file(tmp_path):
         assert str(f) in result.output
     finally:
         f.chmod(0o644)
+
+
+@pytest.mark.skipif(
+    not hasattr(os, "mkfifo"), reason="named pipes need a POSIX platform"
+)
+def test_validate_fifo_is_refused(tmp_path):
+    """A FIFO with a supported extension is refused, not read (would block).
+
+    Run in a subprocess with a timeout so a regression that let the CLI read
+    the FIFO fails the test instead of hanging the whole suite.
+    """
+    fifo = tmp_path / "pipe.md"
+    os.mkfifo(fifo)
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "bootstrap_iac", "--validate", str(fifo)],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        assert proc.returncode == 2
+        assert "Not a regular file" in (proc.stdout + proc.stderr)
+    finally:
+        fifo.unlink()
 
 
 @pytest.mark.skipif(
