@@ -274,9 +274,12 @@ def main(
         # a clean scan.
         try:
             st = os.stat(scan_path)
-        except FileNotFoundError:
+        except FileNotFoundError as exc:
             click.secho(
-                f"  ✗  Path not found: {scan_path}", fg="red", bold=True, err=True
+                f"  ✗  Path not found: {scan_path}: {exc.strerror or exc}",
+                fg="red",
+                bold=True,
+                err=True,
             )
             sys.exit(2)
         except OSError as exc:

@@ -96,12 +96,27 @@ def validate_directory(path: Path) -> DirectoryReport:
     """Recursively scan *path* and return a :class:`DirectoryReport`.
 
     Only files with recognised text extensions are scanned. Files with no
-    unreplaced placeholders are omitted. Files that cannot be read are recorded
-    in ``read_errors`` instead of being silently treated as clean.
+    unreplaced placeholders are omitted. Directories that cannot be scanned and
+    files that cannot be read are recorded in ``read_errors`` instead of being
+    silently treated as clean.
     """
     placeholders: dict[Path, list[str]] = {}
     read_errors: dict[Path, str] = {}
-    for file_path in sorted(path.rglob("*")):
+
+    def _on_walk_error(exc: OSError) -> None:
+        # A directory could not be scanned (for example a permissions problem).
+        # Record it rather than letting the walk abort with a traceback or, on
+        # some Python versions, silently drop the whole subtree. os.walk sets
+        # ``filename`` to the offending directory.
+        errored = Path(getattr(exc, "filename", None) or path)
+        read_errors[errored] = exc.strerror or str(exc)
+
+    files: list[Path] = []
+    for dir_path, _dirnames, filenames in os.walk(path, onerror=_on_walk_error):
+        base = Path(dir_path)
+        files.extend(base / name for name in filenames)
+
+    for file_path in sorted(files):
         if not file_path.is_file():
             continue
         try:
@@ -110,7 +125,7 @@ def validate_directory(path: Path) -> DirectoryReport:
             read_errors[file_path] = exc.reason
             continue
         except FileNotFoundError:
-            # The entry vanished between rglob() and read (a race); skip it.
+            # The entry vanished between the walk and the read (a race); skip it.
             continue
         except OSError as exc:
             # A stat/read problem that is not a plain "missing" (for example a

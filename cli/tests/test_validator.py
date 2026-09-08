@@ -184,3 +184,25 @@ def test_validate_directory_reports_read_errors_separately(tmp_path):
         assert report.read_errors[locked]
     finally:
         locked.chmod(0o644)
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" or os.geteuid() == 0,
+    reason="POSIX file permissions not enforced for root or on Windows",
+)
+def test_validate_directory_reports_unscannable_subdir(tmp_path):
+    """An unreadable subdirectory is recorded, not silently dropped as clean."""
+    (tmp_path / "top.md").write_text("{{COMPANY_NAME}}")
+    locked_dir = tmp_path / "locked_dir"
+    locked_dir.mkdir()
+    (locked_dir / "deep.md").write_text("{{CLOUD_PROVIDER}}")
+    locked_dir.chmod(0o000)
+    try:
+        report = validate_directory(tmp_path)
+        assert not report.ok
+        assert set(p.name for p in report.placeholders) == {"top.md"}
+        # The subtree cannot be scanned, so it is reported as a read error
+        # rather than passing as clean.
+        assert any(p.name == "locked_dir" for p in report.read_errors)
+    finally:
+        locked_dir.chmod(0o755)
