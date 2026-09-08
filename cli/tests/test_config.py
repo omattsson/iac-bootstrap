@@ -159,6 +159,21 @@ def test_load_config_rejects_unsupported_version(tmp_path):
     assert "1" in message
 
 
+def test_load_config_rejects_empty_version(tmp_path):
+    """An explicitly empty/whitespace version is a mistake, not 'unset'."""
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text('version: ""\ncompany: Acme\n')
+    with pytest.raises(ValueError, match="version"):
+        load_config(cfg)
+
+
+def test_load_config_null_version_is_unset(tmp_path):
+    """A YAML null version means 'use the current version', which is valid."""
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("version: null\ncompany: Acme\n")
+    assert load_config(cfg) == {"COMPANY_NAME": "Acme"}
+
+
 def test_load_config_rejects_non_string_key(tmp_path):
     """A non-string YAML key is unknown and errors rather than being ignored."""
     cfg = tmp_path / ".bootstrap-iac.yaml"

@@ -178,8 +178,9 @@ target: both
 
 **Supported keys:** `version`, `company`, `cloud`, `module_prefix`,
 `orchestration`, `orchestration_dir`, `ci_cd`, `auth`, `state_backend`,
-`naming`, `tag_strategy`, `standard_variables`, `org`, `target`. Every value is
-a scalar. `version` is optional; the current schema version is `1`.
+`naming`, `tag_strategy`, `standard_variables`, `org`, `target`. Each non-null
+value is a scalar; a `null` value is treated as unset. `version` is optional;
+the current schema version is `1`.
 
 **Validation:**
 

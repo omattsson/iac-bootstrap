@@ -116,11 +116,13 @@ def load_config(path: Path) -> dict[str, str]:
             + f". Supported keys: {supported}."
         )
 
-    # Validate the optional schema version.
+    # Validate the optional schema version. A YAML null means "unset" (use the
+    # current version), but an explicitly provided empty/whitespace value is a
+    # mistake and is rejected.
     version_raw = raw.get(_VERSION_KEY)
     if version_raw is not None:
         version_val = str(version_raw).strip()
-        if version_val and version_val not in SUPPORTED_CONFIG_VERSIONS:
+        if version_val not in SUPPORTED_CONFIG_VERSIONS:
             raise ValueError(
                 f"Config key '{_VERSION_KEY}' has unsupported value '{version_val}'. "
                 f"Supported: {', '.join(sorted(SUPPORTED_CONFIG_VERSIONS))}"
