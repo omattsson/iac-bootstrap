@@ -31,7 +31,9 @@ from bootstrap_iac import __version__
 from bootstrap_iac.config import (
     CICD_MAP,
     CLOUD_MAP,
+    CONFIG_FILENAMES,
     ORCH_MAP,
+    config_key_for,
     find_config,
     load_config,
     write_config,
@@ -231,6 +233,16 @@ _CICD_CHOICES = click.Choice(list(CICD_MAP), case_sensitive=False)
         "when provided; otherwise writes .bootstrap-iac.yaml in the workspace."
     ),
 )
+@click.option(
+    "--check-config",
+    is_flag=True,
+    default=False,
+    help=(
+        "Validate the config file (--config PATH, or the one auto-detected in "
+        "--workspace) and exit without generating. Exits 0 if valid, 1 if the "
+        "config is invalid, 2 if it is missing or unreadable."
+    ),
+)
 def main(
     company: Optional[str],
     cloud: Optional[str],
@@ -252,6 +264,7 @@ def main(
     validate_path: Optional[str],
     config_path: Optional[str],
     save_config: bool,
+    check_config: bool,
 ) -> None:
     """Bootstrap AI agent customisations for a Terraform IaC workspace.
 
@@ -328,6 +341,52 @@ def main(
             )
         exit_code = _print_validation_results(report)
         sys.exit(exit_code)
+
+    # ------------------------------------------------------------------ #
+    # --check-config mode: validate a config file and exit.               #
+    # ------------------------------------------------------------------ #
+    if check_config:
+        ws_path = Path(workspace_dir).resolve()
+        if config_path:
+            cfg_file = Path(config_path).resolve()
+            if not cfg_file.is_file():
+                click.secho(
+                    f"  ✗  Config file not found: {cfg_file}",
+                    fg="red",
+                    bold=True,
+                    err=True,
+                )
+                sys.exit(2)
+        else:
+            cfg_file = find_config(ws_path)
+            if not cfg_file:
+                click.secho(
+                    f"  ✗  No config file found in {ws_path} "
+                    f"({' or '.join(CONFIG_FILENAMES)}).",
+                    fg="red",
+                    bold=True,
+                    err=True,
+                )
+                sys.exit(2)
+
+        click.echo(f"  Checking config: {cfg_file}")
+        try:
+            overrides = load_config(cfg_file)
+        except (yaml.YAMLError, ValueError) as exc:
+            click.secho(f"  ✗  Invalid config: {exc}", fg="red", bold=True, err=True)
+            sys.exit(1)
+        except OSError as exc:
+            click.secho(
+                f"  ✗  Unable to read config: {exc}", fg="red", bold=True, err=True
+            )
+            sys.exit(2)
+
+        click.secho("\n  ✓  Config is valid.", fg="green", bold=True)
+        if overrides:
+            click.echo("\n  Resolved values:")
+            for upper_key in sorted(overrides, key=config_key_for):
+                click.echo(f"    {config_key_for(upper_key)} = {overrides[upper_key]}")
+        sys.exit(0)
 
     # ------------------------------------------------------------------ #
     # Resolve paths                                                        #

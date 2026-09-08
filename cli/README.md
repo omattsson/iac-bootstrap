@@ -98,6 +98,7 @@ Files with unsupported (for example binary) extensions are ignored.
 | `--validate PATH` | | Check for unreplaced placeholders |
 | `--config PATH` | | Path to `.bootstrap-iac.yaml` config file (auto-detected if omitted) |
 | `--save-config` | | Write interview answers after generation (to `--config` path or workspace) |
+| `--check-config` | | Validate the config file and exit (0 valid, 1 invalid, 2 missing) |
 | `--version` | `-V` | Show version and exit |
 | `--help` | `-h` | Show help and exit |
 
@@ -155,6 +156,7 @@ Commit a `.bootstrap-iac.yaml` (or `.bootstrap-iac.yml`) in your workspace root
 for deterministic re-generation without re-answering prompts:
 
 ```yaml
+version: "1"
 company: Acme Corp
 cloud: Azure
 module_prefix: tf-module
@@ -174,13 +176,36 @@ org: acme
 target: both
 ```
 
+**Supported keys:** `version`, `company`, `cloud`, `module_prefix`,
+`orchestration`, `orchestration_dir`, `ci_cd`, `auth`, `state_backend`,
+`naming`, `tag_strategy`, `standard_variables`, `org`, `target`. Every value is
+a scalar. `version` is optional; the current schema version is `1`.
+
+**Validation:**
+
+- An unknown key (for example a typo such as `clould:`) is an error that names
+  the offending key and lists the supported keys.
+- An invalid `cloud`, `orchestration`, `ci_cd`, `target`, or `version` value is
+  an error that names the key and the accepted values.
+- A `null` value is treated as unset; a non-scalar value (list or mapping) is an
+  error that names the key.
+- Check a config without generating: `bootstrap-iac --check-config`. It exits
+  `0` if valid, `1` if the config is invalid, and `2` if it is missing or
+  unreadable.
+
+**Precedence** (lowest to highest), for each value:
+
+1. Workspace discovery defaults.
+2. Config file values.
+3. CLI flags (for example `--company`, `--cloud`).
+4. Interactive prompts fill only values not set by the layers above.
+
 **Behaviour:**
 
-- Auto-detected in the workspace root (or specify with `--config path`)
-- Config values serve as defaults — CLI flags override them
-- Interactive prompts skip values already provided by config
-- `bootstrap-iac --non-interactive` with a config file requires zero flags
-- Generate a config from your answers: `bootstrap-iac --save-config`
+- Auto-detected in the workspace root (or specify with `--config path`).
+- `bootstrap-iac --non-interactive` with a config file requires zero flags.
+- Generate a config from your answers: `bootstrap-iac --save-config` (the saved
+  file is stamped with `version: "1"`).
 
 ## Environment Variables
 

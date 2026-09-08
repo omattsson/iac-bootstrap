@@ -15,6 +15,14 @@ import yaml
 # Config file names to auto-detect (in priority order)
 CONFIG_FILENAMES = [".bootstrap-iac.yaml", ".bootstrap-iac.yml"]
 
+# Config schema version. write_config stamps this; load_config accepts it.
+# A config with no version is treated as the current version.
+CONFIG_VERSION = "1"
+SUPPORTED_CONFIG_VERSIONS = {"1", "1.0"}
+
+# The config-file key that carries the schema version (meta, not a placeholder).
+_VERSION_KEY = "version"
+
 # Mapping from config file keys to CLI override keys (UPPER_CASE)
 _KEY_MAP: dict[str, str] = {
     "company": "COMPANY_NAME",
@@ -34,6 +42,17 @@ _KEY_MAP: dict[str, str] = {
 
 # Reverse mapping for write_config
 _REVERSE_KEY_MAP: dict[str, str] = {v: k for k, v in _KEY_MAP.items()}
+
+# Every recognised config-file key: the mapped placeholder keys plus meta keys.
+KNOWN_KEYS: frozenset[str] = frozenset(_KEY_MAP) | {_VERSION_KEY}
+
+
+def config_key_for(upper_key: str) -> str:
+    """Return the config-file key for an UPPER_CASE placeholder key.
+
+    Falls back to *upper_key* itself when there is no mapping.
+    """
+    return _REVERSE_KEY_MAP.get(upper_key, upper_key)
 
 # Values that need normalisation from CLI lowercase to interview title-case
 CLOUD_MAP: dict[str, str] = {"azure": "Azure", "aws": "AWS", "gcp": "GCP"}
@@ -86,11 +105,35 @@ def load_config(path: Path) -> dict[str, str]:
     if not isinstance(raw, dict):
         raise ValueError(f"Config file must be a YAML mapping, got {type(raw).__name__}")
 
+    # Reject unknown keys so a typo (for example `clould:`) fails loudly instead
+    # of silently producing incomplete output.
+    unknown_keys = [str(key) for key in raw if key not in KNOWN_KEYS]
+    if unknown_keys:
+        supported = ", ".join(sorted(KNOWN_KEYS))
+        raise ValueError(
+            "Unknown config key(s): "
+            + ", ".join(f"'{key}'" for key in unknown_keys)
+            + f". Supported keys: {supported}."
+        )
+
+    # Validate the optional schema version.
+    version_raw = raw.get(_VERSION_KEY)
+    if version_raw is not None:
+        version_val = str(version_raw).strip()
+        if version_val and version_val not in SUPPORTED_CONFIG_VERSIONS:
+            raise ValueError(
+                f"Config key '{_VERSION_KEY}' has unsupported value '{version_val}'. "
+                f"Supported: {', '.join(sorted(SUPPORTED_CONFIG_VERSIONS))}"
+            )
+
     overrides: dict[str, str] = {}
     for file_key, value in raw.items():
+        if file_key == _VERSION_KEY:
+            continue  # meta key, not a placeholder override
+
         upper_key = _KEY_MAP.get(file_key)
         if upper_key is None:
-            continue  # ignore unknown keys
+            continue  # unreachable: unknown keys already rejected above
 
         if value is None:
             continue  # treat YAML null as unset
@@ -146,8 +189,12 @@ def load_config(path: Path) -> dict[str, str]:
 
 
 def write_config(answers: dict[str, str], path: Path) -> None:
-    """Write interview answers to a YAML config file."""
-    config: dict[str, str] = {}
+    """Write interview answers to a YAML config file.
+
+    The file is stamped with the current schema :data:`CONFIG_VERSION` so it can
+    be validated and migrated later.
+    """
+    config: dict[str, str] = {_VERSION_KEY: CONFIG_VERSION}
     for upper_key, file_key in sorted(_REVERSE_KEY_MAP.items(), key=lambda x: x[1]):
         value = answers.get(upper_key)
         if value:
