@@ -550,7 +550,7 @@ def test_cli_check_config_valid(tmp_path):
     assert result.exit_code == 0
     assert "Config is valid" in result.output
     # Resolved values are shown with config-file keys, and normalisation is
-    # visible (cloud: azure -> AWS-style title case).
+    # visible (the config's `cloud: azure` is displayed as `cloud = Azure`).
     assert "company = Acme" in result.output
     assert "cloud = Azure" in result.output
 
@@ -589,6 +589,18 @@ def test_cli_check_config_explicit_path_missing(tmp_path):
     )
     assert result.exit_code == 2
     assert "not found" in result.output
+
+
+def test_cli_check_config_explicit_path_is_directory(tmp_path):
+    """A directory passed as --config is a non-regular file, not 'not found'."""
+    ws = _make_workspace(tmp_path)
+    a_dir = tmp_path / "cfgdir"
+    a_dir.mkdir()
+    result = cli_runner.invoke(
+        main, ["--workspace", str(ws), "--config", str(a_dir), "--check-config"]
+    )
+    assert result.exit_code == 2
+    assert "not a regular file" in result.output.lower()
 
 
 def test_cli_check_config_does_not_generate(tmp_path):

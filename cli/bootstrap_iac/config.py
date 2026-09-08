@@ -48,7 +48,7 @@ KNOWN_KEYS: frozenset[str] = frozenset(_KEY_MAP) | {_VERSION_KEY}
 
 
 def config_key_for(upper_key: str) -> str:
-    """Return the config-file key for an UPPER_CASE placeholder key.
+    """Return the config-file key that maps to the placeholder *upper_key*.
 
     Falls back to *upper_key* itself when there is no mapping.
     """

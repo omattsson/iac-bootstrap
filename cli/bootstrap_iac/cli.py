@@ -349,9 +349,30 @@ def main(
         ws_path = Path(workspace_dir).resolve()
         if config_path:
             cfg_file = Path(config_path).resolve()
-            if not cfg_file.is_file():
+            # Stat once so missing, unreadable, and non-regular paths are told
+            # apart, instead of is_file() reporting all three as "not found".
+            try:
+                cfg_stat = os.stat(cfg_file)
+            except FileNotFoundError:
                 click.secho(
                     f"  ✗  Config file not found: {cfg_file}",
+                    fg="red",
+                    bold=True,
+                    err=True,
+                )
+                sys.exit(2)
+            except OSError as exc:
+                click.secho(
+                    f"  ✗  Could not access config file {cfg_file}: "
+                    f"{exc.strerror or exc}",
+                    fg="red",
+                    bold=True,
+                    err=True,
+                )
+                sys.exit(2)
+            if not stat.S_ISREG(cfg_stat.st_mode):
+                click.secho(
+                    f"  ✗  Config path is not a regular file: {cfg_file}",
                     fg="red",
                     bold=True,
                     err=True,
