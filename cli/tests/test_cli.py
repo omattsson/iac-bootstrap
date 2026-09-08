@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from bootstrap_iac import __version__
@@ -67,6 +70,60 @@ def test_validate_single_file(tmp_path):
     result = runner.invoke(main, ["--validate", str(f)])
     assert result.exit_code == 1
     assert "CLOUD_PROVIDER" in result.output
+
+
+def test_validate_missing_path(tmp_path):
+    """A typo'd / missing path must fail, not report a clean scan."""
+    missing = tmp_path / "does_not_exist"
+    result = runner.invoke(main, ["--validate", str(missing)])
+    assert result.exit_code == 2
+    assert "No unreplaced placeholders" not in result.output
+    assert str(missing) in result.output
+
+
+def test_validate_binary_file_ignored(tmp_path):
+    """An explicitly requested unsupported file stays ignored (clean, exit 0)."""
+    f = tmp_path / "artifact.bin"
+    f.write_bytes(b"\x00\x01{{NOT_SCANNED}}")
+    result = runner.invoke(main, ["--validate", str(f)])
+    assert result.exit_code == 0
+    assert "No unreplaced placeholders" in result.output
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" or os.geteuid() == 0,
+    reason="POSIX file permissions not enforced for root or on Windows",
+)
+def test_validate_unreadable_file(tmp_path):
+    f = tmp_path / "locked.md"
+    f.write_text("{{COMPANY_NAME}}")
+    f.chmod(0o000)
+    try:
+        result = runner.invoke(main, ["--validate", str(f)])
+        assert result.exit_code == 2
+        assert str(f) in result.output
+    finally:
+        f.chmod(0o644)
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" or os.geteuid() == 0,
+    reason="POSIX file permissions not enforced for root or on Windows",
+)
+def test_validate_directory_with_read_error(tmp_path):
+    """A directory scan lists placeholders and still exits 2 on a read error."""
+    (tmp_path / "dirty.md").write_text("Company: {{COMPANY_NAME}}\n")
+    locked = tmp_path / "locked.md"
+    locked.write_text("Provider: {{CLOUD_PROVIDER}}\n")
+    locked.chmod(0o000)
+    try:
+        result = runner.invoke(main, ["--validate", str(tmp_path)])
+        assert result.exit_code == 2
+        assert "COMPANY_NAME" in result.output
+        assert "Could not read" in result.output
+        assert "locked.md" in result.output
+    finally:
+        locked.chmod(0o644)
 
 
 # ---------------------------------------------------------------------------
