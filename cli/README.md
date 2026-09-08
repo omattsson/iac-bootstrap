@@ -64,7 +64,15 @@ bootstrap-iac --validate /path/to/workspace
 bootstrap-iac --validate .github/copilot-instructions.md
 ```
 
-Exits with code `0` if no placeholders remain, `1` otherwise.
+Exit codes:
+
+- `0` — no unreplaced placeholders remain.
+- `1` — unreplaced placeholders were found.
+- `2` — the requested path is missing or unreadable, or a directory scan hit a
+  file it could not read. A missing or unreadable path is reported as an error,
+  not a clean result, so a mistyped path never looks like a successful check.
+
+Files with unsupported (for example binary) extensions are ignored.
 
 ## Options
 

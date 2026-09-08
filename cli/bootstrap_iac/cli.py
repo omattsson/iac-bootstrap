@@ -18,6 +18,8 @@ Usage examples::
 
 from __future__ import annotations
 
+import os
+import stat
 import sys
 from pathlib import Path
 from typing import Optional
@@ -37,7 +39,12 @@ from bootstrap_iac.config import (
 from bootstrap_iac.discovery import scan_workspace
 from bootstrap_iac.generator import GenerationError, generate_files, get_templates_dir
 from bootstrap_iac.interview import build_context, run_interview
-from bootstrap_iac.validator import validate_directory, validate_file
+from bootstrap_iac.validator import (
+    DirectoryReport,
+    ValidationReadError,
+    validate_directory,
+    validate_file,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -68,23 +75,40 @@ def _print_generated(results: list, dry_run: bool) -> None:
             click.echo(f"    –  {r.output_path}  ({r.skip_reason})")
 
 
-def _print_validation_results(issues: dict) -> int:
-    """Print validation results. Returns exit code (0 = clean, 1 = issues)."""
-    if not issues:
+def _print_validation_results(report: DirectoryReport) -> int:
+    """Print a validation report.
+
+    Returns an exit code: 0 when clean, 1 when placeholders were found, and 2
+    when any file could not be read (a read error outranks a plain finding).
+    """
+    if report.ok:
         click.secho("\n  ✓  No unreplaced placeholders found.", fg="green", bold=True)
         return 0
 
-    total = sum(len(v) for v in issues.values())
-    click.secho(
-        f"\n  ✗  Found {total} unreplaced placeholder(s) in {len(issues)} file(s):\n",
-        fg="red",
-        bold=True,
-    )
-    for file_path, placeholders in sorted(issues.items()):
-        click.secho(f"    {file_path}", fg="yellow")
-        for ph in placeholders:
-            click.echo(f"      • {{{{{ph}}}}}")
-    return 1
+    if report.placeholders:
+        total = sum(len(v) for v in report.placeholders.values())
+        click.secho(
+            f"\n  ✗  Found {total} unreplaced placeholder(s) in "
+            f"{len(report.placeholders)} file(s):\n",
+            fg="red",
+            bold=True,
+        )
+        for file_path, placeholders in sorted(report.placeholders.items()):
+            click.secho(f"    {file_path}", fg="yellow")
+            for ph in placeholders:
+                click.echo(f"      • {{{{{ph}}}}}")
+
+    if report.read_errors:
+        click.secho(
+            f"\n  ✗  Could not read {len(report.read_errors)} path(s):\n",
+            fg="red",
+            bold=True,
+            err=True,
+        )
+        for file_path, reason in sorted(report.read_errors.items()):
+            click.secho(f"    {file_path}: {reason}", fg="yellow", err=True)
+
+    return 2 if report.read_errors else 1
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +208,8 @@ _CICD_CHOICES = click.Choice(list(CICD_MAP), case_sensitive=False)
     default=None,
     help=(
         "Check files in PATH (or --workspace if omitted) for unreplaced "
-        "{{PLACEHOLDER}} tokens. Exits 1 if any are found."
+        "{{PLACEHOLDER}} tokens. Exits 1 if any are found, or 2 if the path is "
+        "missing or unreadable."
     ),
 )
 @click.option(
@@ -243,12 +268,65 @@ def main(
     if validate_path is not None:
         scan_path = Path(validate_path) if validate_path else Path(workspace_dir)
         click.echo(f"  Scanning {scan_path} for unreplaced placeholders …\n")
-        if scan_path.is_file():
-            found = validate_file(scan_path)
-            issues = {scan_path: found} if found else {}
+        # Stat once, so a missing path and an unreadable path are told apart
+        # reliably. os.stat raises for both, unlike Path.exists()/is_file(),
+        # which suppress most OS errors and would report an unreadable path as
+        # a clean scan.
+        try:
+            st = os.stat(scan_path)
+        except FileNotFoundError as exc:
+            click.secho(
+                f"  ✗  Path not found: {scan_path}: {exc.strerror or exc}",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            sys.exit(2)
+        except OSError as exc:
+            click.secho(
+                f"  ✗  Could not access {scan_path}: {exc.strerror or exc}",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            sys.exit(2)
+
+        if stat.S_ISDIR(st.st_mode):
+            report = validate_directory(scan_path)
+        elif not stat.S_ISREG(st.st_mode):
+            # Not a directory and not a regular file (for example a FIFO,
+            # socket, or device). There is nothing to validate, and reading
+            # some of these would block, so refuse it explicitly.
+            click.secho(
+                f"  ✗  Not a regular file: {scan_path}",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            sys.exit(2)
         else:
-            issues = validate_directory(scan_path)
-        exit_code = _print_validation_results(issues)
+            try:
+                found = validate_file(scan_path)
+            except ValidationReadError as exc:
+                click.secho(
+                    f"  ✗  Could not read {scan_path}: {exc.reason}",
+                    fg="red",
+                    bold=True,
+                    err=True,
+                )
+                sys.exit(2)
+            except OSError as exc:
+                click.secho(
+                    f"  ✗  Could not read {scan_path}: {exc.strerror or exc}",
+                    fg="red",
+                    bold=True,
+                    err=True,
+                )
+                sys.exit(2)
+            report = DirectoryReport(
+                placeholders={scan_path: found} if found else {}
+            )
+        exit_code = _print_validation_results(report)
         sys.exit(exit_code)
 
     # ------------------------------------------------------------------ #
