@@ -18,6 +18,7 @@ Usage examples::
 
 from __future__ import annotations
 
+import json
 import os
 import stat
 import sys
@@ -243,6 +244,25 @@ _CICD_CHOICES = click.Choice(list(CICD_MAP), case_sensitive=False)
         "config is invalid, 2 if it is missing or unreadable."
     ),
 )
+@click.option(
+    "--discover",
+    is_flag=True,
+    default=False,
+    help=(
+        "Scan --workspace and print the discovery result as JSON (including "
+        "evidence for each inferred value), then exit without generating."
+    ),
+)
+@click.option(
+    "--ignore-dir",
+    "ignore_dirs",
+    metavar="DIR",
+    multiple=True,
+    help=(
+        "Directory name to skip during workspace discovery, in addition to the "
+        "built-in ignore list. Repeat for multiple directories."
+    ),
+)
 def main(
     company: Optional[str],
     cloud: Optional[str],
@@ -265,6 +285,8 @@ def main(
     config_path: Optional[str],
     save_config: bool,
     check_config: bool,
+    discover: bool,
+    ignore_dirs: tuple[str, ...],
 ) -> None:
     """Bootstrap AI agent customisations for a Terraform IaC workspace.
 
@@ -273,7 +295,9 @@ def main(
 
     Run without flags for fully interactive mode.
     """
-    _print_header()
+    # --discover emits machine-readable JSON on stdout, so it prints no banner.
+    if not discover:
+        _print_header()
 
     # ------------------------------------------------------------------ #
     # --validate mode                                                      #
@@ -410,6 +434,15 @@ def main(
         sys.exit(0)
 
     # ------------------------------------------------------------------ #
+    # --discover mode: print the discovery result as JSON and exit.       #
+    # ------------------------------------------------------------------ #
+    if discover:
+        ws_path = Path(workspace_dir).resolve()
+        discovery = scan_workspace(ws_path, ignored_dirs=list(ignore_dirs) or None)
+        click.echo(json.dumps(discovery.to_dict(), indent=2))
+        sys.exit(0)
+
+    # ------------------------------------------------------------------ #
     # Resolve paths                                                        #
     # ------------------------------------------------------------------ #
     ws_path = Path(workspace_dir).resolve()
@@ -442,7 +475,7 @@ def main(
     # Phase 1: Discovery                                                   #
     # ------------------------------------------------------------------ #
     click.echo(f"  Scanning workspace: {ws_path} …")
-    discovery = scan_workspace(ws_path)
+    discovery = scan_workspace(ws_path, ignored_dirs=list(ignore_dirs) or None)
 
     if discovery.notes:
         for note in discovery.notes:

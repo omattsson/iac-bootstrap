@@ -447,3 +447,194 @@ def test_scan_workspace_detects_existing_claude_md(tmp_path):
     result = scan_workspace(tmp_path)
     assert result.has_claude_md is True
     assert any("CLAUDE.md" in n for n in result.notes)
+
+
+# ---------------------------------------------------------------------------
+# Evidence, confidence, and multi-cloud (issue #61)
+# ---------------------------------------------------------------------------
+
+
+def test_multi_cloud_reported_not_collapsed(tmp_path):
+    """A workspace with two providers reports both, not just the winner."""
+    (tmp_path / "azure.tf").write_text('provider "azurerm" {}\n')
+    (tmp_path / "aws1.tf").write_text('provider "aws" {}\n')
+    (tmp_path / "aws2.tf").write_text('provider "aws" {}\n')
+    result = scan_workspace(tmp_path)
+    # AWS has more signals, so it is primary, but Azure is still reported.
+    assert result.cloud_provider == "AWS"
+    assert set(result.cloud_providers) == {"AWS", "Azure"}
+    assert result.cloud_providers[0] == "AWS"  # ordered by signal count
+    assert any("Multiple cloud providers" in n for n in result.notes)
+
+
+def test_single_cloud_has_no_multi_note(tmp_path):
+    (tmp_path / "main.tf").write_text('provider "azurerm" {}\n')
+    result = scan_workspace(tmp_path)
+    assert result.cloud_providers == ["Azure"]
+    assert not any("Multiple cloud providers" in n for n in result.notes)
+
+
+def test_cloud_tie_break_prefers_canonical_order(tmp_path):
+    """On an equal-count tie the primary is Azure > AWS > GCP (stable)."""
+    (tmp_path / "a.tf").write_text('provider "aws" {}\n')
+    (tmp_path / "b.tf").write_text('provider "azurerm" {}\n')
+    result = scan_workspace(tmp_path)
+    assert result.cloud_provider == "Azure"
+    assert set(result.cloud_providers) == {"Azure", "AWS"}
+
+
+def test_provider_in_both_blocks_counts_once_per_file(tmp_path):
+    """A provider in both a provider block and required_providers counts once."""
+    (tmp_path / "main.tf").write_text(
+        'terraform {\n'
+        '  required_providers {\n'
+        '    azurerm = {\n'
+        '      source = "hashicorp/azurerm"\n'
+        '    }\n'
+        '  }\n'
+        '}\n'
+        'provider "azurerm" {}\n'
+    )
+    result = scan_workspace(tmp_path)
+    azure_signals = [
+        s for s in result.signals if s.field == "cloud_provider" and s.value == "Azure"
+    ]
+    assert len(azure_signals) == 1
+
+
+def test_every_inferred_value_has_a_signal(tmp_path):
+    """Each inferred field can be traced to a file/signal."""
+    (tmp_path / "main.tf").write_text('provider "azurerm" {}\n')
+    (tmp_path / "backend.tf").write_text('terraform {\n  backend "s3" {}\n}\n')
+    result = scan_workspace(tmp_path)
+    fields = {s.field for s in result.signals}
+    assert "cloud_provider" in fields
+    assert "state_backend" in fields
+    # The cloud signal names the file it came from.
+    cloud_sig = next(s for s in result.signals if s.field == "cloud_provider")
+    assert cloud_sig.source == "main.tf"
+    assert cloud_sig.value == "Azure"
+    assert "azurerm" in cloud_sig.detail
+
+
+def test_signal_source_is_nested_file(tmp_path):
+    """Signals point at the actual nested file, not just the workspace root."""
+    nested = tmp_path / "modules" / "network"
+    nested.mkdir(parents=True)
+    (nested / "provider.tf").write_text('provider "google" {}\n')
+    result = scan_workspace(tmp_path)
+    assert result.cloud_provider == "GCP"
+    sig = next(s for s in result.signals if s.field == "cloud_provider")
+    assert sig.source == "modules/network/provider.tf"
+
+
+# ---------------------------------------------------------------------------
+# CI/CD: empty workflow dir and YAML extensions (issue #61)
+# ---------------------------------------------------------------------------
+
+
+def test_empty_workflows_dir_is_not_github_actions(tmp_path):
+    """An empty .github/workflows/ must not be classified as GitHub Actions."""
+    (tmp_path / ".github" / "workflows").mkdir(parents=True)
+    platform, pipeline_dir = _detect_ci_cd(tmp_path)
+    assert platform is None
+    assert pipeline_dir is None
+
+
+def test_github_actions_yaml_extension(tmp_path):
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "ci.yaml").write_text("on: push\n")
+    platform, pipeline_dir = _detect_ci_cd(tmp_path)
+    assert platform == "GitHub Actions"
+
+
+def test_azure_pipelines_yaml_extension(tmp_path):
+    (tmp_path / "azure-pipelines.yaml").write_text("trigger:\n  - main\n")
+    platform, pipeline_dir = _detect_ci_cd(tmp_path)
+    assert platform == "Azure DevOps"
+    assert pipeline_dir == "."
+
+
+def test_gitlab_ci_yaml_extension(tmp_path):
+    (tmp_path / ".gitlab-ci.yaml").write_text("stages:\n  - build\n")
+    platform, pipeline_dir = _detect_ci_cd(tmp_path)
+    assert platform == "GitLab CI"
+
+
+def test_generic_pipelines_dir_detected(tmp_path):
+    """A pipelines/ directory of YAML is detected (workspace-relative)."""
+    pipe = tmp_path / "ci" / "pipelines"
+    pipe.mkdir(parents=True)
+    (pipe / "deploy.yaml").write_text("steps: []\n")
+    platform, pipeline_dir = _detect_ci_cd(tmp_path)
+    assert platform == "Unknown"
+    assert pipeline_dir == "ci/pipelines"
+
+
+def test_pipelines_segment_in_checkout_path_is_not_a_signal(tmp_path):
+    """A `pipelines` segment above the workspace must not fabricate a signal."""
+    workspace = tmp_path / "pipelines" / "repo"
+    workspace.mkdir(parents=True)
+    (workspace / "values.yaml").write_text("foo: bar\n")
+    platform, pipeline_dir = _detect_ci_cd(workspace)
+    assert platform is None
+
+
+# ---------------------------------------------------------------------------
+# Ignored directories and configurable ignores (issue #61)
+# ---------------------------------------------------------------------------
+
+
+def test_ignores_node_modules_by_default(tmp_path):
+    """A provider inside node_modules is not a real signal."""
+    vendored = tmp_path / "node_modules" / "some-pkg"
+    vendored.mkdir(parents=True)
+    (vendored / "main.tf").write_text('provider "aws" {}\n')
+    result = scan_workspace(tmp_path)
+    assert result.cloud_provider is None
+    assert result.cloud_providers == []
+
+
+def test_custom_ignored_dir(tmp_path):
+    """A caller can add extra ignored directories."""
+    (tmp_path / "real.tf").write_text('provider "azurerm" {}\n')
+    vendor = tmp_path / "vendor"
+    vendor.mkdir()
+    (vendor / "aws.tf").write_text('provider "aws" {}\n')
+
+    # Without the ignore, both providers are seen.
+    both = scan_workspace(tmp_path)
+    assert set(both.cloud_providers) == {"Azure", "AWS"}
+
+    # With "vendor" ignored, only the real provider remains.
+    filtered = scan_workspace(tmp_path, ignored_dirs=["vendor"])
+    assert filtered.cloud_providers == ["Azure"]
+
+
+def test_orchestration_ignores_pruned_dirs(tmp_path):
+    """A terragrunt.hcl inside an ignored dir is not detected."""
+    cache = tmp_path / ".terragrunt-cache" / "abc"
+    cache.mkdir(parents=True)
+    (cache / "terragrunt.hcl").write_text("# cached\n")
+    tool, _dir = _detect_orchestration(tmp_path)
+    assert tool is None
+
+
+# ---------------------------------------------------------------------------
+# Machine-readable output (issue #61)
+# ---------------------------------------------------------------------------
+
+
+def test_to_dict_is_json_serialisable(tmp_path):
+    import json
+
+    (tmp_path / "main.tf").write_text('provider "azurerm" {}\n')
+    result = scan_workspace(tmp_path)
+    data = result.to_dict()
+    # Round-trips through JSON without error.
+    reparsed = json.loads(json.dumps(data))
+    assert reparsed["cloud_provider"] == "Azure"
+    assert reparsed["cloud_providers"] == ["Azure"]
+    assert isinstance(reparsed["signals"], list)
+    assert reparsed["signals"][0]["source"] == "main.tf"
