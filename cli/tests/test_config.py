@@ -97,11 +97,89 @@ def test_load_config_normalises_cicd(tmp_path):
         assert load_config(cfg)["CI_CD_PLATFORM"] == expected
 
 
-def test_load_config_ignores_unknown_keys(tmp_path):
+def test_load_config_rejects_unknown_key(tmp_path):
+    """A misspelled/unknown key must fail loudly, not be silently ignored."""
     cfg = tmp_path / ".bootstrap-iac.yaml"
-    cfg.write_text("company: Acme\nunknown_key: ignored\n")
+    cfg.write_text("company: Acme\nclould: azure\n")
+    with pytest.raises(ValueError) as exc_info:
+        load_config(cfg)
+    message = str(exc_info.value)
+    assert "clould" in message
+    assert "Supported keys" in message
+
+
+def test_load_config_reports_all_unknown_keys(tmp_path):
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("company: Acme\nfoo: 1\nbar: 2\n")
+    with pytest.raises(ValueError) as exc_info:
+        load_config(cfg)
+    message = str(exc_info.value)
+    assert "foo" in message
+    assert "bar" in message
+
+
+def test_load_config_accepts_supported_version(tmp_path):
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("version: '1'\ncompany: Acme\n")
+    result = load_config(cfg)
+    # version is a meta key, not an override.
+    assert result == {"COMPANY_NAME": "Acme"}
+
+
+def test_load_config_accepts_numeric_version(tmp_path):
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("version: 1\ncompany: Acme\n")
     result = load_config(cfg)
     assert result == {"COMPANY_NAME": "Acme"}
+
+
+def test_load_config_accepts_float_version(tmp_path):
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("version: 1.0\ncompany: Acme\n")
+    result = load_config(cfg)
+    assert result == {"COMPANY_NAME": "Acme"}
+
+
+def test_load_config_version_only(tmp_path):
+    """A config with only a version key is valid and yields no overrides."""
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("version: '1'\n")
+    assert load_config(cfg) == {}
+
+
+def test_load_config_rejects_unsupported_version(tmp_path):
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("version: '2'\ncompany: Acme\n")
+    with pytest.raises(ValueError) as exc_info:
+        load_config(cfg)
+    message = str(exc_info.value)
+    assert "version" in message
+    assert "'2'" in message
+    # The accepted values must be named.
+    assert "1" in message
+
+
+def test_load_config_rejects_empty_version(tmp_path):
+    """An explicitly empty/whitespace version is a mistake, not 'unset'."""
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text('version: ""\ncompany: Acme\n')
+    with pytest.raises(ValueError, match="version"):
+        load_config(cfg)
+
+
+def test_load_config_null_version_is_unset(tmp_path):
+    """A YAML null version means 'use the current version', which is valid."""
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("version: null\ncompany: Acme\n")
+    assert load_config(cfg) == {"COMPANY_NAME": "Acme"}
+
+
+def test_load_config_rejects_non_string_key(tmp_path):
+    """A non-string YAML key is unknown and errors rather than being ignored."""
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("company: Acme\n1: oops\n")
+    with pytest.raises(ValueError, match="Unknown config key"):
+        load_config(cfg)
 
 
 def test_load_config_empty_file(tmp_path):
@@ -143,6 +221,26 @@ def test_load_config_rejects_invalid_target(tmp_path):
     cfg.write_text("target: vscode\n")
     with pytest.raises(ValueError, match="unsupported value 'vscode'"):
         load_config(cfg)
+
+
+def test_load_config_null_value_is_unset(tmp_path):
+    """A YAML null for a known key is treated as unset, not an error."""
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("company: Acme\ncloud: null\n")
+    result = load_config(cfg)
+    assert result == {"COMPANY_NAME": "Acme"}
+    assert "CLOUD_PROVIDER" not in result
+
+
+def test_load_config_rejects_non_scalar_value(tmp_path):
+    """A list/mapping value for a scalar key names the key."""
+    cfg = tmp_path / ".bootstrap-iac.yaml"
+    cfg.write_text("company:\n  - a\n  - b\n")
+    with pytest.raises(ValueError) as exc_info:
+        load_config(cfg)
+    message = str(exc_info.value)
+    assert "company" in message
+    assert "scalar" in message
 
 
 def test_load_config_all_fields(tmp_path):
@@ -452,3 +550,102 @@ def test_cli_save_config_writes_to_detected_yml(tmp_path):
     assert cfg.exists()
     assert not (ws / ".bootstrap-iac.yaml").exists()
     assert yaml.safe_load(cfg.read_text())["company"] == "YmlCorp"
+
+
+# ---------------------------------------------------------------------------
+# --check-config
+# ---------------------------------------------------------------------------
+
+
+def test_cli_check_config_valid(tmp_path):
+    ws = _make_workspace(tmp_path)
+    cfg = ws / ".bootstrap-iac.yaml"
+    cfg.write_text("version: '1'\ncompany: Acme\ncloud: azure\n")
+    result = cli_runner.invoke(main, ["--workspace", str(ws), "--check-config"])
+    assert result.exit_code == 0
+    assert "Config is valid" in result.output
+    # Resolved values are shown with config-file keys, and normalisation is
+    # visible (the config's `cloud: azure` is displayed as `cloud = Azure`).
+    assert "company = Acme" in result.output
+    assert "cloud = Azure" in result.output
+
+
+def test_cli_check_config_invalid_unknown_key(tmp_path):
+    ws = _make_workspace(tmp_path)
+    cfg = ws / ".bootstrap-iac.yaml"
+    cfg.write_text("company: Acme\nclould: azure\n")
+    result = cli_runner.invoke(main, ["--workspace", str(ws), "--check-config"])
+    assert result.exit_code == 1
+    assert "Invalid config" in result.output
+    assert "clould" in result.output
+
+
+def test_cli_check_config_invalid_enum(tmp_path):
+    ws = _make_workspace(tmp_path)
+    cfg = ws / ".bootstrap-iac.yaml"
+    cfg.write_text("cloud: digitalocean\n")
+    result = cli_runner.invoke(main, ["--workspace", str(ws), "--check-config"])
+    assert result.exit_code == 1
+    assert "Invalid config" in result.output
+
+
+def test_cli_check_config_missing(tmp_path):
+    ws = _make_workspace(tmp_path)  # no config file present
+    result = cli_runner.invoke(main, ["--workspace", str(ws), "--check-config"])
+    assert result.exit_code == 2
+    assert "No config file found" in result.output
+
+
+def test_cli_check_config_explicit_path_missing(tmp_path):
+    ws = _make_workspace(tmp_path)
+    result = cli_runner.invoke(
+        main,
+        ["--workspace", str(ws), "--config", str(tmp_path / "nope.yaml"), "--check-config"],
+    )
+    assert result.exit_code == 2
+    assert "not found" in result.output
+
+
+def test_cli_check_config_explicit_path_is_directory(tmp_path):
+    """A directory passed as --config is a non-regular file, not 'not found'."""
+    ws = _make_workspace(tmp_path)
+    a_dir = tmp_path / "cfgdir"
+    a_dir.mkdir()
+    result = cli_runner.invoke(
+        main, ["--workspace", str(ws), "--config", str(a_dir), "--check-config"]
+    )
+    assert result.exit_code == 2
+    assert "not a regular file" in result.output.lower()
+
+
+def test_cli_check_config_does_not_generate(tmp_path):
+    """--check-config validates only; it never writes generated files."""
+    ws = _make_workspace(tmp_path)
+    cfg = ws / ".bootstrap-iac.yaml"
+    cfg.write_text("company: Acme\ncloud: azure\n")
+    result = cli_runner.invoke(main, ["--workspace", str(ws), "--check-config"])
+    assert result.exit_code == 0
+    assert not (ws / ".github").exists()
+    assert not (ws / "CLAUDE.md").exists()
+
+
+def test_cli_save_then_check_config_roundtrip(tmp_path):
+    """A saved config passes --check-config (version stamp is accepted)."""
+    ws = _make_workspace(tmp_path)
+    save = cli_runner.invoke(main, [
+        "--workspace", str(ws),
+        "--company", "RoundTrip",
+        "--cloud", "aws",
+        "--orchestration", "terramate",
+        "--ci-cd", "github-actions",
+        "--target", "both",
+        "--non-interactive",
+        "--save-config",
+    ])
+    assert save.exit_code == 0
+    cfg = ws / ".bootstrap-iac.yaml"
+    assert yaml.safe_load(cfg.read_text())["version"] == "1"
+
+    check = cli_runner.invoke(main, ["--workspace", str(ws), "--check-config"])
+    assert check.exit_code == 0
+    assert "Config is valid" in check.output
