@@ -574,6 +574,83 @@ def build_context(answers: dict) -> dict:
         ctx.setdefault("STACK_CONFIG_PATTERN", orch_defs["stack_config_pattern"])
     else:
         ctx.setdefault("APPLY_COMMAND", f"{orch_defs['tool_lower']} apply")
+
+    # ---- Terramate-specific derived values ----
+    # The Terramate templates reference example snippets that are not shared
+    # with the other orchestration tools. Fill them here so every Terramate
+    # combination renders with no unresolved placeholders.
+    if orch_key == "Terramate":
+        _tf_backend = {"azurerm": "azurerm", "aws": "s3", "google": "gcs"}
+        backend_name = _tf_backend.get(cloud_defs["provider_name"], "azurerm")
+        _provider_body = {
+            "azurerm": 'provider "azurerm" {\n      features {}\n    }',
+            "aws": 'provider "aws" {\n      region = var.region\n    }',
+            "google": 'provider "google" {\n      project = var.project\n    }',
+        }.get(
+            cloud_defs["provider_name"],
+            'provider "azurerm" {\n      features {}\n    }',
+        )
+        ctx.setdefault(
+            "GENERATE_HCL_PATTERN",
+            (
+                'generate_hcl "_backend.tf" {\n'
+                "  content {\n"
+                "    terraform {\n"
+                "      # Partial config: settings supplied via -backend-config at init.\n"
+                f'      backend "{backend_name}" {{}}\n'
+                "    }\n"
+                "  }\n"
+                "}\n\n"
+                'generate_hcl "_provider.tf" {\n'
+                "  content {\n"
+                f"    {_provider_body}\n"
+                "  }\n"
+                "}"
+            ),
+        )
+        # A valid terraform_remote_state config body for the selected backend.
+        # Each backend needs different keys: azurerm needs the storage account
+        # coordinates, s3 needs a bucket (and region), and gcs uses prefix.
+        _remote_state_config = {
+            "azurerm": (
+                '    resource_group_name  = "rg-tfstate"\n'
+                '    storage_account_name = "sttfstate"\n'
+                '    container_name       = "tfstate"\n'
+                '    key                  = "networking.tfstate"\n'
+            ),
+            "s3": (
+                '    bucket = "my-tfstate-bucket"\n'
+                '    key    = "networking/terraform.tfstate"\n'
+                f'    region = "{default_region}"\n'
+            ),
+            "gcs": (
+                '    bucket = "my-tfstate-bucket"\n'
+                '    prefix = "networking"\n'
+            ),
+        }.get(
+            backend_name,
+            '    key = "networking.tfstate"\n',
+        )
+        ctx.setdefault(
+            "REMOTE_STATE_EXAMPLE",
+            (
+                'data "terraform_remote_state" "networking" {\n'
+                f'  backend = "{backend_name}"\n'
+                "  config = {\n"
+                f"{_remote_state_config}"
+                "  }\n"
+                "}\n\n"
+                "# Reference outputs via "
+                "data.terraform_remote_state.networking.outputs.<name>"
+            ),
+        )
+        ctx.setdefault("STACK_NAME_EXAMPLE", "networking")
+        ctx.setdefault("STACK_DESCRIPTION_EXAMPLE", "Platform networking stack")
+        ctx.setdefault("STACK_ID_EXAMPLE", "networking-dev")
+        ctx.setdefault("DEPENDENCY_STACK_PATH", "/stacks/dev/networking")
+        ctx.setdefault("MODULE_NAME", f"{module_prefix}-network")
+        ctx.setdefault("MODULE_VERSION", "v1.2.0")
+
     ctx.setdefault("ENVCOMMON_PATTERN", orch_defs["envcommon_pattern"])
     ctx.setdefault("HIERARCHY_DIAGRAM", orch_defs["hierarchy_diagram"])
     ctx.setdefault(
