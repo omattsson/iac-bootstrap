@@ -18,6 +18,8 @@ Usage examples::
 
 from __future__ import annotations
 
+import os
+import stat
 import sys
 from pathlib import Path
 from typing import Optional
@@ -266,8 +268,17 @@ def main(
     if validate_path is not None:
         scan_path = Path(validate_path) if validate_path else Path(workspace_dir)
         click.echo(f"  Scanning {scan_path} for unreplaced placeholders …\n")
+        # Stat once, so a missing path and an unreadable path are told apart
+        # reliably. os.stat raises for both, unlike Path.exists()/is_file(),
+        # which suppress most OS errors and would report an unreadable path as
+        # a clean scan.
         try:
-            path_exists = scan_path.exists()
+            st = os.stat(scan_path)
+        except FileNotFoundError:
+            click.secho(
+                f"  ✗  Path not found: {scan_path}", fg="red", bold=True, err=True
+            )
+            sys.exit(2)
         except OSError as exc:
             click.secho(
                 f"  ✗  Could not access {scan_path}: {exc.strerror or exc}",
@@ -276,12 +287,10 @@ def main(
                 err=True,
             )
             sys.exit(2)
-        if not path_exists:
-            click.secho(
-                f"  ✗  Path not found: {scan_path}", fg="red", bold=True, err=True
-            )
-            sys.exit(2)
-        if scan_path.is_file():
+
+        if stat.S_ISDIR(st.st_mode):
+            report = validate_directory(scan_path)
+        else:
             try:
                 found = validate_file(scan_path)
             except ValidationReadError as exc:
@@ -303,8 +312,6 @@ def main(
             report = DirectoryReport(
                 placeholders={scan_path: found} if found else {}
             )
-        else:
-            report = validate_directory(scan_path)
         exit_code = _print_validation_results(report)
         sys.exit(exit_code)
 

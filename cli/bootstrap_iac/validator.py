@@ -66,17 +66,26 @@ def validate_file(path: Path) -> list[str]:
         ValidationReadError: if *path* exists with a supported extension but
             cannot be read (for example a permissions problem).
     """
-    if not path.exists():
-        raise FileNotFoundError(
-            errno.ENOENT, os.strerror(errno.ENOENT), str(path)
-        )
     if path.suffix.lower() not in _TEXT_EXTENSIONS:
+        # Unsupported (for example binary) extensions are ignored, but a
+        # missing path is still an error, so a mistyped path never looks like a
+        # clean result. exists() suppresses a few OS errors (for example a
+        # symlink loop) and returns False; treating those as missing is
+        # acceptable for a file we would not read anyway.
+        if not path.exists():
+            raise FileNotFoundError(
+                errno.ENOENT, os.strerror(errno.ENOENT), str(path)
+            )
         return []
+    # For a supported extension, read directly and let the OS classify the
+    # outcome. This avoids a redundant stat and the race it would open, and it
+    # reports symlink loops or traversal errors as read errors rather than
+    # misreporting them as missing.
     try:
         content = path.read_text(encoding="utf-8", errors="ignore")
     except FileNotFoundError:
-        # The file vanished between exists() and read (a race). Surface it as a
-        # missing file so callers treat both vanish-races identically.
+        # A missing file is not a read error. FileNotFoundError is an OSError
+        # subclass, so re-raise it here before the generic handler wraps it.
         raise
     except OSError as exc:
         raise ValidationReadError(path, exc.strerror or str(exc)) from exc

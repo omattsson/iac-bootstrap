@@ -110,6 +110,26 @@ def test_validate_unreadable_file(tmp_path):
     sys.platform == "win32" or os.geteuid() == 0,
     reason="POSIX file permissions not enforced for root or on Windows",
 )
+def test_validate_unreadable_parent_reports_access_error(tmp_path):
+    """A path under an untraversable dir is an access error, not 'not found'."""
+    locked_dir = tmp_path / "locked_dir"
+    locked_dir.mkdir()
+    target = locked_dir / "file.md"
+    target.write_text("{{COMPANY_NAME}}")
+    locked_dir.chmod(0o000)
+    try:
+        result = runner.invoke(main, ["--validate", str(target)])
+        assert result.exit_code == 2
+        assert "Could not access" in result.output
+        assert "not found" not in result.output.lower()
+    finally:
+        locked_dir.chmod(0o755)
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" or os.geteuid() == 0,
+    reason="POSIX file permissions not enforced for root or on Windows",
+)
 def test_validate_directory_with_read_error(tmp_path):
     """A directory scan lists placeholders and still exits 2 on a read error."""
     (tmp_path / "dirty.md").write_text("Company: {{COMPANY_NAME}}\n")
