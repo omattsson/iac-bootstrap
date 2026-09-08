@@ -596,6 +596,7 @@ def build_context(answers: dict) -> dict:
                 'generate_hcl "_backend.tf" {\n'
                 "  content {\n"
                 "    terraform {\n"
+                "      # Partial config: settings supplied via -backend-config at init.\n"
                 f'      backend "{backend_name}" {{}}\n'
                 "    }\n"
                 "  }\n"
@@ -607,13 +608,36 @@ def build_context(answers: dict) -> dict:
                 "}"
             ),
         )
+        # A valid terraform_remote_state config body for the selected backend.
+        # Each backend needs different keys: azurerm needs the storage account
+        # coordinates, s3 needs a bucket (and region), and gcs uses prefix.
+        _remote_state_config = {
+            "azurerm": (
+                '    resource_group_name  = "rg-tfstate"\n'
+                '    storage_account_name = "sttfstate"\n'
+                '    container_name       = "tfstate"\n'
+                '    key                  = "networking.tfstate"\n'
+            ),
+            "s3": (
+                '    bucket = "my-tfstate-bucket"\n'
+                '    key    = "networking/terraform.tfstate"\n'
+                f'    region = "{default_region}"\n'
+            ),
+            "gcs": (
+                '    bucket = "my-tfstate-bucket"\n'
+                '    prefix = "networking"\n'
+            ),
+        }.get(
+            backend_name,
+            '    key = "networking.tfstate"\n',
+        )
         ctx.setdefault(
             "REMOTE_STATE_EXAMPLE",
             (
                 'data "terraform_remote_state" "networking" {\n'
                 f'  backend = "{backend_name}"\n'
                 "  config = {\n"
-                '    key = "networking.tfstate"\n'
+                f"{_remote_state_config}"
                 "  }\n"
                 "}\n\n"
                 "# Reference outputs via "

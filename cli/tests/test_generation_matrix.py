@@ -217,6 +217,32 @@ _CLOUD_BASE = {
 }
 
 
+@pytest.mark.parametrize(
+    "cloud,backend,required,forbidden",
+    [
+        (
+            "Azure",
+            "azurerm",
+            ["resource_group_name", "storage_account_name", "container_name", "key"],
+            ["bucket", "prefix"],
+        ),
+        ("AWS", "s3", ["bucket", "key", "region"], ["resource_group_name", "prefix"]),
+        ("GCP", "gcs", ["bucket", "prefix"], ["container_name", "resource_group_name"]),
+    ],
+)
+def test_terramate_remote_state_example_is_valid_per_backend(
+    cloud, backend, required, forbidden
+):
+    """The Terramate remote-state snippet is a valid config for each backend."""
+    ctx = build_context(_answers(cloud, "Terramate", "both"))
+    example = ctx["REMOTE_STATE_EXAMPLE"]
+    assert f'backend = "{backend}"' in example
+    for key in required:
+        assert key in example, f"{cloud}: missing {key} in remote-state example"
+    for key in forbidden:
+        assert key not in example, f"{cloud}: unexpected {key} in remote-state example"
+
+
 @pytest.mark.parametrize("cloud", CLOUDS)
 def test_cloud_overrides_used_when_present_else_base(tmp_path, cloud):
     tdir = get_templates_dir()
