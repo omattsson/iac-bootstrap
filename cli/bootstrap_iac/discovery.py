@@ -671,7 +671,8 @@ def scan_workspace(
         result.notes.append(
             "Multiple cloud providers detected: "
             + ", ".join(result.cloud_providers)
-            + f". Using {result.cloud_provider} (most signals)."
+            + f". Using {result.cloud_provider} as the primary "
+            "(ranked by signal count, ties broken by Azure, AWS, GCP)."
         )
     if result.has_copilot_instructions:
         result.notes.append("Existing .github/copilot-instructions.md detected.")
