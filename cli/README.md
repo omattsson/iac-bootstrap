@@ -190,11 +190,16 @@ python scripts/build_templates.py --check
 ```
 
 The package build regenerates the bundle automatically when `references/` is
-reachable. When it is not reachable (for example an isolated build where only
-`cli/` is available), the build uses the `templates/` already present and fails
-if none are present — so run the generator first. On a fresh clone `templates/`
-is absent, so run `python scripts/build_templates.py` before building or
-installing the package. CI does this automatically.
+reachable from the build. A default `pip install ./cli` or `python -m build`
+isolates the build to the `cli/` directory, so `references/` (a sibling of
+`cli/`) is not reachable; the build then uses the `templates/` already present.
+
+- Full checkout, non-isolated build (`references/` reachable): the bundle is
+  regenerated automatically — no manual step.
+- Isolated build, or packaging a standalone `cli/` tree without its repository
+  siblings: run `python scripts/build_templates.py` first. On a fresh clone the
+  bundle is absent, so a default `pip install ./cli` needs this step; otherwise
+  the build fails with a clear message. CI runs the generator automatically.
 
 ## Config File
 

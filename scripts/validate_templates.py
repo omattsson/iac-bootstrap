@@ -213,9 +213,12 @@ def check_template_generation() -> list[str]:
         build_templates.build(REFERENCES_DIR, Path(tmp))
         problems.extend(build_templates.check(REFERENCES_DIR, Path(tmp)))
 
-    # If a bundled copy is present on disk, verify it is not stale.
+    # If a bundle directory exists on disk, verify it matches references/.
+    # Check whenever the directory exists — an existing but empty or partial
+    # bundle is a failure, because get_templates_dir() would select it. A clean
+    # checkout has no bundle directory, so there is nothing to check.
     dest = REPO_ROOT / "cli" / "bootstrap_iac" / "templates"
-    if dest.is_dir() and any(dest.rglob("*.tmpl")):
+    if dest.is_dir():
         problems.extend(build_templates.check(REFERENCES_DIR, dest))
 
     return problems
