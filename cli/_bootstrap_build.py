@@ -7,7 +7,12 @@ templates.
 
 Under build isolation ``references/`` is not part of the copied build context,
 so the step is skipped and the ``templates/`` already present in the tree is
-used. Regeneration never fails the build.
+used. A generation failure while ``references/`` is present propagates and
+fails the build, and the build also fails when no templates are available — the
+backend never silently ships a partial or empty template set.
+
+``setuptools`` is imported lazily inside the hooks, so the template helpers can
+be imported (and tested) in an environment without setuptools.
 """
 
 from __future__ import annotations
@@ -15,20 +20,22 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from setuptools import build_meta as _default
-
 _HERE = Path(__file__).resolve().parent  # the cli/ project directory
 
 
-def _regenerate_templates() -> None:
-    references = _HERE.parent / "references"
-    dest = _HERE / "bootstrap_iac" / "templates"
+def _ensure_templates(references: Path, dest: Path, scripts: Path) -> None:
+    """Regenerate *dest* from *references* when it is reachable, then verify.
+
+    When *references* is a directory, the templates are regenerated from it; a
+    failure there (a bug in the generator, a permissions problem) propagates and
+    fails the build. When *references* is not reachable (an isolated build), the
+    templates already present in *dest* are used. Either way, the build fails if
+    no templates end up available, so an empty or partial set is never shipped.
+    """
+    references = Path(references)
+    dest = Path(dest)
 
     if references.is_dir():
-        # Source-tree build: regenerate from the canonical templates. A failure
-        # here (a bug in the generator, a permissions problem) must fail the
-        # build rather than silently ship a partial or empty template set.
-        scripts = _HERE.parent / "scripts"
         sys.path.insert(0, str(scripts))
         try:
             import build_templates
@@ -38,9 +45,6 @@ def _regenerate_templates() -> None:
             if sys.path and sys.path[0] == str(scripts):
                 sys.path.pop(0)
 
-    # Guard: never build a package with no bundled templates. When references/
-    # is not reachable (an isolated build of a fresh checkout), the templates
-    # must already be present (run scripts/build_templates.py first).
     if not (dest.is_dir() and any(dest.rglob("*.tmpl"))):
         raise RuntimeError(
             "No bundled templates found under bootstrap_iac/templates/ and "
@@ -49,29 +53,59 @@ def _regenerate_templates() -> None:
         )
 
 
+def _regenerate_templates() -> None:
+    _ensure_templates(
+        _HERE.parent / "references",
+        _HERE / "bootstrap_iac" / "templates",
+        _HERE.parent / "scripts",
+    )
+
+
+def _backend():
+    from setuptools import build_meta
+
+    return build_meta
+
+
+# ---- PEP 517 hooks (setuptools is imported only when a build actually runs) ---
+
+
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     _regenerate_templates()
-    return _default.build_wheel(wheel_directory, config_settings, metadata_directory)
+    return _backend().build_wheel(wheel_directory, config_settings, metadata_directory)
 
 
 def build_sdist(sdist_directory, config_settings=None):
     _regenerate_templates()
-    return _default.build_sdist(sdist_directory, config_settings)
+    return _backend().build_sdist(sdist_directory, config_settings)
 
 
 def build_editable(wheel_directory, config_settings=None, metadata_directory=None):
     _regenerate_templates()
-    return _default.build_editable(wheel_directory, config_settings, metadata_directory)
+    return _backend().build_editable(
+        wheel_directory, config_settings, metadata_directory
+    )
 
 
-# Re-export the remaining PEP 517 hooks unchanged. Optional hooks are only
-# defined here when setuptools provides them, so a frontend never sees a hook
-# name bound to None.
-get_requires_for_build_wheel = _default.get_requires_for_build_wheel
-get_requires_for_build_sdist = _default.get_requires_for_build_sdist
-prepare_metadata_for_build_wheel = _default.prepare_metadata_for_build_wheel
+def get_requires_for_build_wheel(config_settings=None):
+    return _backend().get_requires_for_build_wheel(config_settings)
 
-if hasattr(_default, "get_requires_for_build_editable"):
-    get_requires_for_build_editable = _default.get_requires_for_build_editable
-if hasattr(_default, "prepare_metadata_for_build_editable"):
-    prepare_metadata_for_build_editable = _default.prepare_metadata_for_build_editable
+
+def get_requires_for_build_sdist(config_settings=None):
+    return _backend().get_requires_for_build_sdist(config_settings)
+
+
+def get_requires_for_build_editable(config_settings=None):
+    return _backend().get_requires_for_build_editable(config_settings)
+
+
+def prepare_metadata_for_build_wheel(metadata_directory, config_settings=None):
+    return _backend().prepare_metadata_for_build_wheel(
+        metadata_directory, config_settings
+    )
+
+
+def prepare_metadata_for_build_editable(metadata_directory, config_settings=None):
+    return _backend().prepare_metadata_for_build_editable(
+        metadata_directory, config_settings
+    )

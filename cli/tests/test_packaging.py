@@ -95,38 +95,86 @@ def test_build_removes_stale_generated_files(tmp_path):
 
 
 @requires_source
-def test_built_wheel_bundles_the_reference_templates(tmp_path):
-    """The built wheel artifact contains exactly the reference templates.
+def test_sdist_and_wheel_from_sdist_bundle_templates(tmp_path):
+    """A default build (sdist then wheel-from-sdist) bundles the templates.
 
-    This inspects the real .whl, so it catches a build that would ship an
-    empty or stale template set — unlike importing the source package.
+    This inspects the real artifacts, so it exercises the MANIFEST.in contract
+    (the backend ships in the sdist so a wheel can build from it) and the
+    references/-unavailable path (the wheel is built from the sdist, which has
+    no references/). It catches a build that would ship an empty or stale set.
     """
-    build = pytest.importorskip("build")  # noqa: F841 - presence check only
+    pytest.importorskip("build")
     build_templates = _load_build_templates()
-    # Make sure the on-disk bundle exists so an isolated build has it to copy.
+    # An isolated build copies only cli/, so the on-disk bundle must exist.
     build_templates.build(_REFERENCES, _CLI_DIR / "bootstrap_iac" / "templates")
 
-    # A default (isolated) build resolves the in-tree backend and copies the
-    # source (including the on-disk templates) into the build.
     proc = subprocess.run(
-        [sys.executable, "-m", "build", "--wheel", "--outdir", str(tmp_path), str(_CLI_DIR)],
+        [sys.executable, "-m", "build", "--outdir", str(tmp_path), str(_CLI_DIR)],
         capture_output=True,
         text=True,
         timeout=600,
     )
-    if proc.returncode != 0:
-        pytest.skip(f"wheel build unavailable in this environment:\n{proc.stderr[-800:]}")
+    # build is a dev dependency, so a failure here is a real regression.
+    assert proc.returncode == 0, proc.stderr
 
+    sdists = list(tmp_path.glob("*.tar.gz"))
     wheels = list(tmp_path.glob("*.whl"))
+    assert sdists, "no sdist was produced"
     assert wheels, "no wheel was produced"
+
+    # The sdist must ship the build backend so a wheel can build from it.
+    import tarfile
+
+    with tarfile.open(sdists[0]) as tf:
+        names = tf.getnames()
+    assert any(n.endswith("/_bootstrap_build.py") for n in names), (
+        "sdist does not ship the build backend"
+    )
+
+    # The wheel (built from the sdist) must bundle exactly the reference set,
+    # and must not ship the build backend.
+    prefix = "bootstrap_iac/templates/"
     with zipfile.ZipFile(wheels[0]) as zf:
-        prefix = "bootstrap_iac/templates/"
-        bundled = {
-            name[len(prefix):]
-            for name in zf.namelist()
-            if prefix in name and name.endswith(".tmpl")
-        }
+        entries = zf.namelist()
+    bundled = {
+        name[len(prefix):]
+        for name in entries
+        if prefix in name and name.endswith(".tmpl")
+    }
     assert bundled == _tmpl_set(_REFERENCES)
+    assert not any("_bootstrap_build" in name for name in entries)
+
+
+def test_backend_regenerates_and_guards(tmp_path):
+    """The build backend regenerates from references/ and refuses an empty set."""
+    backend_path = _CLI_DIR / "_bootstrap_build.py"
+    if not backend_path.exists() or not _BUILD_SCRIPT.exists():
+        pytest.skip("build backend or generator not reachable")
+    spec = importlib.util.spec_from_file_location("_bootstrap_build_test", backend_path)
+    backend = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(backend)
+
+    scripts_dir = _BUILD_SCRIPT.parent
+
+    # references present, empty dest -> regenerates.
+    refs = tmp_path / "refs"
+    (refs / "sub").mkdir(parents=True)
+    (refs / "a.tmpl").write_text("{{A}}")
+    (refs / "sub" / "b.tmpl").write_text("{{B}}")
+    dest = tmp_path / "dest"
+    backend._ensure_templates(refs, dest, scripts_dir)
+    assert {p.relative_to(dest).as_posix() for p in dest.rglob("*.tmpl")} == {
+        "a.tmpl",
+        "sub/b.tmpl",
+    }
+
+    # references absent, dest already populated -> no-op, no error.
+    backend._ensure_templates(tmp_path / "missing", dest, scripts_dir)
+    assert (dest / "a.tmpl").exists()
+
+    # references absent, dest empty -> refuses to build.
+    with pytest.raises(RuntimeError, match="No bundled templates"):
+        backend._ensure_templates(tmp_path / "missing", tmp_path / "empty", scripts_dir)
 
 
 @requires_source
