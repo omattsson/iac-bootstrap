@@ -240,9 +240,7 @@ def _clouds_by_count(counts: dict[str, int]) -> list[str]:
     ]
 
 
-def _detect_module_prefix(
-    workspace: Path, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
-) -> Optional[str]:
+def _detect_module_prefix(workspace: Path) -> Optional[str]:
     """Guess module prefix from directory names like tf-module-*, modules/."""
     prefix, _source = _detect_module_prefix_detailed(workspace)
     return prefix
@@ -591,7 +589,8 @@ def scan_workspace(
     """
     ignored = DEFAULT_IGNORED_DIRS
     if ignored_dirs:
-        ignored = DEFAULT_IGNORED_DIRS | set(ignored_dirs)
+        # frozenset.union returns a frozenset, so the ignore list stays immutable.
+        ignored = DEFAULT_IGNORED_DIRS.union(ignored_dirs)
 
     result = DiscoveryResult(workspace_path=workspace_path)
 
@@ -627,12 +626,16 @@ def scan_workspace(
     result.orchestration_dir = orch_dir
     if tool and orch_source:
         result.signals.append(Signal("orchestration_tool", tool, orch_source))
+        if orch_dir:
+            result.signals.append(Signal("orchestration_dir", orch_dir, orch_source))
 
     platform, pipeline_dir, ci_source = _detect_ci_cd_detailed(workspace_path, ignored)
     result.ci_cd_platform = platform
     result.pipeline_dir = pipeline_dir
     if platform and ci_source:
         result.signals.append(Signal("ci_cd_platform", platform, ci_source))
+        if pipeline_dir:
+            result.signals.append(Signal("pipeline_dir", pipeline_dir, ci_source))
 
     result.has_copilot_instructions = (
         workspace_path / ".github" / "copilot-instructions.md"

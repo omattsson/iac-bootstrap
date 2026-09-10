@@ -517,6 +517,23 @@ def test_every_inferred_value_has_a_signal(tmp_path):
     assert "azurerm" in cloud_sig.detail
 
 
+def test_orchestration_and_pipeline_dirs_have_signals(tmp_path):
+    """The inferred dir fields are also traceable to a source file."""
+    cfg = tmp_path / "infrastructure-config" / "dev"
+    cfg.mkdir(parents=True)
+    (cfg / "terragrunt.hcl").write_text("# root\n")
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "ci.yml").write_text("on: push\n")
+
+    result = scan_workspace(tmp_path)
+    fields = {s.field for s in result.signals}
+    assert "orchestration_dir" in fields
+    assert "pipeline_dir" in fields
+    orch_dir_sig = next(s for s in result.signals if s.field == "orchestration_dir")
+    assert orch_dir_sig.source == "infrastructure-config/dev/terragrunt.hcl"
+
+
 def test_signal_source_is_nested_file(tmp_path):
     """Signals point at the actual nested file, not just the workspace root."""
     nested = tmp_path / "modules" / "network"
