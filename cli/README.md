@@ -190,16 +190,17 @@ python scripts/build_templates.py --check
 ```
 
 The package build regenerates the bundle automatically when `references/` is
-reachable from the build. A default `pip install ./cli` or `python -m build`
-isolates the build to the `cli/` directory, so `references/` (a sibling of
-`cli/`) is not reachable; the build then uses the `templates/` already present.
+reachable from the build. PEP 517 isolation isolates build dependencies, not
+the source, so `pip install ./cli` from a full checkout regenerates the bundle
+from `references/` (a sibling of `cli/`) — no manual step, even on a fresh
+clone.
 
-- Full checkout, non-isolated build (`references/` reachable): the bundle is
-  regenerated automatically — no manual step.
-- Isolated build, or packaging a standalone `cli/` tree without its repository
-  siblings: run `python scripts/build_templates.py` first. On a fresh clone the
-  bundle is absent, so a default `pip install ./cli` needs this step; otherwise
-  the build fails with a clear message. CI runs the generator automatically.
+Run `python scripts/build_templates.py` first only when building a standalone
+`cli/` tree without its repository siblings — for example a wheel built from a
+copied `cli/` directory, or a wheel built from the sdist (the sdist already
+carries the bundle generated when the sdist was created). If neither
+`references/` nor a bundle is available, the build fails with a clear message.
+CI regenerates the bundle before installing as a safety net.
 
 ## Config File
 
