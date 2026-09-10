@@ -12,6 +12,7 @@ reachable, for example in a pure installed environment without the repository.
 from __future__ import annotations
 
 import importlib.util
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -82,6 +83,22 @@ def test_check_detects_missing_and_stale_and_changed(tmp_path):
 
 
 @requires_source
+def test_check_detects_manifest_problems(tmp_path):
+    build_templates = _load_build_templates()
+    build_templates.build(_REFERENCES, tmp_path)
+    manifest = tmp_path / build_templates.MANIFEST_NAME
+
+    # A corrupt manifest hash is reported.
+    some = sorted(_tmpl_set(_REFERENCES))[0]
+    manifest.write_text(f"deadbeef  {some}\n")
+    assert any("manifest" in p for p in build_templates.check(_REFERENCES, tmp_path))
+
+    # A missing manifest is reported.
+    manifest.unlink()
+    assert any("missing manifest" in p for p in build_templates.check(_REFERENCES, tmp_path))
+
+
+@requires_source
 def test_build_removes_stale_generated_files(tmp_path):
     build_templates = _load_build_templates()
     build_templates.build(_REFERENCES, tmp_path)
@@ -105,44 +122,50 @@ def test_sdist_and_wheel_from_sdist_bundle_templates(tmp_path):
     """
     pytest.importorskip("build")
     build_templates = _load_build_templates()
-    # An isolated build copies only cli/, so the on-disk bundle must exist.
-    build_templates.build(_REFERENCES, _CLI_DIR / "bootstrap_iac" / "templates")
+    bundle = _CLI_DIR / "bootstrap_iac" / "templates"
+    backup = tmp_path / "bundle_backup"
+    # Start with the bundle absent (a clean checkout), so the build must invoke
+    # the backend's generator — otherwise the artifacts would ship no templates.
+    if bundle.exists():
+        shutil.move(str(bundle), str(backup))
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "build", "--outdir", str(tmp_path), str(_CLI_DIR)],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        # build is a dev dependency, so a failure here is a real regression.
+        assert proc.returncode == 0, proc.stderr
 
-    proc = subprocess.run(
-        [sys.executable, "-m", "build", "--outdir", str(tmp_path), str(_CLI_DIR)],
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
-    # build is a dev dependency, so a failure here is a real regression.
-    assert proc.returncode == 0, proc.stderr
+        sdists = list(tmp_path.glob("*.tar.gz"))
+        wheels = list(tmp_path.glob("*.whl"))
+        assert sdists, "no sdist was produced"
+        assert wheels, "no wheel was produced"
 
-    sdists = list(tmp_path.glob("*.tar.gz"))
-    wheels = list(tmp_path.glob("*.whl"))
-    assert sdists, "no sdist was produced"
-    assert wheels, "no wheel was produced"
+        # The sdist must ship the build backend so a wheel can build from it.
+        import tarfile
 
-    # The sdist must ship the build backend so a wheel can build from it.
-    import tarfile
+        with tarfile.open(sdists[0]) as tf:
+            names = tf.getnames()
+        assert any(n.endswith("/_bootstrap_build.py") for n in names), (
+            "sdist does not ship the build backend"
+        )
 
-    with tarfile.open(sdists[0]) as tf:
-        names = tf.getnames()
-    assert any(n.endswith("/_bootstrap_build.py") for n in names), (
-        "sdist does not ship the build backend"
-    )
-
-    # The wheel (built from the sdist) must bundle exactly the reference set,
-    # and must not ship the build backend.
-    prefix = "bootstrap_iac/templates/"
-    with zipfile.ZipFile(wheels[0]) as zf:
-        entries = zf.namelist()
-    bundled = {
-        name[len(prefix):]
-        for name in entries
-        if prefix in name and name.endswith(".tmpl")
-    }
-    assert bundled == _tmpl_set(_REFERENCES)
-    assert not any("_bootstrap_build" in name for name in entries)
+        # The wheel (built from the sdist) must bundle exactly the reference
+        # set, and must not ship the build backend.
+        prefix = "bootstrap_iac/templates/"
+        with zipfile.ZipFile(wheels[0]) as zf:
+            entries = zf.namelist()
+        bundled = {
+            name[len(prefix):]
+            for name in entries
+            if prefix in name and name.endswith(".tmpl")
+        }
+        assert bundled == _tmpl_set(_REFERENCES)
+        assert not any("_bootstrap_build" in name for name in entries)
+    finally:
+        build_templates.build(_REFERENCES, bundle)
 
 
 def test_backend_regenerates_and_guards(tmp_path):
@@ -185,6 +208,20 @@ def test_backend_regenerates_and_guards(tmp_path):
     backend._ensure_templates(refs, dest, scripts_dir)  # rebuild full bundle
     (dest / "a.tmpl").write_text("tampered")
     with pytest.raises(RuntimeError, match="incomplete or corrupt"):
+        backend._ensure_templates(tmp_path / "missing", dest, scripts_dir)
+
+    # references absent, an unlisted template appears -> refuses.
+    backend._ensure_templates(refs, dest, scripts_dir)  # rebuild full bundle
+    (dest / "extra.tmpl").write_text("{{X}}")
+    with pytest.raises(RuntimeError, match="not listed in the manifest"):
+        backend._ensure_templates(tmp_path / "missing", dest, scripts_dir)
+
+    # references absent, an empty manifest -> refuses.
+    backend._ensure_templates(refs, dest, scripts_dir)  # rebuild full bundle
+    for stray in dest.rglob("*.tmpl"):
+        stray.unlink()
+    (dest / backend._MANIFEST_NAME).write_text("")
+    with pytest.raises(RuntimeError, match="manifest is empty"):
         backend._ensure_templates(tmp_path / "missing", dest, scripts_dir)
 
 

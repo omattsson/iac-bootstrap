@@ -95,6 +95,28 @@ def check(
     for rel in sorted(src.keys() & generated.keys()):
         if src[rel].read_bytes() != generated[rel].read_bytes():
             problems.append(f"content differs from references: {rel}")
+
+    # The manifest is the integrity contract used when references/ is not
+    # reachable, so verify it matches what references/ would produce.
+    expected = {rel.as_posix(): _sha256(path) for rel, path in src.items()}
+    manifest_path = dest / MANIFEST_NAME
+    if not manifest_path.is_file():
+        problems.append(f"missing manifest: {MANIFEST_NAME}")
+    else:
+        listed: dict[str, str] = {}
+        for line in manifest_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            digest, _, rel_str = line.partition("  ")
+            listed[rel_str] = digest
+        for rel_str in sorted(expected.keys() - listed.keys()):
+            problems.append(f"manifest missing entry: {rel_str}")
+        for rel_str in sorted(listed.keys() - expected.keys()):
+            problems.append(f"manifest has stale entry: {rel_str}")
+        for rel_str in sorted(expected.keys() & listed.keys()):
+            if listed[rel_str] != expected[rel_str]:
+                problems.append(f"manifest hash mismatch: {rel_str}")
     return problems
 
 

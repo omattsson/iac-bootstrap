@@ -40,17 +40,28 @@ def _verify_bundle(dest: Path) -> None:
             "and references/ is not reachable from the build. Run "
             "`python scripts/build_templates.py` before building the package."
         )
-    problems: list[str] = []
+
+    expected: dict[str, str] = {}
     for line in manifest.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
         expected_hash, _, rel = line.partition("  ")
-        template = dest / rel
-        if not template.is_file():
-            problems.append(f"missing template: {rel}")
-            continue
-        if hashlib.sha256(template.read_bytes()).hexdigest() != expected_hash:
+        expected[rel] = expected_hash
+    if not expected:
+        raise RuntimeError(
+            "The bundled templates manifest is empty. Run "
+            "`python scripts/build_templates.py` before building the package."
+        )
+
+    present = {p.relative_to(dest).as_posix() for p in dest.rglob("*.tmpl")}
+    problems: list[str] = []
+    for rel in sorted(set(expected) - present):
+        problems.append(f"missing template: {rel}")
+    for rel in sorted(present - set(expected)):
+        problems.append(f"template not listed in the manifest: {rel}")
+    for rel in sorted(set(expected) & present):
+        if hashlib.sha256((dest / rel).read_bytes()).hexdigest() != expected[rel]:
             problems.append(f"template does not match manifest: {rel}")
     if problems:
         raise RuntimeError(
