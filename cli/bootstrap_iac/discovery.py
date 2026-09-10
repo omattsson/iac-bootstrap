@@ -210,7 +210,7 @@ _PROVIDER_REQUIRED_PATTERNS = {
 
 
 def _detect_cloud_provider(
-    workspace: Path, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
+    workspace: Path, *, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
 ) -> Optional[str]:
     """Return the primary detected cloud provider, or ``None``."""
     tf = _scan_tf_files(workspace, ignored)
@@ -287,7 +287,7 @@ _ORCH_MARKERS = [
 
 
 def _detect_orchestration(
-    workspace: Path, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
+    workspace: Path, *, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
 ) -> tuple[Optional[str], Optional[str]]:
     """Return (tool_name, dir_name) or (None, None)."""
     tool, orch_dir, _source = _detect_orchestration_detailed(workspace, ignored)
@@ -318,7 +318,7 @@ _PIPELINE_SUFFIXES = (".yml", ".yaml")
 
 
 def _detect_ci_cd(
-    workspace: Path, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
+    workspace: Path, *, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
 ) -> tuple[Optional[str], Optional[str]]:
     """Return (platform_name, pipeline_dir) or (None, None)."""
     platform, pipeline_dir, _source = _detect_ci_cd_detailed(workspace, ignored)
@@ -445,7 +445,7 @@ _BACKEND_PATTERNS = {
 
 
 def _detect_state_backend(
-    workspace: Path, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
+    workspace: Path, *, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
 ) -> Optional[str]:
     """Detect Terraform state backend using the shared .tf file scanner."""
     return _scan_tf_files(workspace, ignored).state_backend
@@ -481,7 +481,7 @@ _NAMING_PATTERNS = [
 
 
 def _detect_naming_pattern(
-    workspace: Path, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
+    workspace: Path, *, ignored: frozenset[str] = DEFAULT_IGNORED_DIRS
 ) -> Optional[str]:
     """Infer naming convention using the shared .tf file scanner."""
     return _scan_tf_files(workspace, ignored).naming_pattern
