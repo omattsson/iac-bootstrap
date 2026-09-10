@@ -7,7 +7,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 
 # Directories never worth scanning. Pruned during the walk, both for speed on
@@ -45,7 +45,7 @@ class Signal:
     """
 
     field: str  # the DiscoveryResult field this supports, e.g. "cloud_provider"
-    value: str | bool  # the inferred value, e.g. "Azure" or True for a flag
+    value: Union[str, bool]  # the inferred value, e.g. "Azure" or True for a flag
     source: str  # workspace-relative file path or signal, e.g. "main.tf"
     detail: str = ""  # the matched token/expression, e.g. 'provider "azurerm"'
 
