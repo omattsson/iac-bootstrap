@@ -366,11 +366,7 @@ def _detect_ci_cd_detailed(
 
     # A generic pipelines/ directory of YAML files. The `pipelines` segment must
     # be within the workspace, not somewhere in the checkout's absolute path.
-    pipeline_files = [
-        f
-        for f in _iter_files(workspace, ignored, lambda n: n.endswith(_PIPELINE_SUFFIXES))
-        if "pipelines" in f.relative_to(workspace).parts
-    ]
+    pipeline_files = _pipelines_yaml_files(workspace, ignored)
     if pipeline_files:
         return (
             "Unknown",
@@ -379,6 +375,24 @@ def _detect_ci_cd_detailed(
         )
 
     return None, None, None
+
+
+def _pipelines_yaml_files(workspace: Path, ignored: frozenset[str]) -> list[Path]:
+    """Return YAML files that live under a ``pipelines`` directory segment.
+
+    Only files already inside a ``pipelines`` subtree are collected, so a large
+    repository full of unrelated YAML is not materialised into a list.
+    """
+    matches: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(workspace):
+        dirnames[:] = [d for d in dirnames if d not in ignored]
+        if "pipelines" not in Path(dirpath).relative_to(workspace).parts:
+            continue
+        for name in filenames:
+            if name.endswith(_PIPELINE_SUFFIXES):
+                matches.append(Path(dirpath) / name)
+    matches.sort()
+    return matches
 
 
 def _detect_org_from_git(workspace: Path) -> Optional[str]:
