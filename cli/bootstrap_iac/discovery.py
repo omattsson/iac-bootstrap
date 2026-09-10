@@ -584,8 +584,9 @@ def scan_workspace(
                    expressions in .tf files
     ============== ========================================================
 
-    Every inferred value is backed by a :class:`Signal` in ``signals`` naming
-    the file or signal it came from.
+    Each value that discovery populates is backed by a :class:`Signal` in
+    ``signals`` naming the file or signal it came from. A field that is not
+    detected has no signal.
     """
     ignored = DEFAULT_IGNORED_DIRS
     if ignored_dirs:
@@ -641,6 +642,16 @@ def scan_workspace(
         workspace_path / ".github" / "copilot-instructions.md"
     ).exists()
     result.has_claude_md = (workspace_path / "CLAUDE.md").exists()
+    if result.has_copilot_instructions:
+        result.signals.append(
+            Signal(
+                "has_copilot_instructions",
+                "true",
+                ".github/copilot-instructions.md",
+            )
+        )
+    if result.has_claude_md:
+        result.signals.append(Signal("has_claude_md", "true", "CLAUDE.md"))
 
     if len(result.cloud_providers) > 1:
         result.notes.append(

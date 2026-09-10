@@ -440,6 +440,8 @@ def test_scan_workspace_detects_existing_copilot_instructions(tmp_path):
     result = scan_workspace(tmp_path)
     assert result.has_copilot_instructions is True
     assert any("copilot-instructions.md" in n for n in result.notes)
+    # The presence flag is also traceable in the machine-readable signals.
+    assert any(s.field == "has_copilot_instructions" for s in result.signals)
 
 
 def test_scan_workspace_detects_existing_claude_md(tmp_path):
