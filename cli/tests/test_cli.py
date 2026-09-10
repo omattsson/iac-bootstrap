@@ -131,6 +131,45 @@ def test_validate_fifo_is_refused(tmp_path):
         fifo.unlink()
 
 
+def test_discover_prints_json(tmp_path):
+    """--discover prints a machine-readable discovery result and exits 0."""
+    import json
+
+    (tmp_path / "main.tf").write_text('provider "azurerm" {}\n')
+    result = runner.invoke(main, ["--workspace", str(tmp_path), "--discover"])
+    assert result.exit_code == 0
+    # stdout must be pure JSON (no banner), so it pipes cleanly into a parser.
+    data = json.loads(result.output)
+    assert data["cloud_provider"] == "Azure"
+    assert data["cloud_providers"] == ["Azure"]
+    assert any(s["field"] == "cloud_provider" for s in data["signals"])
+
+
+def test_discover_does_not_generate(tmp_path):
+    (tmp_path / "main.tf").write_text('provider "aws" {}\n')
+    result = runner.invoke(main, ["--workspace", str(tmp_path), "--discover"])
+    assert result.exit_code == 0
+    assert not (tmp_path / ".github").exists()
+    assert not (tmp_path / "CLAUDE.md").exists()
+
+
+def test_discover_missing_workspace_fails(tmp_path):
+    """--discover on a missing workspace fails fast, not an empty success."""
+    missing = tmp_path / "nope"
+    result = runner.invoke(main, ["--workspace", str(missing), "--discover"])
+    assert result.exit_code == 2
+    assert "not found" in result.output.lower()
+
+
+def test_discover_file_workspace_fails(tmp_path):
+    """--discover on a file (not a directory) fails fast."""
+    a_file = tmp_path / "file.tf"
+    a_file.write_text('provider "aws" {}\n')
+    result = runner.invoke(main, ["--workspace", str(a_file), "--discover"])
+    assert result.exit_code == 2
+    assert "not a directory" in result.output.lower()
+
+
 @pytest.mark.skipif(
     sys.platform == "win32" or os.geteuid() == 0,
     reason="POSIX file permissions not enforced for root or on Windows",

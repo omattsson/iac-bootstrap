@@ -74,6 +74,29 @@ Exit codes:
 
 Files with unsupported (for example binary) extensions are ignored.
 
+### Inspect discovery (`--discover`)
+
+Scan a workspace and print what discovery inferred, as JSON, without generating:
+
+```bash
+bootstrap-iac --workspace /path/to/repo --discover
+bootstrap-iac --workspace /path/to/repo --discover --ignore-dir vendor
+```
+
+The output includes:
+
+- `cloud_provider` — the primary provider (most signals), kept for
+  compatibility, plus `cloud_providers` listing every provider detected. A
+  multi-cloud workspace is reported, not collapsed to one.
+- `signals` — the evidence behind each inferred value, each naming the file or
+  signal it came from, so every value can be traced.
+
+Discovery prunes a built-in list of directories (`.terraform`,
+`.terragrunt-cache`, `.git`, `node_modules`, and similar). Add more with
+`--ignore-dir` (repeatable). Pruning keeps scanning safe on large repositories.
+Pipeline detection accepts both `.yml` and `.yaml`, and an empty
+`.github/workflows/` is not treated as GitHub Actions.
+
 ## Options
 
 | Flag | Short form | Description |
@@ -99,6 +122,8 @@ Files with unsupported (for example binary) extensions are ignored.
 | `--config PATH` | | Path to `.bootstrap-iac.yaml` config file (auto-detected if omitted) |
 | `--save-config` | | Write interview answers after generation (to `--config` path or workspace) |
 | `--check-config` | | Validate the config file and exit (0 valid, 1 invalid, 2 missing) |
+| `--discover` | | Scan `--workspace` and print the discovery result as JSON, then exit |
+| `--ignore-dir DIR` | | Skip a directory during discovery (repeatable; adds to the built-in ignore list) |
 | `--version` | `-V` | Show version and exit |
 | `--help` | `-h` | Show help and exit |
 
