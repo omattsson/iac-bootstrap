@@ -43,6 +43,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Generate bundled templates
+        run: python scripts/build_templates.py
+
       - name: Install CLI package
         run: pip install ./cli[dev]
 

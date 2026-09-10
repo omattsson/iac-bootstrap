@@ -58,9 +58,12 @@ def get_templates_dir() -> Path:
         return dev_path
 
     raise FileNotFoundError(
-        "Cannot locate templates. "
-        "Set the BOOTSTRAP_IAC_TEMPLATES_DIR environment variable to the "
-        "path of the templates/references directory."
+        "Cannot locate templates. The installed package bundles them under "
+        "bootstrap_iac/templates/; if that is missing, the build did not run "
+        "the template generator (scripts/build_templates.py). From a source "
+        "checkout, references/ is used as a fallback. You can also set the "
+        "BOOTSTRAP_IAC_TEMPLATES_DIR environment variable to a templates "
+        "directory."
     )
 
 

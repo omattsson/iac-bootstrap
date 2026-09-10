@@ -19,3 +19,7 @@ env/
 
 # Pytest
 .pytest_cache/
+
+# Generated bundled templates — canonical source is references/.
+# Regenerate with: python scripts/build_templates.py
+/cli/bootstrap_iac/templates/

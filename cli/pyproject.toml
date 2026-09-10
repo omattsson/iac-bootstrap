@@ -1,6 +1,11 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+# setuptools>=64 for PEP 660 editable support, which the in-tree backend wraps.
+requires = ["setuptools>=64"]
+# In-tree backend that regenerates bootstrap_iac/templates/ from the canonical
+# references/ before building (when references/ is reachable). See
+# cli/_bootstrap_build.py and scripts/build_templates.py.
+build-backend = "_bootstrap_build"
+backend-path = ["."]
 
 [project]
 name = "bootstrap-iac"
@@ -28,6 +33,8 @@ include = ["bootstrap_iac*"]
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "build>=1.0",
+    "wheel",
 ]
 
 [tool.pytest.ini_options]

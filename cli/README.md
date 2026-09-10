@@ -175,6 +175,27 @@ cd cli
 pytest
 ```
 
+### Templates
+
+`references/` at the repository root is the single source of truth for the
+`.tmpl` templates. The bundled copy under `cli/bootstrap_iac/templates/` is
+generated from it and is not tracked in git.
+
+```bash
+# Regenerate the bundled copy after editing references/
+python scripts/build_templates.py
+
+# Verify the bundled copy is up to date
+python scripts/build_templates.py --check
+```
+
+The package build regenerates the bundle automatically when `references/` is
+reachable. When it is not reachable (for example an isolated build where only
+`cli/` is available), the build uses the `templates/` already present and fails
+if none are present — so run the generator first. On a fresh clone `templates/`
+is absent, so run `python scripts/build_templates.py` before building or
+installing the package. CI does this automatically.
+
 ## Config File
 
 Commit a `.bootstrap-iac.yaml` (or `.bootstrap-iac.yml`) in your workspace root
