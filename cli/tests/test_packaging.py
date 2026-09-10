@@ -168,13 +168,24 @@ def test_backend_regenerates_and_guards(tmp_path):
         "sub/b.tmpl",
     }
 
-    # references absent, dest already populated -> no-op, no error.
+    # references absent, dest already populated (with a manifest) -> no-op.
     backend._ensure_templates(tmp_path / "missing", dest, scripts_dir)
     assert (dest / "a.tmpl").exists()
 
     # references absent, dest empty -> refuses to build.
-    with pytest.raises(RuntimeError, match="No bundled templates"):
+    with pytest.raises(RuntimeError, match="manifest"):
         backend._ensure_templates(tmp_path / "missing", tmp_path / "empty", scripts_dir)
+
+    # references absent, a template from the manifest is missing -> refuses.
+    (dest / "sub" / "b.tmpl").unlink()
+    with pytest.raises(RuntimeError, match="incomplete or corrupt"):
+        backend._ensure_templates(tmp_path / "missing", dest, scripts_dir)
+
+    # references absent, a template differs from its manifest hash -> refuses.
+    backend._ensure_templates(refs, dest, scripts_dir)  # rebuild full bundle
+    (dest / "a.tmpl").write_text("tampered")
+    with pytest.raises(RuntimeError, match="incomplete or corrupt"):
+        backend._ensure_templates(tmp_path / "missing", dest, scripts_dir)
 
 
 @requires_source

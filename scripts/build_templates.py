@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import shutil
 import sys
 from pathlib import Path
@@ -21,6 +22,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_REFERENCES = REPO_ROOT / "references"
 DEFAULT_DEST = REPO_ROOT / "cli" / "bootstrap_iac" / "templates"
+
+# Manifest of the generated bundle: one "<sha256>  <relpath>" line per template.
+# It ships with the bundle so a build can verify the full set is present and
+# intact even when references/ is not reachable.
+MANIFEST_NAME = "_manifest.sha256"
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def _tmpl_map(root: Path) -> dict[Path, Path]:
@@ -59,7 +69,13 @@ def build(
         shutil.copyfile(path, target)
 
     _prune_empty_dirs(dest)
-    return sorted(str(rel) for rel in src)
+
+    rels = sorted(rel.as_posix() for rel in src)
+    lines = [f"{_sha256(dest / rel)}  {rel}" for rel in rels]
+    (dest / MANIFEST_NAME).write_text(
+        "".join(line + "\n" for line in lines), encoding="utf-8"
+    )
+    return rels
 
 
 def check(

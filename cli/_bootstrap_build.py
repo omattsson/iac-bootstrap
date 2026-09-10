@@ -17,10 +17,46 @@ be imported (and tested) in an environment without setuptools.
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent  # the cli/ project directory
+
+# Manifest written by scripts/build_templates.py alongside the bundle.
+_MANIFEST_NAME = "_manifest.sha256"
+
+
+def _verify_bundle(dest: Path) -> None:
+    """Verify *dest* holds the complete, intact bundle named by its manifest.
+
+    Raises RuntimeError when the manifest is missing or any listed template is
+    absent or has a different hash — so a partial or corrupt bundle never ships.
+    """
+    manifest = dest / _MANIFEST_NAME
+    if not manifest.is_file():
+        raise RuntimeError(
+            "No bundled templates manifest found under bootstrap_iac/templates/ "
+            "and references/ is not reachable from the build. Run "
+            "`python scripts/build_templates.py` before building the package."
+        )
+    problems: list[str] = []
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        expected_hash, _, rel = line.partition("  ")
+        template = dest / rel
+        if not template.is_file():
+            problems.append(f"missing template: {rel}")
+            continue
+        if hashlib.sha256(template.read_bytes()).hexdigest() != expected_hash:
+            problems.append(f"template does not match manifest: {rel}")
+    if problems:
+        raise RuntimeError(
+            "The bundled template set is incomplete or corrupt:\n- "
+            + "\n- ".join(problems)
+        )
 
 
 def _ensure_templates(references: Path, dest: Path, scripts: Path) -> None:
@@ -29,8 +65,9 @@ def _ensure_templates(references: Path, dest: Path, scripts: Path) -> None:
     When *references* is a directory, the templates are regenerated from it; a
     failure there (a bug in the generator, a permissions problem) propagates and
     fails the build. When *references* is not reachable (an isolated build), the
-    templates already present in *dest* are used. Either way, the build fails if
-    no templates end up available, so an empty or partial set is never shipped.
+    templates already present in *dest* are used. Either way the bundle is
+    verified against its manifest, so an empty, partial, or corrupt set is never
+    shipped.
     """
     references = Path(references)
     dest = Path(dest)
@@ -45,12 +82,7 @@ def _ensure_templates(references: Path, dest: Path, scripts: Path) -> None:
             if sys.path and sys.path[0] == str(scripts):
                 sys.path.pop(0)
 
-    if not (dest.is_dir() and any(dest.rglob("*.tmpl"))):
-        raise RuntimeError(
-            "No bundled templates found under bootstrap_iac/templates/ and "
-            "references/ is not reachable from the build. Run "
-            "`python scripts/build_templates.py` before building the package."
-        )
+    _verify_bundle(dest)
 
 
 def _regenerate_templates() -> None:
