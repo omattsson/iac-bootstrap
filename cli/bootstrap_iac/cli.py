@@ -438,6 +438,31 @@ def main(
     # ------------------------------------------------------------------ #
     if discover:
         ws_path = Path(workspace_dir).resolve()
+        # Fail fast on a missing or non-directory workspace so a path typo does
+        # not look like an empty-but-successful scan.
+        try:
+            ws_stat = os.stat(ws_path)
+        except FileNotFoundError:
+            click.secho(
+                f"  ✗  Workspace not found: {ws_path}", fg="red", bold=True, err=True
+            )
+            sys.exit(2)
+        except OSError as exc:
+            click.secho(
+                f"  ✗  Could not access workspace {ws_path}: {exc.strerror or exc}",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            sys.exit(2)
+        if not stat.S_ISDIR(ws_stat.st_mode):
+            click.secho(
+                f"  ✗  Workspace is not a directory: {ws_path}",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            sys.exit(2)
         discovery = scan_workspace(ws_path, ignored_dirs=list(ignore_dirs) or None)
         click.echo(json.dumps(discovery.to_dict(), indent=2))
         sys.exit(0)

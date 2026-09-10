@@ -45,7 +45,7 @@ class Signal:
     """
 
     field: str  # the DiscoveryResult field this supports, e.g. "cloud_provider"
-    value: str  # the inferred value, e.g. "Azure"
+    value: str | bool  # the inferred value, e.g. "Azure" or True for a flag
     source: str  # workspace-relative file path or signal, e.g. "main.tf"
     detail: str = ""  # the matched token/expression, e.g. 'provider "azurerm"'
 
@@ -646,12 +646,12 @@ def scan_workspace(
         result.signals.append(
             Signal(
                 "has_copilot_instructions",
-                "true",
+                True,
                 ".github/copilot-instructions.md",
             )
         )
     if result.has_claude_md:
-        result.signals.append(Signal("has_claude_md", "true", "CLAUDE.md"))
+        result.signals.append(Signal("has_claude_md", True, "CLAUDE.md"))
 
     if len(result.cloud_providers) > 1:
         result.notes.append(
