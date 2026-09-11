@@ -1,0 +1,3 @@
+# The in-tree build backend must ship in the sdist so a wheel can be built
+# from the sdist. It is not part of the installed package (the wheel).
+include _bootstrap_build.py

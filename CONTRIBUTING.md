@@ -16,7 +16,16 @@ Be respectful and constructive. We follow the [Contributor Covenant](https://www
 
 ### Adding or Modifying Templates
 
-Templates live in `references/copilot/` (VS Code Copilot) and `references/claude/` (Claude Code).
+Templates live in `references/copilot/` (VS Code Copilot) and `references/claude/` (Claude Code). `references/` is the single source of truth.
+
+The CLI ships a generated copy under `cli/bootstrap_iac/templates/` so the installed package is self-contained. Do not edit that copy — it is generated from `references/` and is not tracked in git. After you change a template in `references/`, regenerate the copy:
+
+```bash
+python scripts/build_templates.py          # regenerate the bundled copy
+python scripts/build_templates.py --check   # verify it is up to date
+```
+
+The package build regenerates it automatically when `references/` is reachable, and CI regenerates it before installing the package.
 
 #### File Conventions
 
