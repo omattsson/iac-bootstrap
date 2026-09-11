@@ -59,7 +59,7 @@ Hierarchy files:
 - `versions.tf` — terraform and provider version constraints
 
 **Resource conventions:**
-- Single resources use identifier `"default"` (e.g., `azurerm_resource_group.default`)
+- Single resources use identifier `"default"` (e.g., `azurerm_key_vault.default`)
 - Map-driven resources use `for_each` with descriptive keys
 - Boolean toggles use `count`
 - Tags: `merge(var.env_default_tags, var.tags)` — always
@@ -201,8 +201,8 @@ Add a `moved` block in the same commit as any resource or `for_each` key rename.
 
 ```hcl
 moved {
-  from = azurerm_resource_group.old_name
-  to   = azurerm_resource_group.default
+  from = azurerm_key_vault.old_name
+  to   = azurerm_key_vault.default
 }
 ```
 

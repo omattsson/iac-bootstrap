@@ -25,7 +25,7 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
     "Azure": {
         "provider_name": "azurerm",
         "provider_version_constraints": ">=4.0.0,<5.0.0",
-        "provider_resource_example": "azurerm_resource_group.default",
+        "provider_resource_example": "azurerm_key_vault.default",
         "location_attribute": "location = var.location",
         "resource_group_attribute": "resource_group_name = var.resource_group_name",
         "state_backend": "Azure Blob Storage",
@@ -769,13 +769,13 @@ def build_context(answers: dict) -> dict:
         "DATA_SOURCE_OVERRIDE",
         _data_override_map.get(_provider, _data_override_map["azurerm"]),
     )
+    # The templates wrap this in a `variables { ... }` block, so supply only
+    # the block body (no `variables {}` wrapper).
     ctx.setdefault(
         "TEST_STANDARD_VARIABLES",
         (
-            "variables {\n"
             '  prefix   = "test-auto"\n'
-            '  location = "westeurope"\n'
-            "}"
+            '  location = "westeurope"'
         ),
     )
     ctx.setdefault("EXPECTED_NAME_PATTERN", "test-auto-{resource_abbreviation}-mysuffix")
@@ -921,11 +921,13 @@ def _drift_pipeline(cicd: str, orch: str) -> str:
             "    runs-on: ubuntu-latest\n"
             "    steps:\n"
             "      - uses: actions/checkout@v4\n"
-            f"      - run: {plan_cmd}\n"
+            "      - id: plan\n"
+            f"        run: {plan_cmd}\n"
             "        working-directory: infrastructure-config\n"
             "        continue-on-error: true\n"
             "      - name: Notify on drift\n"
-            "        if: failure()\n"
+            # continue-on-error makes the job succeed, so check the step outcome.
+            "        if: steps.plan.outcome == 'failure'\n"
             "        run: echo 'Drift detected — review plan output'\n"
         )
     return "# Define your drift detection pipeline here (scheduled plan run)"

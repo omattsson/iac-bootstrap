@@ -10,6 +10,31 @@ from bootstrap_iac.interview import build_context
 # ---------------------------------------------------------------------------
 
 
+def test_test_standard_variables_has_no_nested_block():
+    """The templates wrap this in `variables {}`, so it must not add its own."""
+    ctx = build_context({"CLOUD_PROVIDER": "Azure"})
+    assert "variables {" not in ctx["TEST_STANDARD_VARIABLES"]
+    assert "prefix" in ctx["TEST_STANDARD_VARIABLES"]
+
+
+def test_drift_pipeline_checks_step_outcome():
+    """continue-on-error makes the job succeed, so drift is read from outcome."""
+    ctx = build_context(
+        {"CI_CD_PLATFORM": "GitHub Actions", "ORCHESTRATION_TOOL": "Terragrunt"}
+    )
+    assert "steps.plan.outcome == 'failure'" in ctx["DRIFT_PIPELINE"]
+    assert "if: failure()" not in ctx["DRIFT_PIPELINE"]
+
+
+def test_azure_example_resource_lives_in_a_resource_group():
+    """The Azure scaffold uses a resource that accepts resource_group_name."""
+    ctx = build_context({"CLOUD_PROVIDER": "Azure"})
+    # azurerm_resource_group has no resource_group_name argument, so it must not
+    # be the example when the scaffold renders a resource_group_name line.
+    assert ctx["PROVIDER_RESOURCE"] != "azurerm_resource_group"
+    assert "resource_group_name" in ctx["RESOURCE_GROUP_ATTRIBUTE"]
+
+
 def test_build_context_azure_defaults():
     ctx = build_context({"CLOUD_PROVIDER": "Azure", "COMPANY_NAME": "TestCo"})
     assert ctx["COMPANY_SLUG"] == "testco"
@@ -17,7 +42,10 @@ def test_build_context_azure_defaults():
     assert ctx["PROVIDER_NAME"] == "azurerm"
     assert ctx["TAG_ATTRIBUTE"] == "tags"
     assert "azurerm" in ctx["PROVIDER_BLOCK"]
-    assert ctx["PROVIDER_RESOURCE"] == "azurerm_resource_group"
+    # The Azure module example is a resource that lives in a resource group,
+    # so `resource_group_name` in the scaffold is valid (a resource group has
+    # no such argument).
+    assert ctx["PROVIDER_RESOURCE"] == "azurerm_key_vault"
     assert "." not in ctx["PROVIDER_RESOURCE"]
     assert "env_default_tags" in ctx["STANDARD_VARIABLES"]
     assert "env_default_tags" in ctx["TAG_STRATEGY"]

@@ -90,11 +90,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: terragrunt run-all plan --detailed-exitcode
+      - id: plan
+        run: terragrunt run-all plan --detailed-exitcode
         working-directory: infrastructure-config
         continue-on-error: true
       - name: Notify on drift
-        if: failure()
+        if: steps.plan.outcome == 'failure'
         run: echo 'Drift detected — review plan output'
 
 
