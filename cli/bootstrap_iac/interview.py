@@ -86,14 +86,16 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
         "provider_name": "google",
         "provider_version_constraints": ">=5.0.0,<6.0.0",
         "provider_resource_example": "google_storage_bucket.default",
-        "location_attribute": "location = var.location",
-        "resource_group_attribute": "project = var.project",
+        # The GCP module declares `region` and `project_id`, so the scaffold
+        # must reference those, not undeclared var.location / var.project.
+        "location_attribute": "location = var.region",
+        "resource_group_attribute": "project = var.project_id",
         "state_backend": "GCS",
         "auth_pattern": "Workload Identity Federation",
         "standard_variables": (
             "- `prefix` — Resource name prefix\n"
-            "- `location` — GCP region or zone\n"
-            "- `project` — GCP project ID\n"
+            "- `region` — GCP region\n"
+            "- `project_id` — GCP project ID\n"
             "- `labels` — Resource labels (map(string))\n"
             "- `env_default_labels` — Project-wide default labels from orchestration"
         ),
@@ -107,9 +109,9 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "Expose `enable_private_service_connect` variable (bool, default false)."
         ),
         "test_standard_variables": (
-            '  prefix   = "test-auto"\n'
-            '  location = "europe-west1"\n'
-            '  project  = "test-project"'
+            '  prefix     = "test-auto"\n'
+            '  region     = "europe-west1"\n'
+            '  project_id = "test-project"'
         ),
     },
 }
@@ -844,10 +846,12 @@ def _single_component_pipeline(cicd: str, org: str, module_prefix: str) -> str:
             "    uses: {org}/pipeline-templates/.github/workflows/tf-apply.yml@main\n"
             "    with:\n"
             "      working_directory: infrastructure-config/dev/platform/{component}\n"
+            # `environment` is not valid on a caller job that uses a reusable
+            # workflow, so pass it as an input the called workflow consumes.
+            "      environment: production\n"
             "    permissions:\n"
             "      id-token: write\n"
             "      contents: read\n"
-            "    environment: production\n"
         ).replace("{org}", org)
     if "Azure DevOps" in cicd:
         return (

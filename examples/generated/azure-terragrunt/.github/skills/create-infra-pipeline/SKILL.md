@@ -46,10 +46,10 @@ jobs:
     uses: acme/pipeline-templates/.github/workflows/tf-apply.yml@main
     with:
       working_directory: infrastructure-config/dev/platform/{component}
+      environment: production
     permissions:
       id-token: write
       contents: read
-    environment: production
 
 <!-- Azure DevOps example:
 ```yaml

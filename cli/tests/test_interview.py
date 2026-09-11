@@ -15,7 +15,7 @@ from bootstrap_iac.interview import build_context
     [
         ("Azure", ["prefix", "location", "resource_group_name"]),
         ("AWS", ["prefix", "region"]),
-        ("GCP", ["prefix", "location", "project"]),
+        ("GCP", ["prefix", "region", "project_id"]),
     ],
 )
 def test_test_standard_variables_match_the_module_inputs(cloud, required):

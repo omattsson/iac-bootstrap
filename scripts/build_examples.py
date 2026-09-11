@@ -20,6 +20,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES_DIR = REPO_ROOT / "examples"
 # Reproducible examples live directly under examples/generated/.
@@ -167,10 +169,11 @@ def main(argv: list[str] | None = None) -> int:
         build(examples)
         print(f"Regenerated {len(examples)} reproducible example(s).")
         return 0
-    except (ValueError, OSError, RuntimeError) as exc:
+    except (ValueError, OSError, RuntimeError, yaml.YAMLError) as exc:
         # RuntimeError covers generator.GenerationError (missing template or an
-        # unresolved placeholder), so an invalid config or a broken template
-        # prints a clean message instead of a traceback.
+        # unresolved placeholder) and yaml.YAMLError a malformed config, so an
+        # invalid config or a broken template prints a clean message instead of
+        # a traceback.
         print(f"ERROR: could not process a reproducible example: {exc}")
         return 1
 
