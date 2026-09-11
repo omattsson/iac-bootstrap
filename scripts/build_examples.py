@@ -22,23 +22,28 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES_DIR = REPO_ROOT / "examples"
+# Reproducible examples live directly under examples/generated/.
+GENERATED_DIR = EXAMPLES_DIR / "generated"
 CONFIG_NAMES = (".bootstrap-iac.yaml", ".bootstrap-iac.yml")
 
 
 def _ensure_import() -> None:
-    try:
-        import bootstrap_iac  # noqa: F401
-    except ImportError:
-        sys.path.insert(0, str(REPO_ROOT / "cli"))
+    # Prefer the checkout's package over any installed release, so regeneration
+    # always uses the current generator and templates.
+    cli = str(REPO_ROOT / "cli")
+    if cli not in sys.path:
+        sys.path.insert(0, cli)
 
 
 def reproducible_examples() -> list[Path]:
-    """Return every example directory that carries a bootstrap config."""
-    found: set[Path] = set()
-    for name in CONFIG_NAMES:
-        for cfg in EXAMPLES_DIR.rglob(name):
-            found.add(cfg.parent)
-    return sorted(found)
+    """Return each examples/generated/ subdirectory that carries a config."""
+    if not GENERATED_DIR.is_dir():
+        return []
+    found: list[Path] = []
+    for entry in sorted(GENERATED_DIR.iterdir()):
+        if entry.is_dir() and any((entry / n).is_file() for n in CONFIG_NAMES):
+            found.append(entry)
+    return found
 
 
 def _config_path(example: Path) -> Path:
@@ -87,12 +92,13 @@ def build(examples: list[Path] | None = None) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_dir = Path(tmp)
             generate_into(config, tmp_dir)
-            # Remove old generated files (keep the config), then prune empties.
-            # reproducible_examples() returns the config's parent, so the config
-            # is always top-level; comparing to its basename is sufficient.
+            # Remove old generated files (keep any config), then prune empties.
+            # A reproducible example directory holds only its config and
+            # generated output; any other file would be removed here.
+            keep = set(CONFIG_NAMES)
             for path in sorted(example.rglob("*"), reverse=True):
                 rel = path.relative_to(example).as_posix()
-                if path.is_file() and rel != config.name:
+                if path.is_file() and rel not in keep:
                     path.unlink()
                 elif path.is_dir() and not any(path.iterdir()):
                     path.rmdir()
@@ -155,7 +161,10 @@ def main(argv: list[str] | None = None) -> int:
         build(examples)
         print(f"Regenerated {len(examples)} reproducible example(s).")
         return 0
-    except (ValueError, OSError) as exc:
+    except (ValueError, OSError, RuntimeError) as exc:
+        # RuntimeError covers generator.GenerationError (missing template or an
+        # unresolved placeholder), so an invalid config or a broken template
+        # prints a clean message instead of a traceback.
         print(f"ERROR: could not process a reproducible example: {exc}")
         return 1
 

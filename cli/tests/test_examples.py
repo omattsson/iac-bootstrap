@@ -43,18 +43,22 @@ def test_reproducible_examples_are_up_to_date():
 @requires_source
 def test_generation_is_deterministic_and_ignores_environment(tmp_path):
     build_examples = _load_build_examples()
-    example = build_examples.reproducible_examples()[0]
-    config = build_examples._config_path(example)
+
+    # A config that omits `org` and `company` — the values a git remote would
+    # feed into discovery. If generation used the surrounding workspace, the
+    # planted remote below would leak into one output and differ from the other.
+    config = tmp_path / ".bootstrap-iac.yaml"
+    config.write_text(
+        "cloud: azure\norchestration: none\nci_cd: github-actions\ntarget: copilot\n"
+    )
 
     first = tmp_path / "first"
-    # Plant a differing git remote under the second output dir. Generation must
-    # not pick it up — the committed config is the only source of values.
     second = tmp_path / "second"
     second.mkdir()
     git_config = second / ".git" / "config"
     git_config.parent.mkdir()
     git_config.write_text(
-        '[remote "origin"]\n\turl = https://github.com/some-other-org/repo.git\n'
+        '[remote "origin"]\n\turl = https://github.com/planted-org/repo.git\n'
     )
 
     build_examples.generate_into(config, first)
@@ -67,7 +71,20 @@ def test_generation_is_deterministic_and_ignores_environment(tmp_path):
             if p.is_file() and ".git/" not in p.relative_to(root).as_posix()
         }
 
-    assert snapshot(first) == snapshot(second)
+    snap_first, snap_second = snapshot(first), snapshot(second)
+    assert snap_first == snap_second
+    # The planted org must not appear anywhere in the output.
+    assert not any(b"planted-org" in content for content in snap_second.values())
+
+
+@requires_source
+def test_config_names_match_the_cli():
+    """The harness config names stay in step with the CLI's config filenames."""
+    build_examples = _load_build_examples()
+    build_examples._ensure_import()
+    from bootstrap_iac.config import CONFIG_FILENAMES
+
+    assert tuple(build_examples.CONFIG_NAMES) == tuple(CONFIG_FILENAMES)
 
 
 @requires_source
