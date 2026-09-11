@@ -52,6 +52,9 @@ jobs:
       - name: Verify entry point
         run: bootstrap-iac --version
 
+      - name: Check reproducible examples are up to date
+        run: python scripts/build_examples.py --check
+
       - name: Run tests
         run: pytest cli/tests/ -q
 

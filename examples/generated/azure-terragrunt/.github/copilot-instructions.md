@@ -1,0 +1,142 @@
+# Workspace Instructions — Acme Corp Infrastructure Automation
+
+## Workspace Overview
+
+This workspace contains infrastructure-as-code for Acme Corp's Azure platform.
+
+| Category | Repos/Dirs | Purpose |
+|----------|------------|---------|
+| **Terraform Modules** | `tf-module-*` | Reusable Azure resource modules |
+| **Orchestration** | `infrastructure-config/` | Terragrunt config for all environments |
+| **Pipelines** | `.github/workflows/` | GitHub Actions pipeline templates |
+
+## Module Source Convention
+
+git::https://github.com/acme/tf-module-{name}?ref={tag}
+<!-- Example: git::https://github.com/acme/tf-module-{name}?ref={tag} -->
+<!-- Example: git::https://dev.azure.com/acme/acme/_git/tf-module-{name}?ref={tag} -->
+
+Version tags managed in subscription.hcl → `locals.module_versions`.
+
+## Standard Variable Set (Cross-Module)
+
+These variables appear across all modules:
+- `prefix` — Resource name prefix
+- `location` — Azure region (e.g. westeurope)
+- `resource_group_name` — Target resource group
+- `tags` — Resource-specific tags (map(string))
+- `env_default_tags` — Environment-wide default tags from orchestration
+<!-- Example:
+- `prefix` — Resource name prefix
+- `location`/`region` — Cloud region
+- `tags`/`labels` — Resource tags/labels (map(string))
+- `env_default_tags` — Default tags from orchestration layer
+-->
+
+## Naming Convention
+
+{prefix}-{resource_abbreviation}-{suffix}
+<!-- Example: {prefix}-{resource_abbreviation}-{suffix} -->
+<!-- Example: {env}-{service}-{resource_type} -->
+
+## Tagging/Labeling Standard
+
+merge(var.env_default_tags, var.tags)
+<!-- Example:
+local.tags = merge(var.env_default_tags, var.tags)
+Always merge defaults with resource-specific. Resource-specific wins on conflicts.
+Required tags: environment, product, managed_by = "Terraform"
+-->
+
+## Environment Structure
+
+config/{environment}/{region}/{stack}/{component}/terragrunt.hcl
+
+Hierarchy files:
+- subscription.hcl — account/subscription ID, module versions
+- site.hcl — region, location
+- stack.hcl — stack name, prefix
+- _envcommon/*.hcl — shared module configs
+<!-- Example for Terragrunt:
+config/{environment}/{region}/{stack}/{component}/terragrunt.hcl
+- subscription.hcl → Account/subscription ID, module versions
+- site.hcl → Region, location
+- stack.hcl → Stack name, prefix
+- _envcommon/*.hcl → Shared module configs
+-->
+<!-- Example for workspaces:
+environments/{env}/main.tf — per-environment root
+modules/ — shared modules
+-->
+
+## Module Maintenance & Backward Compatibility
+
+### Adding optional variables (non-breaking)
+Always provide a default that preserves existing behavior. Use `optional()` for new object attributes:
+
+```hcl
+# New simple variable — default keeps existing behavior
+variable "enable_purge_protection" {
+  type    = bool
+  default = false
+}
+
+# New attribute on existing object — optional() so callers don't have to update
+variable "network_config" {
+  type = object({
+    public_access         = optional(bool, false)
+    allowed_cidrs         = optional(list(string), [])
+    bypass_trusted_services = optional(bool, false)  # new — callers unaffected
+  })
+  default = {}
+}
+```
+
+### Deprecating variables
+Keep the old variable, add a `DEPRECATED` description, and resolve both in `locals`:
+
+```hcl
+variable "old_var_name" {
+  type        = string
+  default     = null
+  description = "DEPRECATED: use `new_var_name` instead. Removed in next major version."
+}
+
+variable "new_var_name" {
+  type    = string
+  default = "default-value"
+}
+
+locals {
+  resolved_value = var.old_var_name != null ? var.old_var_name : var.new_var_name
+}
+```
+
+### Renaming resources with `moved` blocks
+Add a `moved` block in the same commit as any resource or `for_each` key rename to prevent destroy/re-create:
+
+```hcl
+moved {
+  from = azurerm_resource_type.old_name
+  to   = azurerm_resource_type.default
+}
+```
+
+### Semantic versioning
+
+| Change | Version bump |
+|--------|-------------|
+| Bug fix, doc update | Patch (`x.y.Z`) |
+| New optional variable, new output | Minor (`x.Y.0`) |
+| Removed/renamed variable, changed output type | Major (`X.0.0`) |
+
+### Major version migration guides
+Publish a `MIGRATION.md` at the module repository root for every major version bump, and include it with the corresponding major-version release/tag. Document: what broke, old vs new usage, and step-by-step upgrade instructions.
+
+## Key Principles
+
+1. **Minimal intervention** — smallest change that fulfills the requirement
+2. **DRY** — common config extracted, variables flow from hierarchy
+3. **No hardcoded secrets** — use secret manager, identity-based auth, or orchestration inputs
+4. **Plan-only tests** — Terraform native tests use `command = plan` with mock providers
+5. **Pre-commit hooks** — `terraform_fmt`, `tflint`, validation
