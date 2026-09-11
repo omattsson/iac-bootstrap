@@ -5,11 +5,13 @@ templates. This backend regenerates ``bootstrap_iac/templates/`` from it before
 building, so a package built from the source tree always bundles the current
 templates.
 
-Under build isolation ``references/`` is not part of the copied build context,
-so the step is skipped and the ``templates/`` already present in the tree is
-used. A generation failure while ``references/`` is present propagates and
-fails the build, and the build also fails when no templates are available — the
-backend never silently ships a partial or empty template set.
+PEP 517 isolation isolates the build dependencies, not the source, so
+``references/`` is reachable when building ``./cli`` from a full checkout and
+the bundle is regenerated. It is unavailable only for an input that lacks the
+repository siblings — an sdist, or a standalone ``cli/`` copy — where the bundle
+already present is used. A generation failure while ``references/`` is present
+propagates and fails the build, and the bundle is always verified against its
+manifest, so the backend never silently ships a partial or empty template set.
 
 ``setuptools`` is imported lazily inside the hooks, so the template helpers can
 be imported (and tested) in an environment without setuptools.
