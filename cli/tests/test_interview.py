@@ -10,11 +10,22 @@ from bootstrap_iac.interview import build_context
 # ---------------------------------------------------------------------------
 
 
-def test_test_standard_variables_has_no_nested_block():
-    """The templates wrap this in `variables {}`, so it must not add its own."""
-    ctx = build_context({"CLOUD_PROVIDER": "Azure"})
-    assert "variables {" not in ctx["TEST_STANDARD_VARIABLES"]
-    assert "prefix" in ctx["TEST_STANDARD_VARIABLES"]
+@pytest.mark.parametrize(
+    "cloud,required",
+    [
+        ("Azure", ["prefix", "location", "resource_group_name"]),
+        ("AWS", ["prefix", "region"]),
+        ("GCP", ["prefix", "location", "project"]),
+    ],
+)
+def test_test_standard_variables_match_the_module_inputs(cloud, required):
+    """The test's variables body provides exactly the module's inputs, and the
+    templates wrap it in `variables {}`, so it must not add its own wrapper."""
+    ctx = build_context({"CLOUD_PROVIDER": cloud})
+    body = ctx["TEST_STANDARD_VARIABLES"]
+    assert "variables {" not in body
+    for name in required:
+        assert name in body
 
 
 def test_drift_pipeline_checks_step_outcome():
@@ -44,8 +55,9 @@ def test_build_context_azure_defaults():
     assert "azurerm" in ctx["PROVIDER_BLOCK"]
     # The Azure module example is a resource that lives in a resource group,
     # so `resource_group_name` in the scaffold is valid (a resource group has
-    # no such argument).
-    assert ctx["PROVIDER_RESOURCE"] == "azurerm_key_vault"
+    # no such argument). Its required schema is exactly name/location/
+    # resource_group_name, so the rendered block passes `terraform validate`.
+    assert ctx["PROVIDER_RESOURCE"] == "azurerm_user_assigned_identity"
     assert "." not in ctx["PROVIDER_RESOURCE"]
     assert "env_default_tags" in ctx["STANDARD_VARIABLES"]
     assert "env_default_tags" in ctx["TAG_STRATEGY"]

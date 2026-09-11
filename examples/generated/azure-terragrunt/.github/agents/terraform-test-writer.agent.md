@@ -42,8 +42,9 @@ override_data {
 }
 
 variables {
-  prefix   = "test-auto"
-  location = "westeurope"
+  prefix              = "test-auto"
+  location            = "westeurope"
+  resource_group_name = "rg-test"
 }
 ```
 <!-- Example data source override for Azure:
@@ -147,7 +148,7 @@ class CheckRequireEncryption(BaseResourceCheck):
     def __init__(self):
         name = "Ensure storage encryption is enabled"
         id = "CKV_ACME_CORP_001"
-        supported_resources = ["azurerm_key_vault"]
+        supported_resources = ["azurerm_user_assigned_identity"]
         categories = [CheckCategories.GENERAL_SECURITY]
         super().__init__(name=name, id=id, categories=categories,
                          supported_resources=supported_resources)
@@ -200,7 +201,7 @@ import rego.v1
 
 violations contains msg if {
     some resource in input.resource_changes
-    resource.type == "azurerm_key_vault"
+    resource.type == "azurerm_user_assigned_identity"
     resource.change.actions[_] in {"create", "update"}
     not startswith(resource.change.after.name, input.variables.prefix.value)
     msg := sprintf("%s name '%s' must start with prefix '%s'", [resource.address, resource.change.after.name, input.variables.prefix.value])

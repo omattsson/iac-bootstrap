@@ -73,7 +73,13 @@ def generate_into(config_path: Path, out_dir: Path) -> None:
     answers = run_interview(discovery, non_interactive=True, overrides=overrides)
     context = build_context(answers)
     generate_files(
-        context, out_dir, target=answers.get("TARGET", "both"), skip_existing=False
+        context,
+        out_dir,
+        target=answers.get("TARGET", "both"),
+        skip_existing=False,
+        # Always render from the canonical references/, never a bundled copy
+        # that could be stale, so regeneration reflects the source of truth.
+        templates_dir=REPO_ROOT / "references",
     )
 
 

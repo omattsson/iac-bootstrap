@@ -15,7 +15,7 @@ applyTo: "tf-module-*/**/*.tf"
 - `versions.tf` — terraform and provider version constraints
 
 ## Resource Conventions
-- All single resources use identifier `"default"` (e.g., `azurerm_key_vault.default`)
+- All single resources use identifier `"default"` (e.g., `azurerm_user_assigned_identity.default`)
 - Map-driven resources use `for_each` with descriptive keys
 - Use `count` for boolean on/off features
 - Tags: `merge(var.env_default_tags, var.tags)` — always

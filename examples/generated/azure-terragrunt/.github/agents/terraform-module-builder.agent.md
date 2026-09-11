@@ -63,7 +63,7 @@ local.tags = merge(var.env_default_tags, var.tags)
 -->
 
 ### Resource identifiers
-- Single resources: `"default"` (e.g., `azurerm_key_vault.default`)
+- Single resources: `"default"` (e.g., `azurerm_user_assigned_identity.default`)
 - Multiple resources: `for_each` with descriptive map keys
 
 ### Private endpoints / VPC endpoints (if applicable)

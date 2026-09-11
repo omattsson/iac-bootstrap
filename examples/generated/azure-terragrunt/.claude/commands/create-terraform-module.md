@@ -61,7 +61,7 @@ locals {
 
 ### Resource file
 ```hcl
-resource "azurerm_key_vault" "default" {
+resource "azurerm_user_assigned_identity" "default" {
   name                = local.name
   location = var.location
   resource_group_name = var.resource_group_name
@@ -72,12 +72,12 @@ resource "azurerm_key_vault" "default" {
 ### outputs.tf
 ```hcl
 output "name" {
-  value       = azurerm_key_vault.default.name
+  value       = azurerm_user_assigned_identity.default.name
   description = "Name of the resource."
 }
 
 output "id" {
-  value       = azurerm_key_vault.default.id
+  value       = azurerm_user_assigned_identity.default.id
   description = "The ID of the resource."
 }
 ```
@@ -95,14 +95,15 @@ override_data {
 }
 
 variables {
-  prefix   = "test-auto"
-  location = "westeurope"
+  prefix              = "test-auto"
+  location            = "westeurope"
+  resource_group_name = "rg-test"
 }
 
 run "creates_resource_with_correct_name" {
   command = plan
   assert {
-    condition     = azurerm_key_vault.default.name == "test-auto-{resource_abbreviation}-mysuffix"
+    condition     = azurerm_user_assigned_identity.default.name == "test-auto-{resource_abbreviation}-mysuffix"
     error_message = "Name should follow naming convention"
   }
 }
@@ -113,7 +114,7 @@ run "merges_tags_correctly" {
     tags = { extra = "tag" }
   }
   assert {
-    condition     = azurerm_key_vault.default.tags["extra"] == "tag"
+    condition     = azurerm_user_assigned_identity.default.tags["extra"] == "tag"
     error_message = "Custom tags should be merged"
   }
 }

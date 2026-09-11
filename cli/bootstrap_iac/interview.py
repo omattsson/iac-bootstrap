@@ -25,7 +25,7 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
     "Azure": {
         "provider_name": "azurerm",
         "provider_version_constraints": ">=4.0.0,<5.0.0",
-        "provider_resource_example": "azurerm_key_vault.default",
+        "provider_resource_example": "azurerm_user_assigned_identity.default",
         "location_attribute": "location = var.location",
         "resource_group_attribute": "resource_group_name = var.resource_group_name",
         "state_backend": "Azure Blob Storage",
@@ -47,6 +47,11 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "`enable_private_endpoint` variable (bool, default false). "
             "When true, create an azurerm_private_endpoint named "
             "\"${local.name}-pe\" within var.private_endpoint_subnet_id."
+        ),
+        "test_standard_variables": (
+            '  prefix              = "test-auto"\n'
+            '  location            = "westeurope"\n'
+            '  resource_group_name = "rg-test"'
         ),
     },
     "AWS": {
@@ -72,6 +77,10 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "Use VPC endpoints for private connectivity. "
             "Expose `enable_vpc_endpoint` variable (bool, default false)."
         ),
+        "test_standard_variables": (
+            '  prefix = "test-auto"\n'
+            '  region = "us-east-1"'
+        ),
     },
     "GCP": {
         "provider_name": "google",
@@ -96,6 +105,11 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
         "private_endpoint_pattern": (
             "Use Private Service Connect for private connectivity. "
             "Expose `enable_private_service_connect` variable (bool, default false)."
+        ),
+        "test_standard_variables": (
+            '  prefix   = "test-auto"\n'
+            '  location = "europe-west1"\n'
+            '  project  = "test-project"'
         ),
     },
 }
@@ -770,14 +784,9 @@ def build_context(answers: dict) -> dict:
         _data_override_map.get(_provider, _data_override_map["azurerm"]),
     )
     # The templates wrap this in a `variables { ... }` block, so supply only
-    # the block body (no `variables {}` wrapper).
-    ctx.setdefault(
-        "TEST_STANDARD_VARIABLES",
-        (
-            '  prefix   = "test-auto"\n'
-            '  location = "westeurope"'
-        ),
-    )
+    # the block body (no `variables {}` wrapper). It is cloud-specific so the
+    # test provides exactly the module's input variables.
+    ctx.setdefault("TEST_STANDARD_VARIABLES", cloud_defs["test_standard_variables"])
     ctx.setdefault("EXPECTED_NAME_PATTERN", "test-auto-{resource_abbreviation}-mysuffix")
     ctx.setdefault("OPTIONAL_FEATURES", "private endpoints, diagnostics settings, RBAC assignments")
     ctx.setdefault("VARIABLE_GOTCHAS", "Use `optional(type, default)` for object attributes (Terraform 1.3+)")
