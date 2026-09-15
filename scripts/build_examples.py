@@ -117,17 +117,32 @@ def build(examples: list[Path] | None = None) -> None:
 
 
 def check(examples: list[Path] | None = None) -> list[str]:
-    """Return a list of drift problems for the reproducible examples."""
+    """Return a list of drift problems for the reproducible examples.
+
+    When *examples* is not given, every direct child of ``examples/generated/``
+    is treated as a reproducible example. A directory there without a config is
+    reported (not silently skipped), so a deleted or renamed config cannot leave
+    stale output that the check ignores.
+    """
     problems: list[str] = []
     exclude = set(CONFIG_NAMES)
-    for example in examples if examples is not None else reproducible_examples():
+    if examples is None:
+        examples = (
+            [d for d in sorted(GENERATED_DIR.iterdir()) if d.is_dir()]
+            if GENERATED_DIR.is_dir()
+            else []
+        )
+    for example in examples:
+        name = example.relative_to(EXAMPLES_DIR).as_posix()
+        if not any((example / n).is_file() for n in CONFIG_NAMES):
+            problems.append(f"{name}: missing a .bootstrap-iac.yaml config")
+            continue
         config = _config_path(example)
         with tempfile.TemporaryDirectory() as tmp:
             tmp_dir = Path(tmp)
             generate_into(config, tmp_dir)
             generated = _files(tmp_dir, set())
             committed = _files(example, exclude)
-            name = example.relative_to(EXAMPLES_DIR).as_posix()
             for rel in sorted(generated.keys() - committed.keys()):
                 problems.append(f"{name}: missing {rel}")
             for rel in sorted(committed.keys() - generated.keys()):
@@ -148,13 +163,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     examples = reproducible_examples()
-    if not examples:
-        print("No reproducible examples found under examples/.")
-        return 0
 
     try:
         if args.check:
-            problems = check(examples)
+            # check() with no argument scans every examples/generated/ child,
+            # so a directory missing its config is reported, not skipped.
+            problems = check()
             if problems:
                 print(
                     "Reproducible examples are stale. Run: "
@@ -166,6 +180,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{len(examples)} reproducible example(s) up to date.")
             return 0
 
+        if not examples:
+            print("No reproducible examples found under examples/generated/.")
+            return 0
         build(examples)
         print(f"Regenerated {len(examples)} reproducible example(s).")
         return 0

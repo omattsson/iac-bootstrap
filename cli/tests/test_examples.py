@@ -41,6 +41,22 @@ def test_reproducible_examples_are_up_to_date():
 
 
 @requires_source
+def test_check_flags_a_generated_dir_without_a_config():
+    """A directory under examples/generated/ without a config is reported."""
+    build_examples = _load_build_examples()
+    orphan = _EXAMPLES / "generated" / "_orphan_no_config"
+    orphan.mkdir(parents=True)
+    (orphan / "CLAUDE.md").write_text("stale output\n")
+    try:
+        problems = build_examples.check()
+        assert any("_orphan_no_config" in p and "missing" in p for p in problems)
+    finally:
+        import shutil
+
+        shutil.rmtree(orphan)
+
+
+@requires_source
 def test_generation_is_deterministic_and_ignores_environment(tmp_path):
     build_examples = _load_build_examples()
 
