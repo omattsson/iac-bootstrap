@@ -119,6 +119,27 @@ def test_complete_example_has_full_copilot_and_claude_trees():
 
 
 @requires_source
+def test_generated_skill_names_match_their_directories():
+    """A skill's frontmatter `name` must equal its directory (for discovery)."""
+    import re
+
+    build_examples = _load_build_examples()
+    for example in build_examples.reproducible_examples():
+        for skill in example.rglob(".github/skills/*/SKILL.md"):
+            directory = skill.parent.name
+            first = skill.read_text(encoding="utf-8").splitlines()
+            name = next(
+                (
+                    line.split(":", 1)[1].strip()
+                    for line in first
+                    if re.match(r"^name:\s*", line)
+                ),
+                None,
+            )
+            assert name == directory, f"{skill}: name {name!r} != dir {directory!r}"
+
+
+@requires_source
 def test_reproducible_examples_have_no_placeholders():
     import re
 

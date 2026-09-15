@@ -1,5 +1,5 @@
 ---
-name: create-orchestration-stack
+name: create-terragrunt-stack
 description: "Create or extend Terragrunt stacks, components, and environments. Use when: adding a new component to a stack, onboarding a new environment/region/stack, creating shared configs, wiring dependencies, debugging plan errors, managing version pins."
 ---
 
