@@ -1,0 +1,16 @@
+# Reproducible example config. Regenerate the output with:
+#   python scripts/build_examples.py
+# CI verifies it with `python scripts/build_examples.py --check`.
+version: "1"
+company: Acme Corp
+cloud: azure
+module_prefix: tf-module
+orchestration: terragrunt
+orchestration_dir: infrastructure-config
+ci_cd: github-actions
+auth: Managed Identity / OIDC
+state_backend: Azure Blob Storage
+naming: "{prefix}-{resource_abbreviation}-{suffix}"
+tag_strategy: merge(var.env_default_tags, var.tags)
+org: acme
+target: both
