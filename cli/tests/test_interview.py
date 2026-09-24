@@ -159,6 +159,30 @@ def test_build_context_terramate_defaults():
     assert "terramate" in ctx["VALIDATE_COMMAND"]
 
 
+@pytest.mark.parametrize(
+    "cloud, declared",
+    [
+        ("Azure", ["prefix", "location", "resource_group_name"]),
+        ("AWS", ["prefix", "region"]),
+        ("GCP", ["prefix", "region", "project_id"]),
+    ],
+)
+def test_terramate_provider_snippet_uses_declared_variables(cloud, declared):
+    """The generated provider block may only reference the module's inputs.
+
+    GCP declares ``project_id`` (not ``project``), so a Terramate customization
+    must not tell users to generate ``project = var.project``.
+    """
+    import re
+
+    ctx = build_context({"CLOUD_PROVIDER": cloud, "ORCHESTRATION_TOOL": "Terramate"})
+    pattern = ctx["GENERATE_HCL_PATTERN"]
+    referenced = set(re.findall(r"var\.([A-Za-z_][A-Za-z0-9_]*)", pattern))
+    assert referenced <= set(declared), f"{cloud}: undeclared {referenced - set(declared)}"
+    if cloud == "GCP":
+        assert "project = var.project_id" in pattern
+
+
 def test_build_context_no_orchestration():
     ctx = build_context({
         "CLOUD_PROVIDER": "Azure",

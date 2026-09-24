@@ -601,7 +601,7 @@ def build_context(answers: dict) -> dict:
         _provider_body = {
             "azurerm": 'provider "azurerm" {\n      features {}\n    }',
             "aws": 'provider "aws" {\n      region = var.region\n    }',
-            "google": 'provider "google" {\n      project = var.project\n    }',
+            "google": 'provider "google" {\n      project = var.project_id\n    }',
         }.get(
             cloud_defs["provider_name"],
             'provider "azurerm" {\n      features {}\n    }',

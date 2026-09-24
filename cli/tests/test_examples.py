@@ -61,6 +61,48 @@ def test_check_ignores_line_ending_differences(tmp_path):
 
 
 @requires_source
+def test_build_removes_stale_files_and_keeps_the_config(tmp_path):
+    """build() is destructive: it must drop stale output, keep the config
+    byte-for-byte, prune emptied directories, and write canonical LF."""
+    import shutil
+
+    build_examples = _load_build_examples()
+    real = _EXAMPLES / "generated" / "azure-terragrunt"
+    copied = tmp_path / "azure-terragrunt"
+    shutil.copytree(real, copied)
+    config = copied / ".bootstrap-iac.yaml"
+    config_bytes = config.read_bytes()
+
+    # Plant stale output at the top level and in a nested directory that
+    # generation does not produce, and rewrite one real file with CRLF.
+    (copied / "stale.md").write_text("old output\n")
+    nested = copied / ".github" / "obsolete"
+    nested.mkdir()
+    (nested / "old.md").write_text("old output\n")
+    claude_md = copied / "CLAUDE.md"
+    claude_md.write_bytes(claude_md.read_bytes().replace(b"\n", b"\r\n"))
+
+    build_examples.build([copied])
+
+    assert config.read_bytes() == config_bytes
+    assert not (copied / "stale.md").exists()
+    assert not nested.exists(), "emptied stale directory was not pruned"
+    outputs = [p for p in copied.rglob("*") if p.is_file() and p != config]
+    assert outputs, "build() produced no output"
+    assert claude_md.is_file()
+    assert not any(b"\r\n" in p.read_bytes() for p in outputs)
+    # The rebuilt tree equals a fresh generation and matches the committed one.
+    assert build_examples.check([copied]) == []
+    rebuilt = {p.relative_to(copied).as_posix(): p.read_bytes() for p in outputs}
+    committed = {
+        p.relative_to(real).as_posix(): p.read_bytes()
+        for p in real.rglob("*")
+        if p.is_file() and p.name != ".bootstrap-iac.yaml"
+    }
+    assert rebuilt == committed
+
+
+@requires_source
 def test_check_fails_when_no_reproducible_examples_exist(tmp_path):
     """An empty or missing examples/generated/ is a failure, not a pass, so
     deleting the complete example cannot slip past --check."""
