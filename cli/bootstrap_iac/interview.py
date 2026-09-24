@@ -25,7 +25,7 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
     "Azure": {
         "provider_name": "azurerm",
         "provider_version_constraints": ">=4.0.0,<5.0.0",
-        "provider_resource_example": "azurerm_resource_group.default",
+        "provider_resource_example": "azurerm_user_assigned_identity.default",
         "location_attribute": "location = var.location",
         "resource_group_attribute": "resource_group_name = var.resource_group_name",
         "state_backend": "Azure Blob Storage",
@@ -47,6 +47,11 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "`enable_private_endpoint` variable (bool, default false). "
             "When true, create an azurerm_private_endpoint named "
             "\"${local.name}-pe\" within var.private_endpoint_subnet_id."
+        ),
+        "test_standard_variables": (
+            '  prefix              = "test-auto"\n'
+            '  location            = "westeurope"\n'
+            '  resource_group_name = "rg-test"'
         ),
     },
     "AWS": {
@@ -72,19 +77,25 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
             "Use VPC endpoints for private connectivity. "
             "Expose `enable_vpc_endpoint` variable (bool, default false)."
         ),
+        "test_standard_variables": (
+            '  prefix = "test-auto"\n'
+            '  region = "us-east-1"'
+        ),
     },
     "GCP": {
         "provider_name": "google",
         "provider_version_constraints": ">=5.0.0,<6.0.0",
         "provider_resource_example": "google_storage_bucket.default",
-        "location_attribute": "location = var.location",
-        "resource_group_attribute": "project = var.project",
+        # The GCP module declares `region` and `project_id`, so the scaffold
+        # must reference those, not undeclared var.location / var.project.
+        "location_attribute": "location = var.region",
+        "resource_group_attribute": "project = var.project_id",
         "state_backend": "GCS",
         "auth_pattern": "Workload Identity Federation",
         "standard_variables": (
             "- `prefix` — Resource name prefix\n"
-            "- `location` — GCP region or zone\n"
-            "- `project` — GCP project ID\n"
+            "- `region` — GCP region\n"
+            "- `project_id` — GCP project ID\n"
             "- `labels` — Resource labels (map(string))\n"
             "- `env_default_labels` — Project-wide default labels from orchestration"
         ),
@@ -96,6 +107,11 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
         "private_endpoint_pattern": (
             "Use Private Service Connect for private connectivity. "
             "Expose `enable_private_service_connect` variable (bool, default false)."
+        ),
+        "test_standard_variables": (
+            '  prefix     = "test-auto"\n'
+            '  region     = "europe-west1"\n'
+            '  project_id = "test-project"'
         ),
     },
 }
@@ -585,7 +601,7 @@ def build_context(answers: dict) -> dict:
         _provider_body = {
             "azurerm": 'provider "azurerm" {\n      features {}\n    }',
             "aws": 'provider "aws" {\n      region = var.region\n    }',
-            "google": 'provider "google" {\n      project = var.project\n    }',
+            "google": 'provider "google" {\n      project = var.project_id\n    }',
         }.get(
             cloud_defs["provider_name"],
             'provider "azurerm" {\n      features {}\n    }',
@@ -769,15 +785,10 @@ def build_context(answers: dict) -> dict:
         "DATA_SOURCE_OVERRIDE",
         _data_override_map.get(_provider, _data_override_map["azurerm"]),
     )
-    ctx.setdefault(
-        "TEST_STANDARD_VARIABLES",
-        (
-            "variables {\n"
-            '  prefix   = "test-auto"\n'
-            '  location = "westeurope"\n'
-            "}"
-        ),
-    )
+    # The templates wrap this in a `variables { ... }` block, so supply only
+    # the block body (no `variables {}` wrapper). It is cloud-specific so the
+    # test provides exactly the module's input variables.
+    ctx.setdefault("TEST_STANDARD_VARIABLES", cloud_defs["test_standard_variables"])
     ctx.setdefault("EXPECTED_NAME_PATTERN", "test-auto-{resource_abbreviation}-mysuffix")
     ctx.setdefault("OPTIONAL_FEATURES", "private endpoints, diagnostics settings, RBAC assignments")
     ctx.setdefault("VARIABLE_GOTCHAS", "Use `optional(type, default)` for object attributes (Terraform 1.3+)")
@@ -835,10 +846,12 @@ def _single_component_pipeline(cicd: str, org: str, module_prefix: str) -> str:
             "    uses: {org}/pipeline-templates/.github/workflows/tf-apply.yml@main\n"
             "    with:\n"
             "      working_directory: infrastructure-config/dev/platform/{component}\n"
+            # `environment` is not valid on a caller job that uses a reusable
+            # workflow, so pass it as an input the called workflow consumes.
+            "      environment: production\n"
             "    permissions:\n"
             "      id-token: write\n"
             "      contents: read\n"
-            "    environment: production\n"
         ).replace("{org}", org)
     if "Azure DevOps" in cicd:
         return (
@@ -904,31 +917,61 @@ def _stack_pipeline(cicd: str, orch: str) -> str:
     return "# Define your stack-level plan → apply pipeline here"
 
 
+# Drift plan command per tool. Each Terraform-based command uses
+# -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes (drift).
+_DRIFT_PLAN_COMMANDS: dict[str, str] = {
+    "terraform": "terraform plan -detailed-exitcode",
+    "terragrunt": "terragrunt run-all plan -detailed-exitcode",
+    "terramate": "terramate run -- terraform plan -detailed-exitcode",
+}
+
+
 def _drift_pipeline(cicd: str, orch: str) -> str:
     tool = _ORCHESTRATION_DEFAULTS.get(orch, _ORCHESTRATION_DEFAULTS["None"])["tool_lower"]
-    if "GitHub" in cicd:
-        if tool == "terraform":
-            plan_cmd = "terraform plan --detailed-exitcode"
-        else:
-            plan_cmd = f"{tool} run-all plan --detailed-exitcode"
-        return (
-            "name: drift-detection\n"
-            "on:\n"
-            "  schedule:\n"
-            "    - cron: '0 6 * * 1-5'  # Weekdays at 06:00 UTC\n\n"
-            "jobs:\n"
-            "  drift:\n"
-            "    runs-on: ubuntu-latest\n"
-            "    steps:\n"
-            "      - uses: actions/checkout@v4\n"
-            f"      - run: {plan_cmd}\n"
+    if "GitHub" not in cicd:
+        return "# Define your drift detection pipeline here (scheduled plan run)"
+
+    header = (
+        "name: drift-detection\n"
+        "on:\n"
+        "  schedule:\n"
+        "    - cron: '0 6 * * 1-5'  # Weekdays at 06:00 UTC\n\n"
+        "jobs:\n"
+        "  drift:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v4\n"
+    )
+
+    if tool == "pulumi":
+        # Pulumi has no drift-specific exit code. --expect-no-changes fails the
+        # step on changes and on errors alike, so neither is masked.
+        return header + (
+            "      - run: pulumi preview --expect-no-changes\n"
             "        working-directory: infrastructure-config\n"
-            "        continue-on-error: true\n"
-            "      - name: Notify on drift\n"
-            "        if: failure()\n"
-            "        run: echo 'Drift detected — review plan output'\n"
         )
-    return "# Define your drift detection pipeline here (scheduled plan run)"
+
+    plan_cmd = _DRIFT_PLAN_COMMANDS.get(tool, _DRIFT_PLAN_COMMANDS["terraform"])
+    # Capture the exit code instead of using continue-on-error. Only 0 (clean)
+    # and 2 (drift) are expected; every other code — 1 (plan error), 127
+    # (command not found), a signal, or a wrapper-specific code — fails the
+    # job, so no failure is masked. Only genuine drift (2) sends a notification.
+    return header + (
+        "      - id: plan\n"
+        "        run: |\n"
+        "          set +e\n"
+        f"          {plan_cmd}\n"
+        '          echo "code=$?" >> "$GITHUB_OUTPUT"\n'
+        "        working-directory: infrastructure-config\n"
+        "      - name: Fail on plan error\n"
+        "        if: steps.plan.outputs.code != '0' && steps.plan.outputs.code != '2'\n"
+        "        run: |\n"
+        "          echo \"Plan failed with exit code ${{ steps.plan.outputs.code }}\"\n"
+        "          exit 1\n"
+        "      - name: Notify on drift\n"
+        "        if: steps.plan.outputs.code == '2'\n"
+        "        run: echo 'Drift detected — review plan output'\n"
+    )
 
 
 def _destroy_commands(orch: str) -> tuple[str, str]:

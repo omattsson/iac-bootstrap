@@ -10,6 +10,68 @@ from bootstrap_iac.interview import build_context
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    "cloud,required",
+    [
+        ("Azure", ["prefix", "location", "resource_group_name"]),
+        ("AWS", ["prefix", "region"]),
+        ("GCP", ["prefix", "region", "project_id"]),
+    ],
+)
+def test_test_standard_variables_match_the_module_inputs(cloud, required):
+    """The test's variables body provides exactly the module's inputs, and the
+    templates wrap it in `variables {}`, so it must not add its own wrapper."""
+    ctx = build_context({"CLOUD_PROVIDER": cloud})
+    body = ctx["TEST_STANDARD_VARIABLES"]
+    assert "variables {" not in body
+    for name in required:
+        assert name in body
+
+
+@pytest.mark.parametrize(
+    "orch,expected_cmd",
+    [
+        ("None", "terraform plan -detailed-exitcode"),
+        ("Terragrunt", "terragrunt run-all plan -detailed-exitcode"),
+        ("Terramate", "terramate run -- terraform plan -detailed-exitcode"),
+    ],
+)
+def test_drift_pipeline_uses_valid_command_and_exit_codes(orch, expected_cmd):
+    """Each tool gets its own valid drift command; the exit code is captured so
+    a real error (1) fails the job and only drift (2) notifies."""
+    ctx = build_context({"CI_CD_PLATFORM": "GitHub Actions", "ORCHESTRATION_TOOL": orch})
+    drift = ctx["DRIFT_PIPELINE"]
+    assert expected_cmd in drift
+    assert "run-all plan --detailed-exitcode" not in drift or orch == "Terragrunt"
+    # Every code except 0 (clean) and 2 (drift) must fail the job, so 127,
+    # signals, and wrapper-specific codes are not masked as success.
+    assert (
+        "steps.plan.outputs.code != '0' && steps.plan.outputs.code != '2'" in drift
+    )
+    assert "steps.plan.outputs.code == '1'" not in drift  # not a sole gate
+    assert "steps.plan.outputs.code == '2'" in drift  # drift notifies
+    assert "continue-on-error" not in drift
+    assert "if: failure()" not in drift
+
+
+def test_drift_pipeline_pulumi_uses_expect_no_changes():
+    """Pulumi has no drift exit code; --expect-no-changes fails on change/error."""
+    ctx = build_context({"CI_CD_PLATFORM": "GitHub Actions", "ORCHESTRATION_TOOL": "Pulumi"})
+    drift = ctx["DRIFT_PIPELINE"]
+    assert "pulumi preview --expect-no-changes" in drift
+    assert "run-all" not in drift
+    assert "continue-on-error" not in drift
+
+
+def test_azure_example_resource_lives_in_a_resource_group():
+    """The Azure scaffold uses a resource that accepts resource_group_name."""
+    ctx = build_context({"CLOUD_PROVIDER": "Azure"})
+    # azurerm_resource_group has no resource_group_name argument, so it must not
+    # be the example when the scaffold renders a resource_group_name line.
+    assert ctx["PROVIDER_RESOURCE"] != "azurerm_resource_group"
+    assert "resource_group_name" in ctx["RESOURCE_GROUP_ATTRIBUTE"]
+
+
 def test_build_context_azure_defaults():
     ctx = build_context({"CLOUD_PROVIDER": "Azure", "COMPANY_NAME": "TestCo"})
     assert ctx["COMPANY_SLUG"] == "testco"
@@ -17,7 +79,11 @@ def test_build_context_azure_defaults():
     assert ctx["PROVIDER_NAME"] == "azurerm"
     assert ctx["TAG_ATTRIBUTE"] == "tags"
     assert "azurerm" in ctx["PROVIDER_BLOCK"]
-    assert ctx["PROVIDER_RESOURCE"] == "azurerm_resource_group"
+    # The Azure module example is a resource that lives in a resource group,
+    # so `resource_group_name` in the scaffold is valid (a resource group has
+    # no such argument). Its required schema is exactly name/location/
+    # resource_group_name, so the rendered block passes `terraform validate`.
+    assert ctx["PROVIDER_RESOURCE"] == "azurerm_user_assigned_identity"
     assert "." not in ctx["PROVIDER_RESOURCE"]
     assert "env_default_tags" in ctx["STANDARD_VARIABLES"]
     assert "env_default_tags" in ctx["TAG_STRATEGY"]
@@ -91,6 +157,30 @@ def test_build_context_terramate_defaults():
     })
     assert ctx["ORCHESTRATION_TOOL_LOWER"] == "terramate"
     assert "terramate" in ctx["VALIDATE_COMMAND"]
+
+
+@pytest.mark.parametrize(
+    "cloud, declared",
+    [
+        ("Azure", ["prefix", "location", "resource_group_name"]),
+        ("AWS", ["prefix", "region"]),
+        ("GCP", ["prefix", "region", "project_id"]),
+    ],
+)
+def test_terramate_provider_snippet_uses_declared_variables(cloud, declared):
+    """The generated provider block may only reference the module's inputs.
+
+    GCP declares ``project_id`` (not ``project``), so a Terramate customization
+    must not tell users to generate ``project = var.project``.
+    """
+    import re
+
+    ctx = build_context({"CLOUD_PROVIDER": cloud, "ORCHESTRATION_TOOL": "Terramate"})
+    pattern = ctx["GENERATE_HCL_PATTERN"]
+    referenced = set(re.findall(r"var\.([A-Za-z_][A-Za-z0-9_]*)", pattern))
+    assert referenced <= set(declared), f"{cloud}: undeclared {referenced - set(declared)}"
+    if cloud == "GCP":
+        assert "project = var.project_id" in pattern
 
 
 def test_build_context_no_orchestration():
