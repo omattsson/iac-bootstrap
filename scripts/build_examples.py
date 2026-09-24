@@ -15,7 +15,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -46,6 +45,14 @@ def reproducible_examples() -> list[Path]:
         if entry.is_dir() and any((entry / n).is_file() for n in CONFIG_NAMES):
             found.append(entry)
     return found
+
+
+def _display_name(example: Path) -> str:
+    """Workspace-relative name for messages, robust to out-of-tree examples."""
+    try:
+        return example.relative_to(GENERATED_DIR.parent).as_posix()
+    except ValueError:
+        return example.name
 
 
 def _config_path(example: Path) -> Path:
@@ -93,6 +100,17 @@ def _files(root: Path, exclude: set[str]) -> dict[str, Path]:
     }
 
 
+def _normalized(path: Path) -> bytes:
+    """Return the file's bytes with CRLF normalised to LF.
+
+    generate_files() writes with the platform's native newline, so on Windows
+    a freshly generated file is CRLF while the committed checkout is LF. The
+    committed examples are canonical LF; comparing and writing in normalised
+    form keeps regeneration reproducible across operating systems.
+    """
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
 def build(examples: list[Path] | None = None) -> None:
     """Regenerate each reproducible example in place, keeping its config."""
     for example in examples if examples is not None else reproducible_examples():
@@ -113,7 +131,8 @@ def build(examples: list[Path] | None = None) -> None:
             for rel, src in _files(tmp_dir, set()).items():
                 dst = example / rel
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(src, dst)
+                # Write canonical LF regardless of the platform's native newline.
+                dst.write_bytes(_normalized(src))
 
 
 def check(examples: list[Path] | None = None) -> list[str]:
@@ -140,7 +159,7 @@ def check(examples: list[Path] | None = None) -> list[str]:
                 "(expected at least one directory with a .bootstrap-iac.yaml)"
             )
     for example in examples:
-        name = example.relative_to(EXAMPLES_DIR).as_posix()
+        name = _display_name(example)
         if not any((example / n).is_file() for n in CONFIG_NAMES):
             problems.append(f"{name}: missing a .bootstrap-iac.yaml config")
             continue
@@ -155,7 +174,7 @@ def check(examples: list[Path] | None = None) -> list[str]:
             for rel in sorted(committed.keys() - generated.keys()):
                 problems.append(f"{name}: unexpected {rel}")
             for rel in sorted(generated.keys() & committed.keys()):
-                if generated[rel].read_bytes() != committed[rel].read_bytes():
+                if _normalized(generated[rel]) != _normalized(committed[rel]):
                     problems.append(f"{name}: differs {rel}")
     return problems
 

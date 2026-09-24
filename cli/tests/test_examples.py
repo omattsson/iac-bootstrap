@@ -41,6 +41,26 @@ def test_reproducible_examples_are_up_to_date():
 
 
 @requires_source
+def test_check_ignores_line_ending_differences(tmp_path):
+    """A CRLF committed file is not drift against LF generation (Windows)."""
+    import shutil
+
+    build_examples = _load_build_examples()
+    real = _EXAMPLES / "generated" / "azure-terragrunt"
+    fake_generated = tmp_path / "generated"
+    copied = fake_generated / "azure-terragrunt"
+    shutil.copytree(real, copied)
+    # Rewrite one committed file with CRLF endings.
+    target = copied / "CLAUDE.md"
+    target.write_bytes(target.read_bytes().replace(b"\n", b"\r\n"))
+    assert b"\r\n" in target.read_bytes()
+
+    build_examples.GENERATED_DIR = fake_generated
+    problems = build_examples.check()
+    assert not any("differs CLAUDE.md" in p for p in problems), problems
+
+
+@requires_source
 def test_check_fails_when_no_reproducible_examples_exist(tmp_path):
     """An empty or missing examples/generated/ is a failure, not a pass, so
     deleting the complete example cannot slip past --check."""
