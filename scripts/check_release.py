@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import datetime
 import re
 import sys
 from pathlib import Path
@@ -35,18 +36,31 @@ def pyproject_version(pyproject: Path) -> str:
 
 
 def changelog_has_release(changelog_text: str, version: str) -> bool:
-    """Return True when the changelog has a released section for *version*.
+    """Return True when the changelog has a valid dated section for *version*.
 
-    Matches a dated heading like ``## [1.2.3] - 2026-09-24``. The date is
-    required, so a bare ``## [1.2.3]`` placeholder does not count, and neither
-    does the ``[Unreleased]`` section: a release must document its own version
-    with a release date.
+    Matches a Keep a Changelog heading like ``## [1.2.3] - 2026-09-24``. The
+    date is required and must be a real calendar date, so a bare
+    ``## [1.2.3]`` placeholder, an impossible date such as ``2026-99-99``, and
+    the ``[Unreleased]`` section all fail. The heading must end after the date,
+    apart from an optional ``[YANKED]`` marker, so a stray ``## [1.2.3] - draft``
+    does not slip through.
     """
-    pattern = re.compile(
-        r"^##\s*\[" + re.escape(version) + r"\]\s*-\s*\d{4}-\d{2}-\d{2}",
+    # Use [ \t] (not \s) for spacing so the match cannot span lines: \s matches
+    # newlines, which would let a later list item leak into the ``rest`` group.
+    heading = re.compile(
+        r"^##[ \t]*\["
+        + re.escape(version)
+        + r"\][ \t]*-[ \t]*(?P<date>\d{4}-\d{2}-\d{2})[ \t]*(?P<rest>.*)$",
         re.MULTILINE,
     )
-    return bool(pattern.search(changelog_text))
+    for match in heading.finditer(changelog_text):
+        try:
+            datetime.date.fromisoformat(match.group("date"))
+        except ValueError:
+            continue  # a malformed calendar date such as 2026-99-99
+        if match.group("rest") in ("", "[YANKED]"):
+            return True
+    return False
 
 
 def tag_matches_version(tag: str, version: str) -> bool:

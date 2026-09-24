@@ -242,6 +242,18 @@ def test_release_requires_a_dated_changelog_heading(tmp_path):
 
 
 @requires_source
+def test_release_rejects_impossible_dates_and_trailing_text(tmp_path):
+    """The date must be a real calendar date and the heading must end cleanly."""
+    m = _load(_RELEASE_SCRIPT)
+    assert not m.changelog_has_release("## [0.1.0] - 2026-99-99\n", "0.1.0")
+    assert not m.changelog_has_release("## [0.1.0] - 2026-13-01\n", "0.1.0")
+    assert not m.changelog_has_release("## [0.1.0] - 2026-09-24 draft\n", "0.1.0")
+    # A clean heading and the Keep a Changelog [YANKED] marker are accepted.
+    assert m.changelog_has_release("## [0.1.0] - 2026-09-24\n", "0.1.0")
+    assert m.changelog_has_release("## [0.1.0] - 2026-09-24 [YANKED]\n", "0.1.0")
+
+
+@requires_source
 def test_release_main_passes_and_fails_via_argv(tmp_path, capsys):
     m = _load(_RELEASE_SCRIPT)
     pyproject, cl = _release_fixture(
