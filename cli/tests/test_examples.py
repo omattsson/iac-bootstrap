@@ -31,6 +31,16 @@ def _load_build_examples():
     return module
 
 
+def _rewrite_as_crlf(build_examples, path: Path) -> None:
+    """Rewrite *path* with CRLF endings.
+
+    Normalise to LF first so a checkout that is already CRLF (Windows with
+    autocrlf) does not turn into ``\r\r\n``, which would survive
+    ``_normalized()`` and report false drift.
+    """
+    path.write_bytes(build_examples._normalized(path).replace(b"\n", b"\r\n"))
+
+
 @requires_source
 def test_reproducible_examples_are_up_to_date():
     build_examples = _load_build_examples()
@@ -52,7 +62,7 @@ def test_check_ignores_line_ending_differences(tmp_path):
     shutil.copytree(real, copied)
     # Rewrite one committed file with CRLF endings.
     target = copied / "CLAUDE.md"
-    target.write_bytes(target.read_bytes().replace(b"\n", b"\r\n"))
+    _rewrite_as_crlf(build_examples, target)
     assert b"\r\n" in target.read_bytes()
 
     build_examples.GENERATED_DIR = fake_generated
@@ -80,7 +90,7 @@ def test_build_removes_stale_files_and_keeps_the_config(tmp_path):
     nested.mkdir()
     (nested / "old.md").write_text("old output\n")
     claude_md = copied / "CLAUDE.md"
-    claude_md.write_bytes(claude_md.read_bytes().replace(b"\n", b"\r\n"))
+    _rewrite_as_crlf(build_examples, claude_md)
 
     build_examples.build([copied])
 
@@ -94,8 +104,9 @@ def test_build_removes_stale_files_and_keeps_the_config(tmp_path):
     # The rebuilt tree equals a fresh generation and matches the committed one.
     assert build_examples.check([copied]) == []
     rebuilt = {p.relative_to(copied).as_posix(): p.read_bytes() for p in outputs}
+    # Compare the committed side normalised too, so a CRLF checkout passes.
     committed = {
-        p.relative_to(real).as_posix(): p.read_bytes()
+        p.relative_to(real).as_posix(): build_examples._normalized(p)
         for p in real.rglob("*")
         if p.is_file() and p.name != ".bootstrap-iac.yaml"
     }
