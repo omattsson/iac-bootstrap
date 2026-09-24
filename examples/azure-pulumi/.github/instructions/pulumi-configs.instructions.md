@@ -6,6 +6,7 @@ applyTo: "infra/**"
 # Pulumi Configuration Standards
 
 ## Project Layout
+
 ```
 infra/{stack-name}/
   Pulumi.yaml                   # Project metadata (name, runtime)
@@ -18,6 +19,7 @@ infra/components/               # Shared ComponentResource classes (imported by 
 ```
 
 ## Stack Config Pattern (`Pulumi.{env}.yaml`)
+
 ```yaml
 config:
   azure-native:location: westeurope
@@ -31,6 +33,7 @@ config:
 
 ## ComponentResource Pattern
 Every reusable resource group must be a `ComponentResource` in `infra/components/`:
+
 ```python
 import pulumi
 import pulumi_azure_native as azure
@@ -64,15 +67,18 @@ Sanitize user inputs: `re.sub(r"[^0-9A-Za-z]+", "-", suffix).strip("-").lower()`
 - Key Vault: max 24 chars — `(f"{prefix}-kv-{suffix}")[:24]`
 
 ## Tagging Standard
+
 ```python
 tags = {**default_tags, **resource_tags}
 # default_tags from config (environment, managed_by, product)
 # resource_tags win on key conflicts
 ```
+
 Required tags: `environment`, `managed_by: Pulumi`, `product`.
 
 ## Cross-Stack References
 Use `pulumi.StackReference` to read outputs from other stacks:
+
 ```python
 networking = pulumi.StackReference(f"contoso/networking/{env}")
 vnet_id = networking.get_output("vnet_id")

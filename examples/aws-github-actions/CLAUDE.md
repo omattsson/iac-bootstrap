@@ -38,6 +38,7 @@ These variables appear across all modules:
 ```hcl
 local.tags = merge(var.env_default_tags, var.tags)
 ```
+
 Required tags: `environment`, `product`, `managed_by = "Terraform"`.
 
 ## Environment Hierarchy
@@ -83,6 +84,7 @@ Hierarchy files:
 - Never hardcode account IDs — use `data.aws_caller_identity.current.account_id`
 
 **Provider versions:**
+
 ```hcl
 aws = { source = "hashicorp/aws", version = ">=5.0,<6.0" }
 ```
@@ -92,6 +94,7 @@ aws = { source = "hashicorp/aws", version = ">=5.0,<6.0" }
 ### Test Files (`**/*.tftest.hcl`)
 
 **Required boilerplate:**
+
 ```hcl
 mock_provider "aws" {}
 
@@ -106,6 +109,7 @@ override_data {
 ```
 
 **Standard test variables:**
+
 ```hcl
 variables {
   prefix           = "test-auto"

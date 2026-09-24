@@ -9,6 +9,10 @@ Checks:
   5. references/ and cli/bootstrap_iac/templates/ contain identical .tmpl files.
 """
 
+# Keep annotations lazy so PEP 604 unions (for example ``str | None``) do not
+# require Python 3.10 at runtime — this script must run on the declared floor.
+from __future__ import annotations
+
 import re
 import sys
 import yaml

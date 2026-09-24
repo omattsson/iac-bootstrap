@@ -39,6 +39,7 @@ These variables appear across all modules:
 ```hcl
 local.labels = merge(var.env_default_labels, var.labels)
 ```
+
 Required labels: `environment`, `product`, `managed_by = "terraform"`.
 
 > Note: GCP uses `labels`, not `tags`. The pattern is identical but the attribute name differs.
@@ -86,6 +87,7 @@ Hierarchy files:
 - Always set `project = var.project_id` explicitly
 
 **Provider versions:**
+
 ```hcl
 google = { source = "hashicorp/google", version = ">=5.0,<6.0" }
 ```
@@ -95,6 +97,7 @@ google = { source = "hashicorp/google", version = ">=5.0,<6.0" }
 ### Test Files (`**/*.tftest.hcl`)
 
 **Required boilerplate:**
+
 ```hcl
 mock_provider "google" {}
 
@@ -109,6 +112,7 @@ override_data {
 ```
 
 **Standard test variables:**
+
 ```hcl
 variables {
   prefix             = "test-auto"

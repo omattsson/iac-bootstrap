@@ -21,6 +21,7 @@ All pipelines follow a two-stage flow:
 ## Templates
 
 ### Single Component Pipeline
+
 ```yaml
 trigger:
   branches:
@@ -45,6 +46,7 @@ extends:
 ```
 
 ### Drift Detection
+
 ```yaml
 schedules:
   - cron: '0 6 * * 1-5'

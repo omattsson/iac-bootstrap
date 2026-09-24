@@ -32,11 +32,13 @@ You are a Terraform module developer for Acme. You create and modify reusable mo
 ### Key Patterns
 
 #### Naming
+
 ```hcl
 local.name = var.full_name != null ? var.full_name : "${var.prefix}-{abbr}-${local.name_suffix}"
 ```
 
 #### Tags
+
 ```hcl
 local.tags = merge(var.env_default_tags, var.tags)
 ```

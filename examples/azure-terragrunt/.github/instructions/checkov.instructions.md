@@ -62,6 +62,7 @@ Never reuse or reassign IDs; retired checks keep their number.
 | `CKV_CONTOSO_003` | Private endpoint required |
 
 ## Severity Levels
+
 | Severity | When to Use |
 |----------|-------------|
 | CRITICAL | Exposes data, public access on sensitive resources |
@@ -70,6 +71,7 @@ Never reuse or reassign IDs; retired checks keep their number.
 | LOW | Minor compliance gaps |
 
 ## Running Checks
+
 ```bash
 # Run all checks including Contoso custom checks
 checkov -d . --external-checks-dir ./checks
@@ -82,6 +84,7 @@ checkov -d . --external-checks-dir ./checks --check CKV_CONTOSO
 ```
 
 ## Pre-Commit Integration
+
 ```yaml
 # .pre-commit-config.yaml
 - repo: https://github.com/antonbabenko/pre-commit-terraform

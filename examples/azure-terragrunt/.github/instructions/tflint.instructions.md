@@ -92,6 +92,7 @@ func (r *ContosoNamingConventionRule) Check(runner tflint.Runner) error {
 ```
 
 ## Severity Guidelines
+
 | Level | When to Use |
 |-------|-------------|
 | `ERROR` | Naming violations, banned resources — blocks CI |
@@ -99,6 +100,7 @@ func (r *ContosoNamingConventionRule) Check(runner tflint.Runner) error {
 | `NOTICE` | Informational / stylistic suggestions |
 
 ## Running tflint
+
 ```bash
 # Install plugins and run recursively
 tflint --init
@@ -109,6 +111,7 @@ tflint --chdir=./tf-module-key-vault
 ```
 
 ## Pre-Commit Integration
+
 ```yaml
 # .pre-commit-config.yaml
 - repo: https://github.com/antonbabenko/pre-commit-terraform

@@ -19,6 +19,7 @@ Every shared component config must:
 4. Provide inputs mapping hierarchy variables to module variables
 
 ## Component Config Pattern
+
 ```hcl
 include "root" {
   path = find_in_parent_folders("root.hcl")

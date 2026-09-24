@@ -37,6 +37,7 @@ infra/
 #### 1. Check `infra/components/` for a matching `ComponentResource`
 
 #### 2. Import and instantiate in `__main__.py`
+
 ```python
 import sys
 from pathlib import Path
@@ -70,6 +71,7 @@ pulumi.export("vault_uri", kv.vault.properties.vault_uri)
 ```
 
 #### 3. Preview
+
 ```bash
 pulumi preview --stack dev
 ```
@@ -77,6 +79,7 @@ pulumi preview --stack dev
 ### Task B: Create a New Stack
 
 #### 1. `Pulumi.yaml`
+
 ```yaml
 name: contoso-{stack-name}
 runtime: python
@@ -84,6 +87,7 @@ description: "{Description} for Contoso Azure platform"
 ```
 
 #### 2. `Pulumi.dev.yaml`
+
 ```yaml
 config:
   azure-native:location: westeurope
@@ -94,17 +98,20 @@ config:
 ```
 
 #### 3. `requirements.txt`
+
 ```
 pulumi>=3.0.0,<4.0.0
 pulumi-azure-native>=2.0.0,<3.0.0
 ```
 
 #### 4. Set secrets
+
 ```bash
 pulumi config set --secret --stack dev contoso:clientSecret <value>
 ```
 
 #### 5. Preview and deploy
+
 ```bash
 pulumi preview --stack dev
 pulumi up --stack dev --yes
@@ -113,6 +120,7 @@ pulumi up --stack dev --yes
 ### Task C: Add a Shared ComponentResource
 
 Create `infra/components/{name}.py`:
+
 ```python
 import pulumi
 import pulumi_azure_native as azure

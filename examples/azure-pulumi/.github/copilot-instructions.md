@@ -39,12 +39,14 @@ infra/components/               # Shared ComponentResource classes
 ```python
 tags = {**default_tags, **resource_tags}
 ```
+
 `resource_tags` wins on key conflicts.
 Required tags: `environment`, `product`, `managed_by: Pulumi`.
 
 ## Stack Config Structure
 
 Non-secret values in `Pulumi.{env}.yaml`:
+
 ```yaml
 config:
   azure-native:location: westeurope
@@ -54,6 +56,7 @@ config:
 ```
 
 Secrets set via CLI:
+
 ```bash
 pulumi config set --secret --stack dev contoso:clientSecret <value>
 ```

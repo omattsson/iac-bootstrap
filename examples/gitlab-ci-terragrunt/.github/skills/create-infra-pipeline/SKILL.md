@@ -22,6 +22,7 @@ All pipelines follow a two-stage flow:
 ## Templates
 
 ### Single Component Pipeline
+
 ```yaml
 # ci/{component}-{environment}.gitlab-ci.yml
 
@@ -55,6 +56,7 @@ apply:{component}:
 ```
 
 ### Base Job Templates (`ci/terraform-base.gitlab-ci.yml`)
+
 ```yaml
 .terraform:plan:
   image: ghcr.io/gruntwork-io/terragrunt:latest
@@ -84,6 +86,7 @@ apply:{component}:
 ```
 
 ### Drift Detection Pipeline
+
 ```yaml
 # ci/drift-{environment}.gitlab-ci.yml
 

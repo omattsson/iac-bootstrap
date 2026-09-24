@@ -107,6 +107,7 @@ test_violation_when_environment_tag_missing if {
 ```
 
 ## Running Policy Tests
+
 ```bash
 # Run all Contoso policy tests
 opa test policies/ -v
@@ -116,6 +117,7 @@ opa test policies/contoso/ -v --run tags
 ```
 
 ## Azure DevOps Pipeline Integration
+
 ```yaml
 - task: Bash@3
   displayName: 'Evaluate OPA governance policies'
@@ -131,6 +133,7 @@ opa test policies/contoso/ -v --run tags
 ```
 
 ## Package Conventions
+
 | Package | Purpose |
 |---------|---------|
 | `contoso.tags` | Required tag enforcement |

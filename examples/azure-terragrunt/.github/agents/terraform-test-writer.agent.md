@@ -144,6 +144,7 @@ check = CheckContosoRequiredTags()
 ```
 
 ### Running
+
 ```bash
 checkov -d . --external-checks-dir ./checks
 ```
@@ -159,6 +160,7 @@ Use to enforce Contoso coding standards at lint time (naming patterns, banned re
 - `WARNING` — should fix (non-standard patterns)
 
 ### Running
+
 ```bash
 tflint --init && tflint --recursive
 ```
@@ -190,6 +192,7 @@ violations contains msg if {
 ```
 
 ### Running
+
 ```bash
 opa eval --input tfplan.json --data policies/ --fail-defined \
   "data.contoso.tags.violations"

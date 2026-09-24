@@ -1,0 +1,86 @@
+name: Release
+
+# Runs when a version tag is pushed. It validates that the tag, the package
+# version, and the changelog agree, that the built wheel bundles all template
+# package data, and that the installed CLI works from a clean environment. Only
+# then does it publish the built distribution as a GitHub Release.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Validate and publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # create the GitHub Release and upload the distribution
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: pip install build
+
+      - name: Check tag, version, and changelog agree
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python scripts/check_release.py --tag "$TAG"
+
+      - name: Build sdist and wheel
+        run: python -m build --outdir dist ./cli
+
+      - name: Verify the wheel bundles all template package data
+        run: >-
+          python scripts/check_package_artifact.py
+          --dist dist
+          --pyproject cli/pyproject.toml
+
+      - name: Install the wheel in an isolated environment
+        run: |
+          python -m venv "$RUNNER_TEMP/isoenv"
+          "$RUNNER_TEMP/isoenv/bin/pip" install --upgrade pip
+          "$RUNNER_TEMP/isoenv/bin/pip" install dist/*.whl
+
+      - name: Smoke test the installed CLI from outside the checkout
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          BIN="$RUNNER_TEMP/isoenv/bin"
+          SMOKE="$RUNNER_TEMP/smoke"
+          mkdir -p "$SMOKE/out"
+          cd "$SMOKE"
+          # The installed CLI must report the tag's version, so a stale
+          # __version__ cannot ship under a release tag.
+          version_out="$("$BIN/bootstrap-iac" --version)"
+          echo "$version_out"
+          case "$version_out" in
+            *"version ${TAG#v}") ;;
+            *)
+              echo "CLI --version '$version_out' does not match tag $TAG"
+              exit 1
+              ;;
+          esac
+          "$BIN/bootstrap-iac" --non-interactive \
+            --company "Release Smoke" --cloud aws --orchestration none \
+            --ci-cd github-actions --target both \
+            --workspace out --output-dir out
+          "$BIN/bootstrap-iac" --validate out
+
+      - name: Publish GitHub Release with the built distribution
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/* \
+            --title "$TAG" \
+            --notes "Automated release for $TAG. See CHANGELOG.md."

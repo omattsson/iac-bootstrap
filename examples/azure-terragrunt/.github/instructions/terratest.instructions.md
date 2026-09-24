@@ -73,6 +73,7 @@ func TestKeyVault(t *testing.T) {
   - `ARM_CLIENT_ID`, `ARM_CLIENT_SECRET`, `ARM_TENANT_ID`, `ARM_SUBSCRIPTION_ID`
 
 ## Tag All Test Resources
+
 ```go
 "tags": map[string]string{
     "managed_by":  "terratest",
@@ -80,6 +81,7 @@ func TestKeyVault(t *testing.T) {
     "product":     "automated-test",
 },
 ```
+
 Enables easy cleanup via Azure tag-based queries.
 
 ## CI Considerations

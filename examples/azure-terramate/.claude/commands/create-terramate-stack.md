@@ -29,6 +29,7 @@ infrastructure-config/
 ## Task A: Add a New Stack
 
 ### 1. Create `stack.tm.hcl`
+
 ```hcl
 stack {
   name        = "{service}-{environment}"
@@ -39,6 +40,7 @@ stack {
 ```
 
 ### 2. Create stack globals (`globals.tm.hcl`)
+
 ```hcl
 globals {
   prefix       = "app-weu-{env}"
@@ -48,11 +50,13 @@ globals {
 
 ### 3. Add module version to root globals
 In `infrastructure-config/globals.tm.hcl` → `module_versions`:
+
 ```hcl
 "{new-module}" = "v1.0.0"
 ```
 
 ### 4. Create the module call (`{component}.tf`)
+
 ```hcl
 module "{name}" {
   source = "git::https://dev.azure.com/contoso/infra/_git/tf-module-{name}?ref=${global.module_versions["{name}"]}"
@@ -70,14 +74,17 @@ module "{name}" {
 ```
 
 ### 5. Regenerate
+
 ```bash
 terramate generate
 ```
+
 Review the diff — only new `_generated_*.tf` files should appear.
 
 ## Task B: Add a New Environment
 
 ### 1. Create `infrastructure-config/{env}/globals.tm.hcl`
+
 ```hcl
 globals {
   environment     = "{env}"

@@ -41,6 +41,7 @@ These variables appear across all modules:
 ```hcl
 local.tags = merge(var.env_default_tags, var.tags)
 ```
+
 Required tags: `environment`, `product`, `managed_by = "Terraform"`.
 
 ## Terragrunt Hierarchy
@@ -48,6 +49,7 @@ Required tags: `environment`, `product`, `managed_by = "Terraform"`.
 ```
 config/{environment}/{site}/{stack}/{component}/terragrunt.hcl
 ```
+
 - `subscription.hcl` → Subscription ID, module versions
 - `site.hcl` → Region, location
 - `stack.hcl` → Stack name, prefix
@@ -75,11 +77,13 @@ config/{environment}/{site}/{stack}/{component}/terragrunt.hcl
 - Tags: `merge(var.env_default_tags, var.tags)` — always
 
 **Naming pattern:**
+
 ```hcl
 local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-kv-${local.name_suffix}", 0, 24)
 ```
 
 **Provider versions:**
+
 ```hcl
 azurerm = { source = "hashicorp/azurerm", version = ">=4.21.0,<5.0" }
 ```
@@ -89,6 +93,7 @@ azurerm = { source = "hashicorp/azurerm", version = ">=4.21.0,<5.0" }
 ### Test Files (`**/*.tftest.hcl`)
 
 **Required boilerplate:**
+
 ```hcl
 mock_provider "azurerm" {}
 
