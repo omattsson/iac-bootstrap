@@ -301,25 +301,65 @@ def test_cli_version_matches_the_project_version():
 
 
 @requires_source
-def test_repo_classifiers_cover_the_declared_python_floor():
-    """Each Python minor from the requires-python floor up is a classifier."""
-    art = _load(_ARTIFACT_SCRIPT)
-    pyproject = _REPO_ROOT / "cli" / "pyproject.toml"
+def _tomllib():
     try:
         import tomllib
-    except ModuleNotFoundError:  # pragma: no cover
+    except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 in the matrix
         import tomli as tomllib  # type: ignore[no-redef]
-    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    requires = data["project"]["requires-python"]  # e.g. ">=3.9"
-    floor_minor = int(requires.split("3.")[1].split(",")[0].strip())
-    classifiers = data["project"]["classifiers"]
-    versioned = {
-        c.rsplit("::", 1)[1].strip()
-        for c in classifiers
+    return tomllib
+
+
+def _ci_matrix_python_versions() -> set[str]:
+    """The Python versions the CLI-tests matrix runs, from the CI workflow."""
+    import yaml
+
+    workflow = yaml.safe_load(
+        (_REPO_ROOT / ".github" / "workflows" / "validate.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    versions = workflow["jobs"]["cli-tests"]["strategy"]["matrix"]["python-version"]
+    return {str(v) for v in versions}
+
+
+@requires_source
+def test_python_classifiers_match_the_ci_matrix_and_floor():
+    """The advertised Python range must stay aligned across three places.
+
+    The set of ``Programming Language :: Python :: 3.x`` classifiers must equal
+    the CI test matrix exactly, so removing (or adding) any supported minor in
+    one place without the other fails. The set must also be a contiguous run
+    starting at the ``requires-python`` floor, so the declared floor and the
+    tested range cannot drift apart.
+    """
+    tomllib = _tomllib()
+    data = tomllib.loads(
+        (_REPO_ROOT / "cli" / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    floor_minor = int(data["project"]["requires-python"].split("3.")[1].split(",")[0])
+    classifier_minors = {
+        int(c.rsplit(".", 1)[1])
+        for c in data["project"]["classifiers"]
         if c.startswith("Programming Language :: Python :: 3.")
     }
-    assert f"3.{floor_minor}" in versioned, (
-        f"missing a classifier for the declared floor 3.{floor_minor}"
+    matrix_minors = {int(v.split(".")[1]) for v in _ci_matrix_python_versions()}
+
+    assert classifier_minors == matrix_minors, (
+        "Python classifiers and the CI matrix disagree: "
+        f"classifiers={sorted(classifier_minors)}, matrix={sorted(matrix_minors)}"
     )
-    # Ensure check_package_artifact exposes the version reader it advertises.
+    assert min(classifier_minors) == floor_minor, (
+        f"lowest classifier 3.{min(classifier_minors)} != requires-python floor "
+        f"3.{floor_minor}"
+    )
+    expected = set(range(floor_minor, max(classifier_minors) + 1))
+    assert classifier_minors == expected, (
+        f"supported minors are not contiguous from the floor: "
+        f"{sorted(classifier_minors)} vs expected {sorted(expected)}"
+    )
+
+
+@requires_source
+def test_check_package_artifact_exposes_its_version_reader():
+    art = _load(_ARTIFACT_SCRIPT)
     assert hasattr(art, "pyproject_version")
