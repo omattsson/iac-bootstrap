@@ -18,3 +18,13 @@ MD026: false
 # Fenced code blocks should have a language — plain-text blocks are used for
 # interview question lists and directory trees
 MD040: false
+
+# Duplicate headings — the value-comparison doc repeats subsection names
+# (for example "Without Agents", "Time & Quality Summary") under each scenario.
+# Allow the repetition across sections; still flag true sibling duplicates.
+MD024:
+  siblings_only: true
+
+# Emphasis used as a heading — bold "Total: N steps …" summary lines in the
+# value-comparison doc are intentional inline summaries, not section headings.
+MD036: false

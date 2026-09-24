@@ -1,4 +1,4 @@
-name: Validate Templates
+name: CI
 
 on:
   push:
@@ -6,13 +6,13 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  validate-templates:
+  template-validation:
     name: Template validation
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,19 +29,21 @@ jobs:
         run: python scripts/validate_templates.py
 
   cli-tests:
-    name: CLI tests
+    name: CLI tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
+    strategy:
+      fail-fast: false
+      matrix:
+        # Test the full range declared by requires-python in cli/pyproject.toml.
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
       - name: Generate bundled templates
         run: python scripts/build_templates.py
@@ -58,12 +60,98 @@ jobs:
       - name: Run tests
         run: pytest cli/tests/ -q
 
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate bundled templates
+        run: python scripts/build_templates.py
+
+      - name: Install CLI package
+        run: pip install ./cli[dev]
+
+      - name: Run tests with coverage
+        # PYTHONPATH=cli measures the source package, so coverage maps to the
+        # tracked files (not an installed copy) for a stable, reviewable report.
+        env:
+          PYTHONPATH: cli
+        run: >-
+          pytest cli/tests/ -q
+          --cov=bootstrap_iac
+          --cov=scripts
+          --cov-config=cli/pyproject.toml
+          --cov-report=term-missing
+          --cov-fail-under=90
+
+  package:
+    name: Package artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: pip install build
+
+      - name: Build sdist and wheel
+        run: python -m build --outdir dist ./cli
+
+      - name: Verify the wheel bundles all template package data
+        run: >-
+          python scripts/check_package_artifact.py
+          --dist dist
+          --pyproject cli/pyproject.toml
+
+      - name: Install the wheel in an isolated environment
+        # A separate venv with only the wheel — no editable install, no source
+        # on the path. This is what an end user gets from `pip install`.
+        run: |
+          python -m venv "$RUNNER_TEMP/isoenv"
+          "$RUNNER_TEMP/isoenv/bin/pip" install --upgrade pip
+          "$RUNNER_TEMP/isoenv/bin/pip" install dist/*.whl
+
+      - name: Smoke test the installed CLI from outside the checkout
+        # Run from a directory with no references/ or templates/ on disk, so the
+        # generation can only succeed using the bundled package data. This is the
+        # check a source checkout hides.
+        run: |
+          set -euo pipefail
+          BIN="$RUNNER_TEMP/isoenv/bin"
+          SMOKE="$RUNNER_TEMP/smoke"
+          mkdir -p "$SMOKE/out"
+          cd "$SMOKE"
+          "$BIN/bootstrap-iac" --version
+          "$BIN/bootstrap-iac" --non-interactive \
+            --company "Smoke Co" --cloud azure --orchestration terragrunt \
+            --ci-cd github-actions --target both \
+            --workspace out --output-dir out
+          test -f out/CLAUDE.md
+          test -f out/.github/copilot-instructions.md
+          "$BIN/bootstrap-iac" --validate out
+
+      - name: Upload built distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
+          if-no-files-found: error
+
   markdown-lint:
     name: Markdown lint
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -72,4 +160,47 @@ jobs:
         uses: DavidAnson/markdownlint-cli2-action@v19
         with:
           config: .markdownlint.yml
-          globs: "README.md SKILL.md CLAUDE.md"
+          # All maintained Markdown. The example output trees under
+          # examples/<name>/ are generated (or illustrative) and are checked for
+          # drift elsewhere, so they are excluded here.
+          globs: |
+            **/*.md
+            !examples/*/**
+            !cli/build/**
+            !**/node_modules/**
+
+  dependency-scan:
+    name: Dependency scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the package and pip-audit
+        run: |
+          pip install ./cli
+          pip install pip-audit
+
+      - name: Audit installed dependencies for known vulnerabilities
+        # Fails on a known vulnerability in a runtime dependency. Not --strict,
+        # so a package that cannot be audited does not fail the build.
+        run: pip-audit --progress-spinner off
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

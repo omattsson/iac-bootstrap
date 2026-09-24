@@ -15,6 +15,15 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 keywords = ["terraform", "iac", "ai", "copilot", "claude", "bootstrap"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+]
 dependencies = [
     "click>=8.0",
     "pyyaml>=6.0",
@@ -33,9 +42,34 @@ include = ["bootstrap_iac*"]
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-cov>=4.0",
     "build>=1.0",
     "wheel",
+    # The packaging tests read pyproject.toml; tomllib is stdlib only on 3.11+.
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+# Gate the shipped package and the release/artifact checks that guard packaging.
+source = ["bootstrap_iac", "scripts"]
+omit = [
+    # The module-execution shim (`python -m bootstrap_iac`) only forwards to the
+    # console entry point, which the CLI tests already exercise directly.
+    "*/bootstrap_iac/__main__.py",
+    # These scripts have their own dedicated coverage path: build_templates and
+    # build_examples are covered by test_packaging/test_examples, and
+    # validate_templates runs as a whole via the template-validation CI job.
+    "*/scripts/build_templates.py",
+    "*/scripts/build_examples.py",
+    "*/scripts/validate_templates.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]

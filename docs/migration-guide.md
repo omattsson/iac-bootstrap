@@ -139,17 +139,17 @@ In long-lived workspaces, you often have multiple generations of conventions:
 2. **Designate the target standard.** New modules always use the current standard.
 3. **Flag legacy modules explicitly.** Add a comment in the instructions:
 
-```markdown
-## Naming Conventions
+   ```markdown
+   ## Naming Conventions
 
-### Target Standard (use for all new modules)
-Pattern: `"${var.prefix}-${local.resource_code}-${local.suffix}"`
-Example: `"prod-kv-payments"`
+   ### Target Standard (use for all new modules)
+   Pattern: `"${var.prefix}-${local.resource_code}-${local.suffix}"`
+   Example: `"prod-kv-payments"`
 
-### Legacy Pattern (existing modules only — do not introduce in new work)
-Pattern: `"${var.company}-${var.env}-${var.resource_type}"`
-Modules: tf-module-storage, tf-module-networking (pre-2022)
-```
+   ### Legacy Pattern (existing modules only — do not introduce in new work)
+   Pattern: `"${var.company}-${var.env}-${var.resource_type}"`
+   Modules: tf-module-storage, tf-module-networking (pre-2022)
+   ```
 
 4. **Use the gap analysis (Phase 3) to track migration progress.** Mark naming as `Partial` and add a note about which modules still use the legacy pattern.
 5. **Don't block on full migration.** Generate AI agents that follow the target standard. As legacy modules are touched for other reasons, migrate their naming then.

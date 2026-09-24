@@ -46,17 +46,21 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
 
 **Solution:**
 - Confirm the symlink target is correct:
+
   ```bash
   ls -la ~/.copilot/skills/bootstrap-infra-workspace
   ```
+
   It should point to the repo root (the directory containing `SKILL.md`), not to `SKILL.md` itself.
 - Check that `SKILL.md` contains a valid YAML front-matter block at the top:
+
   ```yaml
   ---
   name: bootstrap-infra-workspace
   description: "..."
   ---
   ```
+
   Copilot uses the `name` field for skill discovery. If the front matter is malformed, the skill will be silently ignored.
 - Reload the VS Code window (`Ctrl+Shift+P` → *Developer: Reload Window*) after creating or updating the symlink.
 - Ensure the Copilot extension is up to date — skill support was added in a specific extension version. Check the VS Code Copilot changelog if the feature is unavailable.
@@ -70,9 +74,11 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
 **Solution:**
 - `CLAUDE.md` must be present in the **root of the workspace** that Claude Code is opened in, not in a parent or sibling directory.
 - Verify the file was generated to the correct location:
+
   ```bash
   ls -la CLAUDE.md
   ```
+
 - Rules in `CLAUDE.md` are guidance, not hard constraints — Claude Code can still deviate if a request conflicts with a rule. Reinforce critical rules by adding them to individual slash commands in `.claude/commands/`.
 - If Claude is operating on a specific subdirectory, add a second `CLAUDE.md` to that subdirectory with the subset of rules relevant to it.
 - Check for syntax issues: CLAUDE.md is plain Markdown. Malformed headings or broken lists may cause sections to be skipped. Compare your file against `references/claude/CLAUDE.md.tmpl`.
@@ -85,9 +91,11 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
 
 **Solution:**
 1. Pull the latest `iac-bootstrap` changes:
+
    ```bash
    cd /path/to/iac-bootstrap && git pull
    ```
+
 2. Re-run the bootstrap procedure against your workspace. The agent will detect existing files and offer to merge or overwrite them (Phase 4, Generation Rule 6).
 3. If you only need to update specific files, copy the relevant `.tmpl` file, manually replace all `{{PLACEHOLDER}}` values with your workspace's values, and overwrite the existing output file.
 4. After updating, validate with Phase 5 checks: confirm no `{{PLACEHOLDER}}` strings remain, check `applyTo` patterns, and verify no secrets were introduced.
@@ -144,11 +152,14 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
 
 **Solution:**
 - Before committing, run a quick check for unreplaced placeholders:
+
   ```bash
   grep -rn '{{' .github/ CLAUDE.md .claude/ 2>/dev/null
   ```
+
   Any matches indicate placeholders that were not substituted.
 - Add a pre-commit hook or CI step to catch this automatically:
+
   ```bash
   # .git/hooks/pre-commit (make executable with chmod +x)
   if grep -rqn '{{' .github/ CLAUDE.md .claude/ 2>/dev/null; then
@@ -156,4 +167,5 @@ Common setup and usage issues when working with the IaC Bootstrap tool.
     exit 1
   fi
   ```
+
 - Re-run the bootstrap procedure, providing values for any placeholders that were left empty during the interview.

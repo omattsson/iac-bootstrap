@@ -27,6 +27,7 @@ Every module should follow the same file structure. New team members should know
 
 ### Resource Identifier Convention
 Use a consistent identifier for single-instance resources:
+
 ```hcl
 # Good: predictable, grepable
 resource "azurerm_key_vault" "default" { ... }
@@ -41,6 +42,7 @@ resource "azurerm_private_endpoint" "default" {
 
 ### Full-Name Override Pattern
 Always allow consumers to bypass your naming logic:
+
 ```hcl
 variable "full_name" {
   type        = string
@@ -55,6 +57,7 @@ locals {
 
 ### Resource Name Length Safety
 Cloud providers have different name limits (Key Vault: 24, Storage Account: 24, etc.). Always truncate:
+
 ```hcl
 locals {
   name = substr(local.unsafe_name, 0, 24)  # Enforce max length
@@ -67,6 +70,7 @@ locals {
 
 ### Name Sanitization
 User inputs contain special characters. Always sanitize:
+
 ```hcl
 locals {
   name_suffix = lower(trimprefix(trimsuffix(
@@ -76,6 +80,7 @@ locals {
 
 ### Tag Merge Strategy
 Define a clear merge order where resource-specific tags win:
+
 ```hcl
 locals {
   tags = merge(var.env_default_tags, var.tags)
@@ -101,6 +106,7 @@ Enforce these at the orchestration/pipeline layer:
 
 ### Common Variables File
 Maintain a `common.variables.tf` that's identical across all modules. This is the contract between your orchestration layer and your modules:
+
 ```hcl
 variable "prefix"              { type = string }
 variable "location"            { type = string, default = "westeurope" }
@@ -113,6 +119,7 @@ variable "env_default_tags"    { type = map(string), default = {} }
 
 ### Optional with Defaults
 Use Terraform 1.3+ `optional()` for complex objects so consumers only specify what they care about:
+
 ```hcl
 variable "network_config" {
   type = object({
@@ -129,6 +136,7 @@ variable "network_config" {
 
 ### Feature Toggles
 Use boolean variables with `count` or conditional `for_each` for optional features:
+
 ```hcl
 variable "enable_rbac" {
   type    = bool
@@ -168,6 +176,7 @@ Choose the right tool for each testing concern:
 
 ### Plan-Only Tests (Native `.tftest.hcl`)
 Never create real resources in module unit tests. Use `command = plan` with mock providers:
+
 ```hcl
 mock_provider "azurerm" {}
 
@@ -192,6 +201,7 @@ One file per concern — not one monolithic test file:
 
 ### Data Source Overrides
 Mock data sources that call cloud APIs:
+
 ```hcl
 override_data {
   target = data.azurerm_subscription.current
@@ -201,6 +211,7 @@ override_data {
 
 ### Test Variables
 Always include ALL required variables. Missing variables cause confusing errors:
+
 ```hcl
 variables {
   prefix              = "test-auto"
@@ -214,6 +225,7 @@ variables {
 
 ### Terratest (Go) Integration Tests
 Use for scenarios that require actual resource creation:
+
 ```go
 func TestKeyVault(t *testing.T) {
     t.Parallel()
@@ -230,6 +242,7 @@ func TestKeyVault(t *testing.T) {
     assert.NotEmpty(t, terraform.Output(t, opts, "name"))
 }
 ```
+
 - Always `defer terraform.Destroy` before `InitAndApply`
 - Never hardcode cloud credentials — use environment variables
 - Tag all test resources with `managed_by = "terratest"` for cleanup identification
@@ -237,6 +250,7 @@ func TestKeyVault(t *testing.T) {
 
 ### Checkov Custom Policies
 Encode organization-specific compliance rules as reusable checkov checks:
+
 ```python
 class CheckRequiredTags(BaseResourceCheck):
     def __init__(self):
@@ -253,6 +267,7 @@ class CheckRequiredTags(BaseResourceCheck):
             return CheckResult.FAILED
         return CheckResult.PASSED
 ```
+
 - Check IDs: `CKV_{COMPANY_SLUG}_{NNN}` — never reuse or reassign
 - Run alongside plan: `checkov -d . --external-checks-dir ./checks`
 
@@ -264,6 +279,7 @@ Enforce workspace-specific coding standards at lint time:
 
 ### OPA/Rego Policies
 Evaluate `terraform show -json` plan output for governance:
+
 ```rego
 package contoso.tags
 
@@ -276,6 +292,7 @@ violations contains msg if {
     msg := sprintf("Resource %s is missing required tag 'environment'", [resource.address])
 }
 ```
+
 - One package per policy area: `naming`, `tags`, `network`, `iam`
 - Always expose violations as a **set named `violations`**
 - Gate CI approval: `opa eval --fail-defined "data.contoso.tags.violations"`
@@ -286,6 +303,7 @@ violations contains msg if {
 
 ### DRY Hierarchy
 Never repeat configuration. Extract shared config into a common layer:
+
 ```
 _envcommon/keyvault.hcl    ← shared inputs, dependencies, source URL
 config/dev/keyvault/       ← includes shared + only overrides what differs
@@ -315,9 +333,11 @@ dependency "vnet" {
 
 ### Input Flow
 Establish a clear hierarchy where variables merge predictably:
+
 ```
 account/subscription-level → region/site-level → stack-level → component-level
 ```
+
 Each level can override the previous. Document the merge order.
 
 ---
@@ -345,12 +365,14 @@ Schedule periodic plan-only runs on main branch:
 
 ### Provider Caching
 Cache Terraform providers across pipeline runs to speed up `init`:
+
 ```
 --provider-cache --provider-cache-dir /tmp/providers/
 ```
 
 ### Lock Timeout
 In shared environments, set a generous lock timeout:
+
 ```
 -lock-timeout=20m
 ```
@@ -365,16 +387,19 @@ In shared environments, set a generous lock timeout:
 - Use identity-based auth wherever possible
 
 ### Network Hardening by Default
+
 ```hcl
 variable "public_network_access_enabled" {
   type    = bool
   default = false  # Secure by default
 }
 ```
+
 Require explicit opt-in for public access. Combine with private endpoints.
 
 ### Private Endpoint Pattern
 Every module that supports private connectivity should follow a consistent pattern:
+
 ```hcl
 variable "private_endpoints" {
   type = map(object({
@@ -403,6 +428,7 @@ resource "..._private_endpoint" "default" {
 
 ### Pre-Commit Hooks
 Automate quality checks before code leaves the developer's machine:
+
 ```yaml
 repos:
   - repo: https://github.com/antonbabenko/pre-commit-terraform
@@ -550,6 +576,7 @@ Never use local state in shared environments. Configure remote backend:
 
 ### State File Per Component
 One state file per deployable unit. Don't put your entire infrastructure in one state:
+
 ```
 Good: keyvault/ → keyvault/terraform.tfstate
       aks/      → aks/terraform.tfstate
@@ -565,9 +592,11 @@ Enable encryption at rest for state storage. State contains sensitive values.
 ## 10. Progressive Rollout
 
 ### Environment Promotion
+
 ```
 dev → staging → prod
 ```
+
 - Each environment pins its own module versions
 - Promote by updating the version pin, not by copying code
 - Always plan in the target environment before applying
@@ -576,6 +605,7 @@ dev → staging → prod
 - Small modules → small state files → small blast radius
 - Separate stateful resources (databases) from stateless (compute)
 - Use `prevent_destroy` lifecycle on critical resources:
+
 ```hcl
 lifecycle {
   prevent_destroy = true
