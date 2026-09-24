@@ -51,13 +51,25 @@ jobs:
           "$RUNNER_TEMP/isoenv/bin/pip" install dist/*.whl
 
       - name: Smoke test the installed CLI from outside the checkout
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           BIN="$RUNNER_TEMP/isoenv/bin"
           SMOKE="$RUNNER_TEMP/smoke"
           mkdir -p "$SMOKE/out"
           cd "$SMOKE"
-          "$BIN/bootstrap-iac" --version
+          # The installed CLI must report the tag's version, so a stale
+          # __version__ cannot ship under a release tag.
+          version_out="$("$BIN/bootstrap-iac" --version)"
+          echo "$version_out"
+          case "$version_out" in
+            *"version ${TAG#v}") ;;
+            *)
+              echo "CLI --version '$version_out' does not match tag $TAG"
+              exit 1
+              ;;
+          esac
           "$BIN/bootstrap-iac" --non-interactive \
             --company "Release Smoke" --cloud aws --orchestration none \
             --ci-cd github-actions --target both \

@@ -286,6 +286,21 @@ def test_repo_changelog_documents_the_current_version():
 
 
 @requires_source
+def test_cli_version_matches_the_project_version():
+    """The CLI's reported version must match pyproject, so a release tag (which
+    check_release ties to pyproject) also matches what `bootstrap-iac --version`
+    prints. Guards against the two version sources drifting apart."""
+    m = _load(_RELEASE_SCRIPT)
+    project_version = m.pyproject_version(_REPO_ROOT / "cli" / "pyproject.toml")
+    from bootstrap_iac import __version__
+
+    assert __version__ == project_version, (
+        f"bootstrap_iac.__version__ ({__version__}) != pyproject version "
+        f"({project_version}); update cli/bootstrap_iac/__init__.py"
+    )
+
+
+@requires_source
 def test_repo_classifiers_cover_the_declared_python_floor():
     """Each Python minor from the requires-python floor up is a classifier."""
     art = _load(_ARTIFACT_SCRIPT)

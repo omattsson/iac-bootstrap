@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Continuous integration hardening: the test suite runs across the full
-  declared Python range (3.9 through 3.13); a built wheel is installed in
+  declared Python range (3.9 through 3.14); a built wheel is installed in
   isolation and smoke-tested so missing package data can no longer hide behind a
   source checkout; coverage is measured with a minimum threshold; dependency and
   secret scans run on pull requests; and all maintained Markdown is linted.
