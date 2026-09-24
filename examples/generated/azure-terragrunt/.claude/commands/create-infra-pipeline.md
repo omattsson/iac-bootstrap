@@ -97,8 +97,10 @@ jobs:
           echo "code=$?" >> "$GITHUB_OUTPUT"
         working-directory: infrastructure-config
       - name: Fail on plan error
-        if: steps.plan.outputs.code == '1'
-        run: exit 1
+        if: steps.plan.outputs.code != '0' && steps.plan.outputs.code != '2'
+        run: |
+          echo "Plan failed with exit code ${{ steps.plan.outputs.code }}"
+          exit 1
       - name: Notify on drift
         if: steps.plan.outputs.code == '2'
         run: echo 'Drift detected — review plan output'

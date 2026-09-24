@@ -952,8 +952,10 @@ def _drift_pipeline(cicd: str, orch: str) -> str:
         )
 
     plan_cmd = _DRIFT_PLAN_COMMANDS.get(tool, _DRIFT_PLAN_COMMANDS["terraform"])
-    # Capture the exit code instead of using continue-on-error, so a real
-    # error (1) fails the job and only genuine drift (2) sends a notification.
+    # Capture the exit code instead of using continue-on-error. Only 0 (clean)
+    # and 2 (drift) are expected; every other code — 1 (plan error), 127
+    # (command not found), a signal, or a wrapper-specific code — fails the
+    # job, so no failure is masked. Only genuine drift (2) sends a notification.
     return header + (
         "      - id: plan\n"
         "        run: |\n"
@@ -962,8 +964,10 @@ def _drift_pipeline(cicd: str, orch: str) -> str:
         '          echo "code=$?" >> "$GITHUB_OUTPUT"\n'
         "        working-directory: infrastructure-config\n"
         "      - name: Fail on plan error\n"
-        "        if: steps.plan.outputs.code == '1'\n"
-        "        run: exit 1\n"
+        "        if: steps.plan.outputs.code != '0' && steps.plan.outputs.code != '2'\n"
+        "        run: |\n"
+        "          echo \"Plan failed with exit code ${{ steps.plan.outputs.code }}\"\n"
+        "          exit 1\n"
         "      - name: Notify on drift\n"
         "        if: steps.plan.outputs.code == '2'\n"
         "        run: echo 'Drift detected — review plan output'\n"

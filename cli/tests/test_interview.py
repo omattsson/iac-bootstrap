@@ -43,7 +43,12 @@ def test_drift_pipeline_uses_valid_command_and_exit_codes(orch, expected_cmd):
     drift = ctx["DRIFT_PIPELINE"]
     assert expected_cmd in drift
     assert "run-all plan --detailed-exitcode" not in drift or orch == "Terragrunt"
-    assert "steps.plan.outputs.code == '1'" in drift  # genuine error fails
+    # Every code except 0 (clean) and 2 (drift) must fail the job, so 127,
+    # signals, and wrapper-specific codes are not masked as success.
+    assert (
+        "steps.plan.outputs.code != '0' && steps.plan.outputs.code != '2'" in drift
+    )
+    assert "steps.plan.outputs.code == '1'" not in drift  # not a sole gate
     assert "steps.plan.outputs.code == '2'" in drift  # drift notifies
     assert "continue-on-error" not in drift
     assert "if: failure()" not in drift
