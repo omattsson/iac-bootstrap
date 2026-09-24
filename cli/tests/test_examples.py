@@ -41,6 +41,19 @@ def test_reproducible_examples_are_up_to_date():
 
 
 @requires_source
+def test_check_fails_when_no_reproducible_examples_exist(tmp_path):
+    """An empty or missing examples/generated/ is a failure, not a pass, so
+    deleting the complete example cannot slip past --check."""
+    build_examples = _load_build_examples()
+    empty = tmp_path / "generated"
+    empty.mkdir()
+    build_examples.GENERATED_DIR = empty
+    assert any("no reproducible examples" in p for p in build_examples.check())
+    build_examples.GENERATED_DIR = tmp_path / "does-not-exist"
+    assert any("no reproducible examples" in p for p in build_examples.check())
+
+
+@requires_source
 def test_check_flags_a_generated_dir_without_a_config():
     """A directory under examples/generated/ without a config is reported."""
     build_examples = _load_build_examples()

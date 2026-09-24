@@ -132,6 +132,13 @@ def check(examples: list[Path] | None = None) -> list[str]:
             if GENERATED_DIR.is_dir()
             else []
         )
+        # The repository must always carry at least one reproducible example,
+        # so an empty or missing examples/generated/ is a failure, not a pass.
+        if not examples:
+            problems.append(
+                "examples/generated/ has no reproducible examples "
+                "(expected at least one directory with a .bootstrap-iac.yaml)"
+            )
     for example in examples:
         name = example.relative_to(EXAMPLES_DIR).as_posix()
         if not any((example / n).is_file() for n in CONFIG_NAMES):

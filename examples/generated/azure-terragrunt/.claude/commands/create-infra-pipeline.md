@@ -91,11 +91,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: plan
-        run: terragrunt run-all plan --detailed-exitcode
+        run: |
+          set +e
+          terragrunt run-all plan -detailed-exitcode
+          echo "code=$?" >> "$GITHUB_OUTPUT"
         working-directory: infrastructure-config
-        continue-on-error: true
+      - name: Fail on plan error
+        if: steps.plan.outputs.code == '1'
+        run: exit 1
       - name: Notify on drift
-        if: steps.plan.outcome == 'failure'
+        if: steps.plan.outputs.code == '2'
         run: echo 'Drift detected — review plan output'
 
 

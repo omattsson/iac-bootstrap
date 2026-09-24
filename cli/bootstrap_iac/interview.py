@@ -917,33 +917,57 @@ def _stack_pipeline(cicd: str, orch: str) -> str:
     return "# Define your stack-level plan → apply pipeline here"
 
 
+# Drift plan command per tool. Each Terraform-based command uses
+# -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes (drift).
+_DRIFT_PLAN_COMMANDS: dict[str, str] = {
+    "terraform": "terraform plan -detailed-exitcode",
+    "terragrunt": "terragrunt run-all plan -detailed-exitcode",
+    "terramate": "terramate run -- terraform plan -detailed-exitcode",
+}
+
+
 def _drift_pipeline(cicd: str, orch: str) -> str:
     tool = _ORCHESTRATION_DEFAULTS.get(orch, _ORCHESTRATION_DEFAULTS["None"])["tool_lower"]
-    if "GitHub" in cicd:
-        if tool == "terraform":
-            plan_cmd = "terraform plan --detailed-exitcode"
-        else:
-            plan_cmd = f"{tool} run-all plan --detailed-exitcode"
-        return (
-            "name: drift-detection\n"
-            "on:\n"
-            "  schedule:\n"
-            "    - cron: '0 6 * * 1-5'  # Weekdays at 06:00 UTC\n\n"
-            "jobs:\n"
-            "  drift:\n"
-            "    runs-on: ubuntu-latest\n"
-            "    steps:\n"
-            "      - uses: actions/checkout@v4\n"
-            "      - id: plan\n"
-            f"        run: {plan_cmd}\n"
+    if "GitHub" not in cicd:
+        return "# Define your drift detection pipeline here (scheduled plan run)"
+
+    header = (
+        "name: drift-detection\n"
+        "on:\n"
+        "  schedule:\n"
+        "    - cron: '0 6 * * 1-5'  # Weekdays at 06:00 UTC\n\n"
+        "jobs:\n"
+        "  drift:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v4\n"
+    )
+
+    if tool == "pulumi":
+        # Pulumi has no drift-specific exit code. --expect-no-changes fails the
+        # step on changes and on errors alike, so neither is masked.
+        return header + (
+            "      - run: pulumi preview --expect-no-changes\n"
             "        working-directory: infrastructure-config\n"
-            "        continue-on-error: true\n"
-            "      - name: Notify on drift\n"
-            # continue-on-error makes the job succeed, so check the step outcome.
-            "        if: steps.plan.outcome == 'failure'\n"
-            "        run: echo 'Drift detected — review plan output'\n"
         )
-    return "# Define your drift detection pipeline here (scheduled plan run)"
+
+    plan_cmd = _DRIFT_PLAN_COMMANDS.get(tool, _DRIFT_PLAN_COMMANDS["terraform"])
+    # Capture the exit code instead of using continue-on-error, so a real
+    # error (1) fails the job and only genuine drift (2) sends a notification.
+    return header + (
+        "      - id: plan\n"
+        "        run: |\n"
+        "          set +e\n"
+        f"          {plan_cmd}\n"
+        '          echo "code=$?" >> "$GITHUB_OUTPUT"\n'
+        "        working-directory: infrastructure-config\n"
+        "      - name: Fail on plan error\n"
+        "        if: steps.plan.outputs.code == '1'\n"
+        "        run: exit 1\n"
+        "      - name: Notify on drift\n"
+        "        if: steps.plan.outputs.code == '2'\n"
+        "        run: echo 'Drift detected — review plan output'\n"
+    )
 
 
 def _destroy_commands(orch: str) -> tuple[str, str]:

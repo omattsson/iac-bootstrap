@@ -28,13 +28,34 @@ def test_test_standard_variables_match_the_module_inputs(cloud, required):
         assert name in body
 
 
-def test_drift_pipeline_checks_step_outcome():
-    """continue-on-error makes the job succeed, so drift is read from outcome."""
-    ctx = build_context(
-        {"CI_CD_PLATFORM": "GitHub Actions", "ORCHESTRATION_TOOL": "Terragrunt"}
-    )
-    assert "steps.plan.outcome == 'failure'" in ctx["DRIFT_PIPELINE"]
-    assert "if: failure()" not in ctx["DRIFT_PIPELINE"]
+@pytest.mark.parametrize(
+    "orch,expected_cmd",
+    [
+        ("None", "terraform plan -detailed-exitcode"),
+        ("Terragrunt", "terragrunt run-all plan -detailed-exitcode"),
+        ("Terramate", "terramate run -- terraform plan -detailed-exitcode"),
+    ],
+)
+def test_drift_pipeline_uses_valid_command_and_exit_codes(orch, expected_cmd):
+    """Each tool gets its own valid drift command; the exit code is captured so
+    a real error (1) fails the job and only drift (2) notifies."""
+    ctx = build_context({"CI_CD_PLATFORM": "GitHub Actions", "ORCHESTRATION_TOOL": orch})
+    drift = ctx["DRIFT_PIPELINE"]
+    assert expected_cmd in drift
+    assert "run-all plan --detailed-exitcode" not in drift or orch == "Terragrunt"
+    assert "steps.plan.outputs.code == '1'" in drift  # genuine error fails
+    assert "steps.plan.outputs.code == '2'" in drift  # drift notifies
+    assert "continue-on-error" not in drift
+    assert "if: failure()" not in drift
+
+
+def test_drift_pipeline_pulumi_uses_expect_no_changes():
+    """Pulumi has no drift exit code; --expect-no-changes fails on change/error."""
+    ctx = build_context({"CI_CD_PLATFORM": "GitHub Actions", "ORCHESTRATION_TOOL": "Pulumi"})
+    drift = ctx["DRIFT_PIPELINE"]
+    assert "pulumi preview --expect-no-changes" in drift
+    assert "run-all" not in drift
+    assert "continue-on-error" not in drift
 
 
 def test_azure_example_resource_lives_in_a_resource_group():
