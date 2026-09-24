@@ -39,6 +39,7 @@ These variables appear across all modules:
 ```hcl
 local.tags = merge(var.env_default_tags, var.tags)
 ```
+
 Always merge environment defaults with resource-specific tags. `var.tags` wins on key conflicts.
 Required tags: `Environment`, `Product`, `ManagedBy = "Terraform"`.
 

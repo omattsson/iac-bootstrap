@@ -43,12 +43,14 @@ Sanitize: `re.sub(r"[^0-9A-Za-z]+", "-", suffix).strip("-").lower()`
 ```python
 tags = {**default_tags, **resource_tags}
 ```
+
 `resource_tags` wins on key conflicts.
 Required tags: `environment`, `managed_by: Pulumi`, `product`.
 
 ## Stack Config Structure
 
 Non-secret values in `Pulumi.{env}.yaml`:
+
 ```yaml
 config:
   azure-native:location: westeurope
@@ -59,6 +61,7 @@ config:
 ```
 
 Secrets set via CLI (stored encrypted in `Pulumi.{env}.yaml`):
+
 ```bash
 pulumi config set --secret --stack dev contoso:clientSecret <value>
 ```

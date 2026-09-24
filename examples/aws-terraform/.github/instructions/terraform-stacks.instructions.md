@@ -13,6 +13,7 @@ applyTo: "environments/**/*.tf"
 - `versions.tf` — required_providers + module version locals
 
 ## Backend Pattern
+
 ```hcl
 terraform {
   backend "s3" {
@@ -26,6 +27,7 @@ terraform {
 ```
 
 ## Module Call Pattern
+
 ```hcl
 locals {
   module_versions = {

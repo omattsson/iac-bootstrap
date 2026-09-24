@@ -41,6 +41,7 @@ You are an expert cross-repo change coordinator for Contoso's Azure infrastructu
 ## Output Format
 
 ### For module rollout plans:
+
 ```
 ## Rollout Plan: tf-module-{name} {old_tag} → {new_tag}
 
@@ -75,6 +76,7 @@ You are an expert cross-repo change coordinator for Contoso's Azure infrastructu
 ```
 
 ### For impact analysis:
+
 ```
 ## Impact Analysis: tf-module-{name} change
 

@@ -161,12 +161,13 @@ jobs:
         uses: DavidAnson/markdownlint-cli2-action@v19
         with:
           config: .markdownlint.yml
-          # All maintained Markdown. The example output trees under
-          # examples/<name>/ are generated (or illustrative) and are checked for
-          # drift elsewhere, so they are excluded here.
+          # All maintained Markdown, including the hand-authored illustrative
+          # examples. Only examples/generated/ is excluded: it is machine
+          # generated from the templates and verified byte-for-byte by
+          # `build_examples.py --check`, so linting it would fight regeneration.
           globs: |
             **/*.md
-            !examples/*/**
+            !examples/generated/**
             !cli/build/**
             !**/node_modules/**
 

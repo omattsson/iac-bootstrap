@@ -31,10 +31,12 @@ You manage Pulumi Python programs in `infra/`. You understand the project/stack 
 5. Write `__main__.py` and `requirements.txt`
 
 ### Managing cross-stack references:
+
 ```python
 networking = pulumi.StackReference(f"contoso/networking/{env}")
 vnet_id = networking.get_output("vnet_id")
 ```
+
 Always handle `None` for plan-time safety.
 
 ### Running deployments:
@@ -71,6 +73,7 @@ infra/
 ```
 
 ### ComponentResource pattern
+
 ```python
 import pulumi
 import pulumi_azure_native as azure

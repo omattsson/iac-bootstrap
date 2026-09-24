@@ -39,6 +39,7 @@ These variables appear across all modules:
 ```hcl
 local.tags = merge(var.env_default_tags, var.tags)
 ```
+
 Required tags: `Environment`, `Product`, `ManagedBy = "Terraform"`.
 
 ## Stack Hierarchy
@@ -77,11 +78,13 @@ DynamoDB lock table: `acme-terraform-locks`
 - Tags: `merge(var.env_default_tags, var.tags)` — always
 
 **Naming pattern:**
+
 ```hcl
 local.name = var.full_name != null ? var.full_name : "${var.prefix}-{abbr}-${local.name_suffix}"
 ```
 
 **Provider versions:**
+
 ```hcl
 aws = { source = "hashicorp/aws", version = ">=5.0,<6.0" }
 ```
@@ -91,6 +94,7 @@ aws = { source = "hashicorp/aws", version = ">=5.0,<6.0" }
 ### Test Files (`**/*.tftest.hcl`)
 
 **Required boilerplate:**
+
 ```hcl
 mock_provider "aws" {}
 

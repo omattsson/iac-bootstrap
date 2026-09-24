@@ -36,6 +36,7 @@ tf-module-{name}/
 ## File Templates
 
 ### versions.tf
+
 ```hcl
 terraform {
   required_version = ">=1.3"
@@ -49,6 +50,7 @@ terraform {
 ```
 
 ### locals.tf
+
 ```hcl
 locals {
   name_suffix = lower(regexreplace(var.suffix, "[^0-9a-zA-Z]+", "-"))
@@ -58,6 +60,7 @@ locals {
 ```
 
 ### Resource file
+
 ```hcl
 resource "aws_{resource}" "default" {
   name = local.name
@@ -66,6 +69,7 @@ resource "aws_{resource}" "default" {
 ```
 
 ### outputs.tf
+
 ```hcl
 output "name" {
   value       = aws_{resource}.default.name
@@ -84,6 +88,7 @@ output "id" {
 ```
 
 ## Post-Creation
+
 ```bash
 cd tf-module-{name}
 terraform fmt -recursive

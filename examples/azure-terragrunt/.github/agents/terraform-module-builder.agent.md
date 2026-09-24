@@ -32,11 +32,13 @@ You are a Terraform module developer for Contoso. You create and modify reusable
 ### Key Patterns
 
 #### Naming
+
 ```hcl
 local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-kv-${local.name_suffix}", 0, 24)
 ```
 
 #### Tags
+
 ```hcl
 local.tags = merge(var.env_default_tags, var.tags)
 ```

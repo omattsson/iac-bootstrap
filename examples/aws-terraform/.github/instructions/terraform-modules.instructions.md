@@ -21,9 +21,11 @@ applyTo: "tf-module-*/**/*.tf"
 - Tags: `local.tags = merge(var.env_default_tags, var.tags)` — always
 
 ## Naming Pattern
+
 ```hcl
 local.name = var.full_name != null ? var.full_name : "${var.prefix}-{abbr}-${local.name_suffix}"
 ```
+
 All names use `lower(regexreplace(...))` for sanitization — AWS resource names are case-sensitive and often lowercase-only.
 
 ## Variable Conventions
@@ -32,6 +34,7 @@ All names use `lower(regexreplace(...))` for sanitization — AWS resource names
 - All variables need `type`, `description`, and sensible `default` where possible
 
 ## Provider Versions
+
 ```hcl
 aws = { source = "hashicorp/aws", version = ">=5.0,<6.0" }
 ```

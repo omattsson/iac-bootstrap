@@ -7,6 +7,7 @@ applyTo: "**/*.tftest.hcl"
 
 ## Required Boilerplate
 Every test file must include:
+
 ```hcl
 mock_provider "aws" {}
 

@@ -24,6 +24,7 @@ infrastructure-config/{environment}/{site}/{stack}/{component}/terragrunt.hcl
 ## Task A: Add a New Component
 
 ### 1. Create shared config in `_envcommon/{component}.hcl`
+
 ```hcl
 locals {
   subscription_vars = read_terragrunt_config(find_in_parent_folders("subscription.hcl"))
@@ -53,6 +54,7 @@ inputs = {
 ### 2. Add version in `subscription.hcl` → `module_tags`
 
 ### 3. Create `{component}/terragrunt.hcl`
+
 ```hcl
 include "root" {
   path = find_in_parent_folders("root.hcl")
@@ -64,6 +66,7 @@ include "envcommon" {
 ```
 
 ## Validation
+
 ```bash
 terragrunt validate
 terragrunt plan

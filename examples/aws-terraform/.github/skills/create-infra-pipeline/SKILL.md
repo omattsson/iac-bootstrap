@@ -21,6 +21,7 @@ All workflows follow a two-stage flow:
 ## Templates
 
 ### Single Stack Deployment Workflow
+
 ```yaml
 name: 'Terraform {environment}/{stack}'
 
@@ -88,6 +89,7 @@ jobs:
 ```
 
 ### Drift Detection Workflow
+
 ```yaml
 on:
   schedule:

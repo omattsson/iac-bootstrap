@@ -21,6 +21,7 @@ applyTo: "tf-module-*/**/*.tf"
 - Tags: `local.tags = merge(var.env_default_tags, var.tags)` — always
 
 ## Naming Pattern
+
 ```hcl
 local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-kv-${local.name_suffix}", 0, 24)
 ```
@@ -31,6 +32,7 @@ local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-kv-${
 - All variables need `type`, `description`, and sensible `default` where possible
 
 ## Provider Versions
+
 ```hcl
 azurerm = { source = "hashicorp/azurerm", version = ">=4.21.0,<5.0" }
 ```

@@ -22,6 +22,7 @@ All pipelines follow a two-stage flow:
 ## Templates
 
 ### Single Component Pipeline
+
 ```yaml
 name: 'Terraform {component} — {environment}'
 
@@ -88,6 +89,7 @@ jobs:
 ```
 
 ### Drift Detection Pipeline
+
 ```yaml
 name: 'Drift Detection — {environment}'
 

@@ -26,9 +26,11 @@ config/{environment}/{region}/{stack}/{component}/terragrunt.hcl
 - `_envcommon/*.hcl` — shared module configs with dependencies and inputs
 
 ### Input flow
+
 ```
 account.hcl → region.hcl → stack.hcl → component/terragrunt.hcl
 ```
+
 Each level can override the previous.
 
 ## Approach

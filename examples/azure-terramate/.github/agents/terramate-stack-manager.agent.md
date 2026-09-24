@@ -57,12 +57,15 @@ infrastructure-config/
 ```
 
 ### Input flow
+
 ```
 Root globals.tm.hcl → Environment globals.tm.hcl → Stack globals.tm.hcl → stack.tm.hcl
 ```
+
 Each level extends and can override the previous.
 
 ### Stack config pattern
+
 ```hcl
 stack {
   name        = "keyvault-dev"
@@ -76,6 +79,7 @@ stack {
 ```
 
 ### Shared generate_hcl pattern
+
 ```hcl
 # _generate/backend.tm.hcl
 generate_hcl "_generated_backend.tf" {

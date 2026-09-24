@@ -20,6 +20,7 @@ All pipelines follow a two-stage flow:
 ## Templates
 
 ### Single Component Pipeline
+
 ```yaml
 # ci/{component}-{environment}.gitlab-ci.yml
 
@@ -54,6 +55,7 @@ apply:{component}:
 ```
 
 ### Base Job Templates (`ci/terraform-base.gitlab-ci.yml`)
+
 ```yaml
 .terraform:plan:
   image: ghcr.io/gruntwork-io/terragrunt:latest
@@ -84,6 +86,7 @@ apply:{component}:
 ```
 
 ### Multi-Stack Pipeline
+
 ```yaml
 # ci/stack-{environment}.gitlab-ci.yml
 
@@ -127,6 +130,7 @@ apply:stack:
 ```
 
 ### Drift Detection Pipeline
+
 ```yaml
 # ci/drift-{environment}.gitlab-ci.yml
 
@@ -152,6 +156,7 @@ drift:{environment}:
 Schedule in GitLab: Project → CI/CD → Schedules → `0 6 * * 1-5` on `main`.
 
 ### Destroy Pipeline
+
 ```yaml
 # ci/destroy-{component}-{environment}.gitlab-ci.yml
 

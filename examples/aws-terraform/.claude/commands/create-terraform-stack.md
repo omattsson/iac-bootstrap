@@ -24,6 +24,7 @@ environments/{environment}/{stack}/
 ## Task A: Add a New Module Call
 
 ### 1. Add version to `versions.tf` → `module_versions`
+
 ```hcl
 locals {
   module_versions = {
@@ -33,6 +34,7 @@ locals {
 ```
 
 ### 2. Add module block in `main.tf`
+
 ```hcl
 module "{name}" {
   source = "git::https://github.com/acme/tf-module-{name}.git?ref=${local.module_versions.{name}}"
@@ -44,6 +46,7 @@ module "{name}" {
 ```
 
 ### 3. Expose outputs in `outputs.tf`
+
 ```hcl
 output "{name}_arn" {
   value = module.{name}.arn
@@ -53,6 +56,7 @@ output "{name}_arn" {
 ## Task B: Add a New Stack
 
 ### 1. Create `environments/{environment}/{stack}/backend.tf`
+
 ```hcl
 terraform {
   backend "s3" {
@@ -74,6 +78,7 @@ terraform {
 3. Adjust variable defaults for the target account and region
 
 ## Validation
+
 ```bash
 terraform init
 terraform validate

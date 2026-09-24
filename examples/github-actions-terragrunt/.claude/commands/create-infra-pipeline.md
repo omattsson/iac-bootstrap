@@ -20,6 +20,7 @@ All pipelines follow a two-stage flow:
 ## Templates
 
 ### Single Component Pipeline
+
 ```yaml
 name: 'Terraform {component} — {environment}'
 
@@ -86,6 +87,7 @@ jobs:
 ```
 
 ### Multi-Stack Pipeline
+
 ```yaml
 name: 'Terraform Stack — {environment}'
 
@@ -130,6 +132,7 @@ jobs:
 ```
 
 ### Drift Detection Pipeline
+
 ```yaml
 name: 'Drift Detection — {environment}'
 
@@ -167,6 +170,7 @@ jobs:
 ```
 
 ### Destroy Pipeline
+
 ```yaml
 name: 'Terraform Destroy — {component} — {environment}'
 

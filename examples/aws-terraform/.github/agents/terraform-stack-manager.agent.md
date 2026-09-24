@@ -25,6 +25,7 @@ environments/{environment}/{stack}/
 ```
 
 ### Input flow
+
 ```
 versions.tf (module_versions) → main.tf (module sources) → outputs.tf
 ```

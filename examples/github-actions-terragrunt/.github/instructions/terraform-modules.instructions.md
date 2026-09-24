@@ -21,6 +21,7 @@ applyTo: "tf-module-*/**/*.tf"
 - Tags: `local.tags = merge(var.env_default_tags, var.tags)` — always
 
 ## Naming Pattern
+
 ```hcl
 local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-s3-${local.name_suffix}", 0, 63)
 ```
@@ -31,6 +32,7 @@ local.name = substr(var.full_name != null ? var.full_name : "${var.prefix}-s3-${
 - All variables need `type`, `description`, and sensible `default` where possible
 
 ## Provider Versions
+
 ```hcl
 aws = { source = "hashicorp/aws", version = ">=5.0,<6.0" }
 ```

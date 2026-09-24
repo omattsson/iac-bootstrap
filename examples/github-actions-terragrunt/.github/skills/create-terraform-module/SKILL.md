@@ -19,6 +19,7 @@ Scaffolds a new `tf-module-{name}` directory following workspace conventions.
 ## Procedure
 
 ### 1. Create Directory Structure
+
 ```
 tf-module-{name}/
 ├── main.tf
@@ -37,6 +38,7 @@ tf-module-{name}/
 ### 2. Key File Patterns
 
 #### versions.tf
+
 ```hcl
 terraform {
   required_version = ">=1.3"
@@ -47,6 +49,7 @@ terraform {
 ```
 
 #### locals.tf
+
 ```hcl
 locals {
   name_suffix = regexreplace(var.suffix, "[^0-9A-Za-z]+", "-")
@@ -56,6 +59,7 @@ locals {
 ```
 
 ### 3. Post-Creation
+
 ```bash
 terraform fmt -recursive
 terraform validate

@@ -35,6 +35,7 @@ infrastructure-config/
 ### Task A: Add a New Stack
 
 #### 1. Create `stack.tm.hcl`
+
 ```hcl
 stack {
   name        = "{service}-{environment}"
@@ -48,6 +49,7 @@ stack {
 ```
 
 #### 2. Add stack-level globals (`globals.tm.hcl`)
+
 ```hcl
 globals {
   prefix       = "app-weu-{env}"
@@ -57,6 +59,7 @@ globals {
 
 #### 3. Add module version to root globals
 In `infrastructure-config/globals.tm.hcl` → `module_versions`:
+
 ```hcl
 globals {
   module_versions = {
@@ -67,6 +70,7 @@ globals {
 ```
 
 #### 4. Create the stack's Terraform entry file (`{component}.tf`)
+
 ```hcl
 module "key_vault" {
   source = "git::https://dev.azure.com/contoso/infra/_git/tf-module-key-vault?ref=${global.module_versions["key-vault"]}"
@@ -84,14 +88,17 @@ module "key_vault" {
 ```
 
 #### 5. Regenerate all `generate_hcl` outputs
+
 ```bash
 terramate generate
 ```
+
 Review the diff — only the new stack's `_generated_*.tf` files should appear.
 
 ### Task B: Add a New Environment
 
 #### 1. Create `infrastructure-config/{env}/globals.tm.hcl`
+
 ```hcl
 globals {
   environment     = "{env}"

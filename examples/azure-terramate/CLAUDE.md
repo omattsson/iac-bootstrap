@@ -44,6 +44,7 @@ These variables appear across all modules:
 ```hcl
 local.tags = merge(var.env_default_tags, var.tags)
 ```
+
 Required tags: `environment`, `product`, `managed_by = "Terraform"`.
 
 ## Terramate Hierarchy
@@ -63,9 +64,11 @@ infrastructure-config/
 ```
 
 ### Input flow
+
 ```
 Root globals.tm.hcl → Environment globals.tm.hcl → Stack globals.tm.hcl
 ```
+
 Each level extends the previous. Values are referenced as `global.{key}` in generate_hcl and stack configs.
 
 ---
@@ -90,6 +93,7 @@ Each level extends the previous. Values are referenced as `global.{key}` in gene
 - Tags: `merge(var.env_default_tags, var.tags)` — always
 
 **Provider versions:**
+
 ```hcl
 azurerm = { source = "hashicorp/azurerm", version = ">=4.21.0,<5.0" }
 ```
@@ -97,6 +101,7 @@ azurerm = { source = "hashicorp/azurerm", version = ">=4.21.0,<5.0" }
 ### Terramate Files (`infrastructure-config/**/*.tm.hcl`)
 
 **`stack.tm.hcl` pattern:**
+
 ```hcl
 stack {
   name        = "{service}-{environment}"
@@ -107,6 +112,7 @@ stack {
 ```
 
 **`globals.tm.hcl` pattern:**
+
 ```hcl
 globals {
   environment = "dev"

@@ -36,6 +36,7 @@ tf-module-{name}/
 ## File Templates
 
 ### versions.tf
+
 ```hcl
 terraform {
   required_version = ">=1.3"
@@ -49,6 +50,7 @@ terraform {
 ```
 
 ### locals.tf
+
 ```hcl
 locals {
   name_suffix = replace(var.suffix, "/[^0-9A-Za-z]+/", "-")
@@ -58,6 +60,7 @@ locals {
 ```
 
 ### Resource file
+
 ```hcl
 resource "azurerm_{resource}" "default" {
   name                = local.name
@@ -68,6 +71,7 @@ resource "azurerm_{resource}" "default" {
 ```
 
 ### outputs.tf
+
 ```hcl
 output "name" {
   value       = azurerm_{resource}.default.name
@@ -81,6 +85,7 @@ output "id" {
 ```
 
 ## Post-Creation
+
 ```bash
 cd tf-module-{name}
 terraform fmt -recursive

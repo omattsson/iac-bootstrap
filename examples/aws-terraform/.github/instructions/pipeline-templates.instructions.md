@@ -10,6 +10,7 @@ All deployment workflows: Plan job → Apply job (on protected branches with env
 
 ## Authentication
 Use OIDC — never long-lived IAM access keys:
+
 ```yaml
 jobs:
   terraform:
@@ -24,6 +25,7 @@ jobs:
 ```
 
 ## Terraform Setup
+
 ```yaml
 - uses: hashicorp/setup-terraform@v3
   with:

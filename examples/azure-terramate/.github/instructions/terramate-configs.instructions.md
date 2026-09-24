@@ -7,6 +7,7 @@ applyTo: "infrastructure-config/**/*.tm.hcl"
 
 ## Stack Definition Pattern
 Every stack directory must contain a `stack.tm.hcl` file:
+
 ```hcl
 stack {
   name        = "{service}-{environment}"
@@ -24,6 +25,7 @@ stack {
 Share values across stacks using layered globals files:
 
 Root (`infrastructure-config/globals.tm.hcl`):
+
 ```hcl
 globals {
   company                = "contoso"
@@ -38,6 +40,7 @@ globals {
 ```
 
 Environment (`infrastructure-config/{env}/globals.tm.hcl`):
+
 ```hcl
 globals {
   environment     = "dev"
@@ -47,6 +50,7 @@ globals {
 ```
 
 Stack (`infrastructure-config/{env}/{stack}/globals.tm.hcl`):
+
 ```hcl
 globals {
   prefix       = "app-weu-dev"
@@ -63,6 +67,7 @@ globals {
 
 ## Shared generate_hcl Pattern (`_generate/`)
 Every shared `generate_hcl` block that creates backend/provider config lives in `_generate/`:
+
 ```hcl
 generate_hcl "_generated_backend.tf" {
   content {
