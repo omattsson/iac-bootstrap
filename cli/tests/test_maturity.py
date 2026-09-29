@@ -257,8 +257,6 @@ def test_cli_writes_to_a_file_and_keeps_stdout_clean(tmp_path):
     assert result.exit_code == 0, result.output
     assert out.is_file()
     assert "IaC Maturity Assessment" in out.read_text(encoding="utf-8")
-    # The report must go to the file only, so stdout stays pipeable.
-    assert result.stdout == "", f"stdout not clean: {result.stdout!r}"
 
 
 def test_cli_threshold_controls_the_exit_code(tmp_path):
@@ -499,3 +497,36 @@ def test_report_definitions_match_the_implementation(tmp_path):
     assert "A Partial status in a category weighted under 15%." in rendered
     # The superseded wording, which contradicted the code, must be gone.
     assert "Partial or Missing status in categories other than" not in rendered
+
+
+def test_output_mode_leaves_stdout_empty_for_redirection(tmp_path):
+    """Run the real process: CliRunner folds stderr into stdout on older Click,
+    so only separate pipes prove the streams are actually split (#54 review).
+    """
+    import subprocess
+    import sys
+
+    out = tmp_path / "maturity.md"
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(_REPO_ROOT / "cli") + os.pathsep + env.get("PYTHONPATH", "")
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "bootstrap_iac",
+            "--maturity-report",
+            "--workspace",
+            str(tmp_path),
+            "--output",
+            str(out),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout == "", f"stdout not clean: {proc.stdout!r}"
+    # The one-line summary goes to stderr instead.
+    assert "Maturity report written" in proc.stderr
+    assert out.is_file()
