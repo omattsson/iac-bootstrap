@@ -627,3 +627,700 @@ def test_build_output_specs_no_orchestration_omits_stack_files():
     output_paths = [s.output_rel for s in specs]
     assert not any("stack-manager" in p for p in output_paths)
     assert not any("create-" in p and "-stack" in p for p in output_paths)
+
+
+# ---------------------------------------------------------------------------
+# PR review agent / command (issue #55)
+# ---------------------------------------------------------------------------
+
+
+def _pr_review_answers(
+    cloud="Azure", orch="Terragrunt", target="both", cicd="GitHub Actions"
+):
+    """A complete interview answer set, as generate_files requires."""
+    return {
+        "COMPANY_NAME": "Acme Corp",
+        "CLOUD_PROVIDER": cloud,
+        "MODULE_PREFIX": "tf-module",
+        "ORCHESTRATION_TOOL": orch,
+        # Mirror run_interview: no orchestration means no orchestration dir.
+        "ORCHESTRATION_DIR": "." if orch == "None" else "infrastructure-config",
+        "CI_CD_PLATFORM": cicd,
+        "AUTH_PATTERN": "Managed Identity / OIDC",
+        "STATE_BACKEND": "Azure Blob Storage",
+        "NAMING_PATTERN": "{prefix}-{type}-{suffix}",
+        # TAG_STRATEGY is deliberately not set: the cloud default is multiline,
+        # which is what interactive generation produces (issue #55 review).
+        "STANDARD_VARIABLES": "- prefix",
+        "TARGET": target,
+        "ORG": "acme",
+    }
+
+
+@pytest.mark.parametrize("cloud", ["Azure", "AWS", "GCP"])
+@pytest.mark.parametrize("orch", ["None", "Terragrunt", "Terramate", "Pulumi"])
+def test_pr_reviewer_is_generated_for_every_cloud_and_orchestration(cloud, orch):
+    """The PR reviewer is convention-driven, so it ships in every combination."""
+    tdir = get_templates_dir()
+    ctx = build_context({"CLOUD_PROVIDER": cloud, "ORCHESTRATION_TOOL": orch})
+    output_paths = [s.output_rel for s in _build_output_specs(ctx, tdir)]
+    assert ".github/agents/terraform-pr-reviewer.agent.md" in output_paths
+    assert ".claude/commands/review-terraform-pr.md" in output_paths
+
+
+def test_pr_reviewer_outputs_are_split_by_target():
+    """The agent belongs to the copilot target and the command to claude."""
+    tdir = get_templates_dir()
+    ctx = build_context({"CLOUD_PROVIDER": "Azure", "ORCHESTRATION_TOOL": "Terragrunt"})
+    specs = {s.output_rel: s for s in _build_output_specs(ctx, tdir)}
+    assert specs[".github/agents/terraform-pr-reviewer.agent.md"].target == "copilot"
+    assert specs[".claude/commands/review-terraform-pr.md"].target == "claude"
+
+
+@pytest.mark.parametrize("cloud", ["Azure", "AWS", "GCP"])
+@pytest.mark.parametrize("orch", ["None", "Terragrunt", "Terramate", "Pulumi"])
+def test_pr_reviewer_renders_without_placeholders_and_keeps_conventions(
+    tmp_path, cloud, orch
+):
+    """Generated review guidance resolves fully and cites workspace conventions."""
+    ctx = build_context(_pr_review_answers(cloud=cloud, orch=orch))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    agent = (tmp_path / ".github/agents/terraform-pr-reviewer.agent.md").read_text()
+    command = (tmp_path / ".claude/commands/review-terraform-pr.md").read_text()
+
+    for text, name in ((agent, "agent"), (command, "command")):
+        assert "{{" not in text, f"{name} has an unresolved placeholder"
+        # The workspace's own conventions must appear, not generic advice.
+        assert ctx["MODULE_PREFIX"] in text, f"{name} omits the module prefix"
+        assert ctx["TAG_MERGE_PATTERN"] in text, f"{name} omits the tag merge pattern"
+        assert ctx["PROVIDER_NAME"] in text, f"{name} omits the provider name"
+        assert ctx["COMMON_VARS_FILE"] in text, f"{name} omits the common vars file"
+        # All eight review categories from the issue are covered.
+        for heading in (
+            "Naming compliance",
+            "Tag and label strategy",
+            "Variable design",
+            "Test coverage",
+            "Security",
+            "Module structure",
+            "Orchestration compliance",
+            "Pipeline standards",
+        ):
+            assert heading in text, f"{name} is missing the '{heading}' category"
+        # Severity vocabulary the report format depends on.
+        for severity in ("Blocking", "Should fix", "Consider", "Verified"):
+            assert severity in text, f"{name} is missing the '{severity}' severity"
+
+
+def test_pr_reviewer_agent_has_valid_frontmatter(tmp_path):
+    """The Copilot agent needs frontmatter with a description to be discovered."""
+    import yaml
+
+    ctx = build_context(_pr_review_answers(orch="None"))
+    generate_files(ctx, tmp_path, target="copilot", skip_existing=False)
+    text = (tmp_path / ".github/agents/terraform-pr-reviewer.agent.md").read_text()
+
+    assert text.startswith("---\n")
+    frontmatter = yaml.safe_load(text.split("---", 2)[1])
+    assert isinstance(frontmatter, dict)
+    assert frontmatter["description"].strip()
+    assert "tools" in frontmatter
+
+
+def test_pr_reviewer_command_is_omitted_for_the_copilot_target(tmp_path):
+    """A copilot-only run must not write the Claude command, and vice versa."""
+    ctx = build_context(_pr_review_answers(orch="None"))
+
+    copilot_dir = tmp_path / "copilot"
+    generate_files(ctx, copilot_dir, target="copilot", skip_existing=False)
+    assert (copilot_dir / ".github/agents/terraform-pr-reviewer.agent.md").is_file()
+    assert not (copilot_dir / ".claude/commands/review-terraform-pr.md").exists()
+
+    claude_dir = tmp_path / "claude"
+    generate_files(ctx, claude_dir, target="claude", skip_existing=False)
+    assert (claude_dir / ".claude/commands/review-terraform-pr.md").is_file()
+    assert not (claude_dir / ".github/agents/terraform-pr-reviewer.agent.md").exists()
+
+
+@pytest.mark.parametrize(
+    "orch, expected, forbidden",
+    [
+        # Without orchestration the review must not ask for concepts that do
+        # not exist, and must not name an instructions file that is never
+        # generated (issue #55 review).
+        ("None", ["no orchestration layer"], ["mock_outputs", "_envcommon", "StackReference"]),
+        ("Terragrunt", ["_envcommon/", "mock_outputs"], ["StackReference", "generate_hcl"]),
+        ("Terramate", ["generate_hcl", "terraform_remote_state"], ["mock_outputs", "_envcommon"]),
+        ("Pulumi", ["StackReference", "ComponentResource"], ["mock_outputs", "_envcommon"]),
+    ],
+)
+def test_pr_reviewer_orchestration_section_matches_the_tool(tmp_path, orch, expected, forbidden):
+    """Section 7 must describe the workspace's actual orchestration tool."""
+    ctx = build_context(_pr_review_answers(orch=orch))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for needle in expected:
+            assert needle in text, f"{rel} ({orch}) should mention {needle!r}"
+        for needle in forbidden:
+            assert needle not in text, (
+                f"{rel} ({orch}) must not mention {needle!r} from another tool"
+            )
+        # The "in use: None" phrasing that read as a broken sentence is gone.
+        assert "in use: None" not in text
+
+
+def test_pr_reviewer_does_not_reference_a_missing_instructions_file(tmp_path):
+    """Without orchestration there is no *-configs.instructions.md to read."""
+    ctx = build_context(_pr_review_answers(orch="None"))
+    generate_files(ctx, tmp_path, target="copilot", skip_existing=False)
+    text = (tmp_path / ".github/agents/terraform-pr-reviewer.agent.md").read_text()
+    assert "configs.instructions.md" not in text
+    assert "no orchestration layer" in text
+
+
+def test_pr_reviewer_keeps_multiline_values_out_of_bullets(tmp_path):
+    """Multi-line context values must be fenced, not inlined into a list item.
+
+    PROVIDER_VERSION_CONSTRAINTS and PIPELINE_CONVENTIONS are multi-line; if
+    they are interpolated mid-bullet the markdown list breaks (issue #55 review).
+    """
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for line in text.splitlines():
+            if line.startswith("- ") and line.rstrip().endswith("{"):
+                raise AssertionError(f"{rel}: multi-line value inlined in bullet: {line!r}")
+        # The provider block is fenced as HCL.
+        assert "```hcl\nterraform {" in text
+        # Pipeline conventions start their own block, not mid-sentence.
+        assert "Conventions: -" not in text
+
+
+def test_pr_reviewer_resolves_the_real_base_ref(tmp_path):
+    """The diff base must come from the PR, not a hardcoded `origin/main`.
+
+    A PR targeting a release branch would otherwise be reviewed against the
+    wrong change set (issue #55 review).
+    """
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "origin/main...HEAD" not in text, f"{rel} hardcodes origin/main"
+        assert "baseRefName" in text, f"{rel} does not resolve the PR base"
+        assert "refs/remotes/origin/HEAD" in text, f"{rel} has no default-branch fallback"
+        # Resolving the name is not enough: a stale or shallow clone needs a fetch
+        # before the diff, and gh pr diff is preferred (issue #55 review).
+        assert "git fetch --no-tags origin" in text, (
+            f"{rel} diffs against a possibly stale base ref"
+        )
+        flat = " ".join(text.split())
+        assert "does not depend on what this clone happens to have fetched" in flat
+
+
+def test_pr_review_command_honours_its_arguments(tmp_path):
+    """The Claude command advertises $ARGUMENTS, so it must actually use them."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="claude", skip_existing=False)
+    text = (tmp_path / ".claude/commands/review-terraform-pr.md").read_text()
+
+    assert "$ARGUMENTS" in text
+    # Each advertised invocation mode has a concrete resolution.
+    assert "gh pr diff" in text, "a PR number argument has no resolution"
+    assert "a base ref" in text, "a base ref argument has no resolution"
+    # A path filter must be attached to `git diff`, which accepts a pathspec ...
+    assert "git diff FETCH_HEAD...HEAD -- <path>" in text, (
+        "a path argument is never applied to a command that supports a pathspec"
+    )
+    # ... and never to `gh pr diff`, which does not (issue #55 review). Match the
+    # literal invocation, so the sentence warning against it does not count.
+    for bad in (
+        "gh pr diff -- ",
+        "gh pr diff --name-only -- ",
+        "gh pr diff 123 -- ",
+        "gh pr diff <number> -- ",
+    ):
+        assert bad not in text, f"invalid pathspec usage: {bad!r}"
+    assert "takes no pathspec" in text, "the gh pr diff limitation is not stated"
+
+
+@pytest.mark.parametrize(
+    "orch, expected",
+    [
+        ("Pulumi", ["Pulumi.yaml", "*.ts", "*.py"]),
+        ("Terragrunt", ["*.tf", "*.hcl"]),
+        ("Terramate", ["*.tm.hcl"]),
+        ("None", ["*.tf", "*.tfvars"]),
+    ],
+)
+def test_pr_reviewer_file_scope_covers_the_tools_own_sources(tmp_path, orch, expected):
+    """A Pulumi workspace's review must not skip the Pulumi program files."""
+    ctx = build_context(_pr_review_answers(orch=orch))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for needle in expected:
+            assert needle in text, f"{rel} ({orch}) omits {needle!r} from the review scope"
+
+
+def test_pr_reviewer_describes_optional_correctly(tmp_path):
+    """`optional()` applies to object attributes, not to top-level variables.
+
+    Advising otherwise makes the reviewer raise false findings, and contradicts
+    references/iac-best-practices.md (issue #55 review).
+    """
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "Optional inputs use `optional()`" not in text
+        assert "optional(type, default)" in text
+        assert "object variable" in text
+
+
+@pytest.mark.parametrize(
+    "cicd, expected, forbidden",
+    [
+        # Atlantis applies via a PR comment with server-side credentials, so
+        # demanding a protected-branch apply job produces false findings (#55).
+        (
+            "Atlantis",
+            ["atlantis apply", "Atlantis server environment"],
+            [
+                "apply job requires an environment approval",
+                "OIDC federation",
+                # Generic bullets that PIPELINE_REVIEW_CHECKS replaces.
+                "apply gated on a protected branch",
+                "Identity-based authentication",
+            ],
+        ),
+        ("GitHub Actions", ["OIDC federation", "protected branch"], ["atlantis apply"]),
+        ("GitLab CI", ["when: manual", "id_tokens"], ["atlantis apply"]),
+        ("Azure DevOps", ["workload identity service connection"], ["atlantis apply"]),
+    ],
+)
+def test_pr_reviewer_pipeline_checks_match_the_platform(tmp_path, cicd, expected, forbidden):
+    """Section 8 must not impose one platform's workflow on another."""
+    ctx = build_context(_pr_review_answers(cicd=cicd))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for needle in expected:
+            assert needle in text, f"{rel} ({cicd}) should mention {needle!r}"
+        for needle in forbidden:
+            assert needle not in text, (
+                f"{rel} ({cicd}) must not impose {needle!r} from another platform"
+            )
+
+
+def test_pr_reviewer_reviews_the_patch_not_whole_files(tmp_path):
+    """Findings must be tied to changed lines, or the reviewer blames the author
+    for pre-existing problems on untouched lines (issue #55 review)."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "Review the patch, not the whole file" in text
+        assert "added, modified, or **deleted**" in text, (
+            f"{rel} does not treat deletions as reviewable"
+        )
+        # The patch itself is fetched, not only a name-only list.
+        assert "gh pr diff" in text
+        assert "git diff FETCH_HEAD...HEAD" in text
+
+
+def test_pr_review_command_fetches_the_pr_patch(tmp_path):
+    """A PR-number invocation must read that PR's patch, not the local checkout."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="claude", skip_existing=False)
+    text = (tmp_path / ".claude/commands/review-terraform-pr.md").read_text()
+    assert "gh pr diff 123`" in text or "gh pr diff 123 " in text or "`gh pr diff 123`" in text
+    assert "the local checkout may be a different branch" in text
+
+
+def test_pr_reviewer_terraform_sections_are_scoped_to_terraform(tmp_path):
+    """Terraform-only checks must not be applied to Pulumi program sources."""
+    ctx = build_context(_pr_review_answers(orch="Pulumi"))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        # Pulumi sources are in scope ...
+        assert "*.ts" in text
+        # ... but the Terraform-only categories say so explicitly.
+        assert text.count("Applies to Terraform") >= 2, (
+            f"{rel} does not scope the Terraform-only checklist sections"
+        )
+
+
+def test_pr_reviewer_command_safety_note_is_accurate(tmp_path):
+    """`terraform fmt` neither initialises modules nor executes code."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "Both commands initialise" not in text, f"{rel} still misstates fmt"
+        assert "only reads and formats files" in text
+        assert "untrusted fork" in text
+
+
+def test_pr_reviewer_treats_deletions_as_reviewable(tmp_path):
+    """A removed test, encryption setting, or approval gate is a regression.
+
+    Scoping findings to added/modified lines only would let those through
+    (issue #55 review).
+    """
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "added, modified, or **deleted**" in text
+        assert "base-side line" in text, f"{rel} does not say how to cite a deletion"
+        # The earlier, narrower rule must be gone.
+        assert "adds or modifies;" not in text
+
+
+@pytest.mark.parametrize("cicd", ["Atlantis", "GitHub Actions", "GitLab CI", "Azure DevOps"])
+def test_pr_reviewer_pipeline_section_has_no_generic_bullets(tmp_path, cicd):
+    """Section 8 must rely only on the platform-specific checks."""
+    ctx = build_context(_pr_review_answers(cicd=cicd))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for generic in (
+            "Plan on every change; apply gated on a protected branch with approval",
+            "Identity-based authentication; no credential variables",
+            "Plan runs on every change; apply is gated on a protected branch and an approval",
+        ):
+            assert generic not in text, f"{rel} ({cicd}) still imposes {generic!r}"
+
+
+def test_new_placeholders_are_documented_in_the_readme():
+    """CONTRIBUTING requires every new placeholder to appear in the README."""
+    import re
+
+    repo_root = Path(__file__).resolve().parents[2]
+    readme = (repo_root / "README.md").read_text(encoding="utf-8")
+    # Derive the list from the templates rather than hardcoding it, so a
+    # placeholder added later cannot slip past undocumented.
+    used = set()
+    for rel in (
+        "references/copilot/agents/terraform-pr-reviewer.agent.md.tmpl",
+        "references/claude/commands/review-terraform-pr.md.tmpl",
+    ):
+        text = (repo_root / rel).read_text(encoding="utf-8")
+        used |= set(re.findall(r"\{\{[A-Z][A-Z0-9_]*\}\}", text))
+    assert used, "no placeholders found in the PR reviewer templates"
+    missing = sorted(p for p in used if p not in readme)
+    assert not missing, f"undocumented in README.md: {missing}"
+
+
+def test_pr_reviewer_naming_and_tagging_are_scoped_to_terraform(tmp_path):
+    """Sections 1 and 2 are written in HCL terms, so a Pulumi program must not
+    be judged by `locals.tf` or the HCL tag merge (issue #55 review)."""
+    ctx = build_context(_pr_review_answers(orch="Pulumi"))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "apply to Terraform files" in text, (
+            f"{rel} does not scope the naming rules to Terraform"
+        )
+        assert "is the Terraform form" in text, (
+            f"{rel} does not scope the tagging rule to Terraform"
+        )
+        # The tool's own sources are named by a noun phrase, not the bare tool name.
+        assert text.count("Pulumi program sources") >= 2
+        assert "None sources" not in text
+
+
+def test_pr_reviewer_keeps_committed_generated_iac_in_scope(tmp_path):
+    """A blanket "ignore generated files" rule would hide Terramate's committed
+    _generated_*.tf, which is where a hand edit or drift shows up."""
+    ctx = build_context(_pr_review_answers(orch="Terramate"))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        flat = " ".join(text.split())
+        assert "Committed generated infrastructure code stays in scope" in flat, (
+            f"{rel} does not keep generated IaC in scope"
+        )
+        assert "checked-in generated `.tf` file" in flat
+        # The note must not name one tool for every workspace.
+        assert "Terramate" not in flat or ctx["ORCHESTRATION_TOOL"] == "Terramate"
+        # The blanket exclusion is gone.
+        assert "Ignore generated files, lock files" not in text
+        assert "Out of scope: generated files" not in text
+
+
+def test_pr_reviewer_defers_to_the_selected_naming_and_tag_conventions(tmp_path):
+    """NAMING_PATTERN_HCL and TAG_MERGE_PATTERN are hardcoded cloud defaults that
+    build_context sets independently of the interview answers. Enforcing them as
+    the rule produces false findings in a customised workspace (issue #55 review).
+    """
+    answers = _pr_review_answers()
+    answers["NAMING_PATTERN"] = "{team}-{service}-{environment}"
+    answers["TAG_STRATEGY"] = "merge(local.required_tags, var.extra_tags)"
+    ctx = build_context(answers)
+    # The custom answers survive, while the HCL forms stay at their defaults.
+    assert ctx["NAMING_PATTERN"] == "{team}-{service}-{environment}"
+    assert "resource_abbreviation" in ctx["NAMING_PATTERN_HCL"]
+
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        # The workspace's own convention is stated as the rule ...
+        assert "{team}-{service}-{environment}" in text, f"{rel} ignores the convention"
+        assert "merge(local.required_tags, var.extra_tags)" in text, (
+            f"{rel} ignores the tag strategy"
+        )
+        # ... and the default HCL form is demoted to an illustration.
+        flat = " ".join(text.split())
+        assert "an illustration, not as the rule" in flat
+        assert "an illustration, not the rule" in flat
+        # The report example cites the convention, not the hardcoded expression.
+        assert "Convention: names follow {team}-{service}-{environment}" in text
+
+
+def test_pr_reviewer_keeps_the_terraform_lock_file_in_scope(tmp_path):
+    """.terraform.lock.hcl is committed and records provider versions and
+    checksums, so it must not be excluded as disposable output."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        # Collapse wrapping so the assertion does not depend on line breaks.
+        flat = " ".join(text.split())
+        assert ".terraform.lock.hcl" in text, f"{rel} does not mention the lock file"
+        assert "in scope for the provider and security checks" in flat
+        # The blanket "lock files" exclusion is gone.
+        assert "disposable output only: lock files" not in text
+        assert "disposable output only — lock files" not in text
+
+
+@pytest.mark.parametrize("orch", ["None", "Terragrunt", "Terramate", "Pulumi"])
+def test_pr_reviewer_never_renders_the_tool_name_as_a_noun(tmp_path, orch):
+    """"None sources" and "A None program" are nonsense for a workspace with no
+    orchestration, and one tool's name must not leak into another's guidance."""
+    ctx = build_context(_pr_review_answers(orch=orch))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    others = {"Terragrunt", "Terramate", "Pulumi"} - {orch}
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for bad in ("None sources", "A None program", "None program or config"):
+            assert bad not in text, f"{rel} ({orch}) renders {bad!r}"
+        for other in others:
+            assert other not in text, f"{rel} ({orch}) leaks {other} guidance"
+
+
+def test_pr_reviewer_keeps_selected_conventions_authoritative(tmp_path):
+    """Declaring the convention files authoritative must not re-open the door to
+    the hardcoded defaults those files still contain (issue #55 review)."""
+    answers = _pr_review_answers(cicd="Atlantis")
+    answers["NAMING_PATTERN"] = "{team}-{service}-{environment}"
+    answers["TAG_STRATEGY"] = "merge(local.required_tags, var.extra_tags)"
+    ctx = build_context(answers)
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        flat = " ".join((tmp_path / rel).read_text().split())
+        assert "Three exceptions" in flat, f"{rel} has no precedence carve-out"
+        assert "{team}-{service}-{environment}" in flat
+        assert "merge(local.required_tags, var.extra_tags)" in flat
+        assert "Atlantis checks in section 8" in flat
+        assert "predates the selection" in flat
+
+
+def test_pr_reviewer_renders_a_multiline_tag_strategy_as_a_block(tmp_path):
+    """TAG_STRATEGY is multiline by default for every cloud. Inlining it inside
+    bold text splits the list item and leaves emphasis spanning lines (#55 review).
+    """
+    ctx = build_context(_pr_review_answers())
+    assert "\n" in ctx["TAG_STRATEGY"], "expected the default multiline tag strategy"
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    first_line = ctx["TAG_STRATEGY"].splitlines()[0]
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert ctx["TAG_STRATEGY"] in text, f"{rel} does not carry the tag strategy"
+        for line in text.splitlines():
+            # The strategy must start its own line, not sit inside a bullet or bold.
+            if first_line in line:
+                assert line.strip() == first_line, (
+                    f"{rel}: multiline tag strategy inlined into {line!r}"
+                )
+            # Emphasis must never be left open at end of line.
+            assert line.count("**") % 2 == 0, f"{rel}: unbalanced emphasis in {line!r}"
+
+
+def test_pulumi_scope_covers_every_supported_runtime(tmp_path):
+    """A PR touching only index.js or Main.java must not be skipped entirely."""
+    ctx = build_context(_pr_review_answers(orch="Pulumi"))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for ext in ("*.ts", "*.js", "*.py", "*.go", "*.cs", "*.fs", "*.java"):
+            assert ext in text, f"{rel} omits {ext} from the Pulumi review scope"
+
+
+def test_both_reviewers_check_the_same_hardcoded_values(tmp_path):
+    """The Copilot agent and the Claude command must not disagree on a rule."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+    agent = (tmp_path / ".github/agents/terraform-pr-reviewer.agent.md").read_text()
+    command = (tmp_path / ".claude/commands/review-terraform-pr.md").read_text()
+    for text, name in ((agent, "agent"), (command, "command")):
+        assert "region literals" in text, f"{name} does not check hardcoded regions"
+
+
+def test_validation_safety_note_is_tool_neutral(tmp_path):
+    """`terraform validate` expects a prior init and does not fetch code, so the
+    note must not claim every validate command initialises (issue #55 review)."""
+    ctx = build_context(_pr_review_answers(orch="None"))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        flat = " ".join((tmp_path / rel).read_text().split())
+        assert "neither downloads nor executes module code" in flat, (
+            f"{rel} still claims every validate command initialises"
+        )
+        assert "safe to run on any pull request" in flat
+        # The note must not name the other orchestration tools.
+        for other in ("Terragrunt", "Terramate", "Pulumi"):
+            assert other not in flat, f"{rel} names {other} for a no-orchestration workspace"
+
+
+@pytest.mark.parametrize(
+    "orch, initialises",
+    [
+        # Only Terragrunt auto-initialises; Pulumi executes the program. Plain
+        # terraform validate and terramate run do neither (issue #55 review).
+        ("None", False),
+        ("Terramate", False),
+        ("Terragrunt", True),
+        ("Pulumi", True),
+    ],
+)
+def test_validate_safety_note_matches_the_command_behaviour(tmp_path, orch, initialises):
+    ctx = build_context(_pr_review_answers(orch=orch))
+    note = ctx["VALIDATE_COMMAND_SAFETY"]
+    if initialises:
+        assert "trusted branch" in note, f"{orch} note omits the untrusted-code warning"
+    else:
+        assert "downloads n" in note, f"{orch} note wrongly implies a download"
+        # The warning belongs to the init step, not to validation itself.
+        assert "init" in note
+
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        flat = " ".join((tmp_path / rel).read_text().split())
+        assert " ".join(note.split()) in flat, f"{rel} ({orch}) lost the safety note"
+
+
+@pytest.mark.parametrize(
+    "cicd, expected, forbidden",
+    [
+        # Azure DevOps keeps azure-pipelines.yml at the root, which the default
+        # `pipelines` directory would exclude. The other platforms must not be
+        # told to look for that file (issue #55 review).
+        ("Azure DevOps", ["azure-pipelines.yml", "hint rather than a boundary"], []),
+        ("GitHub Actions", [".github/workflows", "reusable workflow"], ["azure-pipelines.yml"]),
+        ("GitLab CI", [".gitlab-ci.yml", "include:"], ["azure-pipelines.yml"]),
+        ("Atlantis", ["atlantis.yaml"], ["azure-pipelines.yml", ".gitlab-ci.yml"]),
+    ],
+)
+def test_pipeline_scope_names_only_this_platforms_files(tmp_path, cicd, expected, forbidden):
+    """The scope note must describe where this platform keeps its pipelines, and
+    never cite another platform's filename."""
+    ctx = build_context(_pr_review_answers(cicd=cicd))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        flat = " ".join((tmp_path / rel).read_text().split())
+        for needle in expected:
+            assert needle in flat, f"{rel} ({cicd}) omits {needle!r}"
+        for needle in forbidden:
+            assert needle not in flat, (
+                f"{rel} ({cicd}) cites {needle!r} from another platform"
+            )

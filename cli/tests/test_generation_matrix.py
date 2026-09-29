@@ -80,6 +80,7 @@ def _expected_copilot(orch: str) -> set[str]:
         ".github/agents/infra-architect.agent.md",
         ".github/agents/terraform-module-builder.agent.md",
         ".github/agents/terraform-test-writer.agent.md",
+        ".github/agents/terraform-pr-reviewer.agent.md",
         ".github/skills/create-terraform-module/SKILL.md",
         ".github/skills/create-infra-pipeline/SKILL.md",
         ".github/instructions/terraform-modules.instructions.md",
@@ -102,6 +103,7 @@ def _expected_claude(orch: str) -> set[str]:
         "CLAUDE.md",
         ".claude/commands/create-terraform-module.md",
         ".claude/commands/create-infra-pipeline.md",
+        ".claude/commands/review-terraform-pr.md",
     }
     if orch != "None":
         low = _ORCH_LOWER[orch]

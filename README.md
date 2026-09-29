@@ -12,6 +12,7 @@ The bootstrap process scans your IaC workspace, interviews you about conventions
 | **Planning agent** | `.github/agents/infra-architect.agent.md` | Embedded in `CLAUDE.md` |
 | **Module builder agent** | `.github/agents/terraform-module-builder.agent.md` | Embedded in `CLAUDE.md` |
 | **Test writer agent** | `.github/agents/terraform-test-writer.agent.md` | Embedded in `CLAUDE.md` |
+| **PR review agent** | `.github/agents/terraform-pr-reviewer.agent.md` | `.claude/commands/review-terraform-pr.md` |
 | **Orchestration agent** | `.github/agents/*-stack-manager.agent.md` | Embedded in `CLAUDE.md` |
 | **File-scoped standards** | `.github/instructions/*.instructions.md` | Rules section in `CLAUDE.md` |
 | **Module scaffolding** | `.github/skills/create-terraform-module/SKILL.md` | `.claude/commands/create-terraform-module.md` |
@@ -240,6 +241,8 @@ Files that contain cloud-specific provider references, data sources, naming patt
 
 - `agents/infra-architect.agent.md.tmpl` — planning agent (uses `{{PLACEHOLDER}}` tokens)
 - `agents/terraform-test-writer.agent.md.tmpl` — test patterns (resolved via `{{DATA_SOURCE_OVERRIDE}}`)
+- `agents/terraform-pr-reviewer.agent.md.tmpl` — PR review against workspace conventions
+- `commands/review-terraform-pr.md.tmpl` — Claude Code counterpart of the PR reviewer
 - `agents/*-stack-manager.agent.md.tmpl` — orchestration-specific, not cloud-specific
 - `skills/create-infra-pipeline.skill.md.tmpl` — CI/CD-specific, not cloud-specific
 - `instructions/pipeline-templates.instructions.md.tmpl` — CI/CD platform rules
@@ -297,6 +300,8 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{NAMING_LOCALS}}` | `name = substr(...)` | Full locals block for name construction |
 | `{{TAG_MERGE_PATTERN}}` | `merge(var.env_default_tags, var.tags)` | Tag merge expression |
 | `{{TAG_MERGE_LOCAL}}` | `tags = merge(var.env_default_tags, var.tags)` | Full locals line for tag merging |
+| `{{NAMING_PATTERN}}` | `{prefix}-{resource_abbreviation}-{suffix}` | Naming convention selected in the interview (authoritative over the HCL example) |
+| `{{TAG_STRATEGY}}` | `merge(var.env_default_tags, var.tags)` | Tag strategy selected in the interview (authoritative over the HCL example) |
 
 ### Module & provider placeholders
 
@@ -322,6 +327,11 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{MOCK_OUTPUTS_EXAMPLE}}` | (HCL block) | Example mock_outputs block |
 | `{{VALIDATE_COMMAND}}` | `terragrunt validate` | Validation command |
 | `{{PLAN_COMMAND}}` | `terragrunt plan` | Plan command |
+| `{{ORCHESTRATION_REVIEW_CHECKS}}` | (bullet list) | PR review checks for the orchestration tool |
+| `{{ORCHESTRATION_INSTRUCTIONS_REF}}` | `` `.github/instructions/terragrunt-configs.instructions.md` — orchestration rules `` | Orchestration rules file, or a note when there is none |
+| `{{REVIEW_FILE_SCOPE}}` | `` `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs `` | File types a PR review covers for this tool |
+| `{{ORCHESTRATION_SOURCES}}` | `Terragrunt configs` | Noun phrase for the tool's own sources, used in review scope wording |
+| `{{VALIDATE_COMMAND_SAFETY}}` | (sentence) | Whether the tool's validate command fetches and executes author-controlled code |
 
 ### Variable & testing placeholders
 
@@ -345,6 +355,9 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{DRIFT_PIPELINE}}` | (YAML block) | Drift detection pipeline template |
 | `{{STANDARD_PARAMETERS}}` | (multi-line) | Pipeline parameter definitions |
 | `{{PIPELINE_CONVENTIONS}}` | (multi-line) | Pipeline naming/structure conventions |
+| `{{PIPELINE_REVIEW_CHECKS}}` | (bullet list) | PR review checks for the CI/CD platform |
+| `{{PIPELINE_DIR}}` | `.github/workflows` | Directory holding pipeline definitions |
+| `{{PIPELINE_SCOPE_NOTE}}` | (sentence) | Where this platform keeps its pipeline definitions, for review scope |
 
 ## Migration Guide
 

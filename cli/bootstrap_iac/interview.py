@@ -122,6 +122,24 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
 
 _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
     "Terragrunt": {
+        "validate_command_safety": (
+            "`terragrunt validate` resolves and initialises the module sources the pull request declares, so it downloads and can execute code the author controls. Run it only for a pull request from a trusted branch, and skip it for an untrusted fork."
+        ),
+        "orchestration_sources": "Terragrunt configs",
+        "review_file_scope": (
+            "`*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs"
+        ),
+        "orchestration_instructions_ref": (
+            "`.github/instructions/terragrunt-configs.instructions.md` — orchestration rules"
+        ),
+        "orchestration_review_checks": (
+            "- Terragrunt configs under `{orchestration_dir}` follow the DRY hierarchy\n"
+            "- Shared values live in `_envcommon/` rather than repeated per component\n"
+            "- `terraform { source = ... }` pins a module version tag, never a branch\n"
+            "- Every `dependency` block declares realistic `mock_outputs` and\n"
+            "  `mock_outputs_allowed_terraform_commands`\n"
+            "- Component `terragrunt.hcl` carries only component-specific overrides"
+        ),
         "tool_lower": "terragrunt",
         "validate_command": "terragrunt validate",
         "plan_command": "terragrunt plan",
@@ -221,6 +239,28 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'module_versions = {\n  tf-module-keyvault = "v1.2.0"\n  tf-module-network   = "v2.0.1"\n}',
     },
     "Terramate": {
+        "validate_command_safety": (
+            "`terramate run terraform validate` only dispatches `terraform validate` in each stack, "
+            "and neither command performs `terraform init`, so validation itself downloads "
+            "nothing. It requires an existing init, and that separate `terraform init` step is "
+            "what fetches and can execute code the author controls — run the init only for a "
+            "pull request from a trusted branch."
+        ),
+        "orchestration_sources": "Terramate configs",
+        "review_file_scope": (
+            "`*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terramate `*.tm.hcl` / `*.hcl` configs"
+        ),
+        "orchestration_instructions_ref": (
+            "`.github/instructions/terramate-configs.instructions.md` — orchestration rules"
+        ),
+        "orchestration_review_checks": (
+            "- Terramate stacks under `{orchestration_dir}` declare `stack { name, id }`\n"
+            "- Generated files come from `generate_hcl` blocks, not hand-edited copies\n"
+            "- Shared globals are defined once and inherited, not repeated per stack\n"
+            "- Cross-stack values use `terraform_remote_state`, with the producing\n"
+            "  stack listed in `after` so ordering is explicit\n"
+            "- Module sources pin a version tag, never a branch"
+        ),
         "tool_lower": "terramate",
         "validate_command": "terramate run terraform validate",
         "plan_command": "terramate run terraform plan",
@@ -259,6 +299,24 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'module_versions = {\n  tf-module-keyvault = "v1.2.0"\n}',
     },
     "None": {
+        "validate_command_safety": (
+            "`terraform validate` expects an existing init, so it neither downloads nor executes module code and is safe to run on any pull request."
+        ),
+        "orchestration_sources": "any non-Terraform infrastructure sources",
+        "review_file_scope": (
+            "`*.tf`, `*.tfvars`, and `*.tftest.hcl`"
+        ),
+        "orchestration_instructions_ref": (
+            "No orchestration instructions file — this workspace has no orchestration layer"
+        ),
+        "orchestration_review_checks": (
+            "- This workspace has no orchestration layer, so there is no stack\n"
+            "  hierarchy to review. Check the equivalent concerns in the root module:\n"
+            "- Module sources pin a version tag, never a branch or a floating ref\n"
+            "- Per-environment values come from `.tfvars` or a backend config, not\n"
+            "  from edited-in-place defaults\n"
+            "- The backend configuration is not duplicated across environments"
+        ),
         "tool_lower": "terraform",
         "validate_command": "terraform validate",
         "plan_command": "terraform plan",
@@ -299,6 +357,24 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'terraform {\n  required_providers {\n    azurerm = {\n      version = ">=4.0.0,<5.0.0"\n    }\n  }\n}',
     },
     "Pulumi": {
+        "validate_command_safety": (
+            "`pulumi preview` runs the program and resolves its providers, so it executes code the author controls. Run it only for a pull request from a trusted branch, and skip it for an untrusted fork."
+        ),
+        "orchestration_sources": "Pulumi program sources",
+        "review_file_scope": (
+            "`*.tf`, `*.tfvars`, `*.tftest.hcl`, the Pulumi project and stack config (`Pulumi.yaml`, `Pulumi.*.yaml`), and the Pulumi program sources (`*.ts`, `*.js`, `*.py`, `*.go`, `*.cs`, `*.fs`, `*.java`)"
+        ),
+        "orchestration_instructions_ref": (
+            "`.github/instructions/pulumi-configs.instructions.md` — orchestration rules"
+        ),
+        "orchestration_review_checks": (
+            "- Pulumi projects under `{orchestration_dir}` keep per-stack settings in\n"
+            "  `Pulumi.{stack}.yaml`, not hardcoded in program code\n"
+            "- Reusable logic is a ComponentResource, not copy-pasted between stacks\n"
+            "- Cross-stack values use `StackReference`, never a hardcoded id\n"
+            "- Secrets use Pulumi encrypted config, never plaintext in a config file\n"
+            "- Resource options such as `dependsOn` and `protect` are set deliberately"
+        ),
         "tool_lower": "pulumi",
         "validate_command": "pulumi preview",
         "plan_command": "pulumi preview",
@@ -358,6 +434,12 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
 
 _CICD_DEFAULTS: dict[str, dict] = {
     "GitHub Actions": {
+        "pipeline_scope_note": (
+            "Workflow definitions live under `.github/workflows`. Include any reusable workflow or composite action they call, wherever it lives."
+        ),
+        "pipeline_review_checks": (
+            "- Plan runs on every pull request; apply runs only on the protected branch\n- The apply job requires an environment approval before it runs\n- Authentication uses OIDC federation, not stored credentials\n- The apply job consumes the plan artifact the plan job published\n- A failing plan fails the job; no `continue-on-error` hides the exit code"
+        ),
         "pipeline_apply_to": ".github/workflows/**/*.yml",
         "pipeline_dir": ".github/workflows",
         "auth_requirements": (
@@ -380,6 +462,12 @@ _CICD_DEFAULTS: dict[str, dict] = {
         ),
     },
     "Azure DevOps": {
+        "pipeline_scope_note": (
+            "A pipeline definition may be `azure-pipelines.yml` or `azure-pipelines.yaml` at the repository root, or live under `pipelines/`. Include any template it references, so the directory is a hint rather than a boundary."
+        ),
+        "pipeline_review_checks": (
+            "- Plan runs on every pull request; apply runs only on the protected branch\n- The apply stage is gated by an environment check or manual approval\n- Authentication uses a workload identity service connection, not secrets\n- The apply stage downloads the plan artifact the plan stage published\n- A failing plan fails the stage; no step swallows the exit code"
+        ),
         "pipeline_apply_to": "**/pipelines/**/*.yml",
         "pipeline_dir": "pipelines",
         "auth_requirements": (
@@ -403,6 +491,12 @@ _CICD_DEFAULTS: dict[str, dict] = {
         ),
     },
     "GitLab CI": {
+        "pipeline_scope_note": (
+            "The pipeline definition is `.gitlab-ci.yml` at the repository root. Include any file it pulls in with `include:`, wherever that lives."
+        ),
+        "pipeline_review_checks": (
+            "- Plan runs on every merge request; apply runs only on the default branch\n- The apply job is `when: manual` so a human releases it\n- Authentication uses OIDC (`id_tokens`), not masked credential variables\n- The apply job consumes the plan artifact the plan job published\n- A failing plan fails the job; no `allow_failure: true` hides it"
+        ),
         "pipeline_apply_to": "**/.gitlab-ci.yml",
         "pipeline_dir": ".",
         "auth_requirements": (
@@ -425,6 +519,12 @@ _CICD_DEFAULTS: dict[str, dict] = {
         ),
     },
     "Atlantis": {
+        "pipeline_scope_note": (
+            "The configuration is `atlantis.yaml` at the repository root. Include any custom workflow it defines and any server-side config the change refers to."
+        ),
+        "pipeline_review_checks": (
+            "- Repos and workflows are declared in `atlantis.yaml`\n- Plan runs automatically on the pull request; apply is released by an\n  `atlantis apply` comment, so do not expect a protected-branch apply job\n- Provider credentials come from the Atlantis server environment, so do not\n  expect identity configuration in the repository\n- Apply approval is enforced by Atlantis settings, not by a pipeline gate\n- `when_modified:` scopes each project to the files it owns"
+        ),
         "pipeline_apply_to": "atlantis.yaml",
         "pipeline_dir": ".",
         "auth_requirements": (
@@ -683,6 +783,27 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("DEPENDENCY_CONVENTIONS", orch_defs["dependency_conventions"])
     ctx.setdefault("VERSION_TAG_LOCATION", orch_defs["version_tag_location"])
     ctx.setdefault("VERSION_TAG_EXAMPLE", orch_defs["version_tag_example"])
+    # Per-tool PR review checks: the review agent must not tell a workspace
+    # to verify a concept its orchestration tool does not have (issue #55).
+    ctx.setdefault("REVIEW_FILE_SCOPE", orch_defs["review_file_scope"])
+    # Noun phrase for the tool's own sources, so scope wording never renders
+    # as "None sources" in a workspace without orchestration (#55).
+    ctx.setdefault("ORCHESTRATION_SOURCES", orch_defs["orchestration_sources"])
+    # Whether the validate command fetches and executes author-controlled
+    # code differs per tool, so the safety note must too (#55).
+    ctx.setdefault(
+        "VALIDATE_COMMAND_SAFETY", orch_defs["validate_command_safety"]
+    )
+    ctx.setdefault(
+        "ORCHESTRATION_INSTRUCTIONS_REF",
+        orch_defs["orchestration_instructions_ref"],
+    )
+    ctx.setdefault(
+        "ORCHESTRATION_REVIEW_CHECKS",
+        orch_defs["orchestration_review_checks"].replace(
+            "{orchestration_dir}", str(ctx.get("ORCHESTRATION_DIR", "."))
+        ),
+    )
 
     # ---- CI/CD derived values ----
     cicd_key = cicd if cicd in _CICD_DEFAULTS else "GitHub Actions"
@@ -692,6 +813,14 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("AUTH_REQUIREMENTS", cicd_defs["auth_requirements"])
     ctx.setdefault("TEMPLATE_REFERENCE_PATTERN", cicd_defs["template_reference_pattern"])
     ctx.setdefault("PIPELINE_CONVENTIONS", cicd_defs["pipeline_conventions"])
+    # Per-platform PR review checks: the reviewer must not demand a
+    # protected-branch apply job from Atlantis, which applies by comment (#55).
+    ctx.setdefault(
+        "PIPELINE_REVIEW_CHECKS", cicd_defs["pipeline_review_checks"]
+    )
+    # Where this platform keeps its pipeline definitions, so the scope note
+    # never cites another platform's filename (#55).
+    ctx.setdefault("PIPELINE_SCOPE_NOTE", cicd_defs["pipeline_scope_note"])
     ctx.setdefault("PIPELINE_CONVENTIONS_LIST", cicd_defs["pipeline_conventions"])
     ctx.setdefault("STANDARD_PARAMETERS", cicd_defs["standard_parameters"])
     ctx.setdefault("STANDARD_PARAMETERS_LIST", cicd_defs["standard_parameters"])

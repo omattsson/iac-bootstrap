@@ -200,6 +200,7 @@ def test_complete_example_has_full_copilot_and_claude_trees():
         "agents/infra-architect.agent.md",
         "agents/terraform-module-builder.agent.md",
         "agents/terraform-test-writer.agent.md",
+        "agents/terraform-pr-reviewer.agent.md",
         "agents/terragrunt-stack-manager.agent.md",
         "instructions/terraform-modules.instructions.md",
         "instructions/terraform-tests.instructions.md",
@@ -217,6 +218,7 @@ def test_complete_example_has_full_copilot_and_claude_trees():
         ".claude/commands/create-terraform-module.md",
         ".claude/commands/create-infra-pipeline.md",
         ".claude/commands/create-terragrunt-stack.md",
+        ".claude/commands/review-terraform-pr.md",
     }
 
 
