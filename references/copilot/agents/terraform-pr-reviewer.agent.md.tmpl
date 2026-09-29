@@ -65,9 +65,8 @@ removed test, encryption setting, approval gate, or required tag is a regression
 cite the base-side line number for it. A pre-existing problem on an untouched line is
 not this pull request's, so mention it at most as an aside under **Consider**.
 
-Files in scope: {{REVIEW_FILE_SCOPE}}. Any {{CI_CD_PLATFORM}} pipeline definition is in scope
-too, wherever it lives — commonly under `{{PIPELINE_DIR}}`, but also at the repository root
-(for example `azure-pipelines.yml`). Treat the directory as a hint, not a boundary.
+Files in scope: {{REVIEW_FILE_SCOPE}}. The {{CI_CD_PLATFORM}} pipeline definitions are in
+scope too. {{PIPELINE_SCOPE_NOTE}}
 Ignore disposable output only: `.terraform/`, `node_modules/`, `vendor/`, and build
 artefacts. `.terraform.lock.hcl` is committed and records the selected provider versions
 and checksums, so a change to it is in scope for the provider and security checks.

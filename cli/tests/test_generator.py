@@ -1295,10 +1295,21 @@ def test_validate_safety_note_matches_the_command_behaviour(tmp_path, orch, init
         assert " ".join(note.split()) in flat, f"{rel} ({orch}) lost the safety note"
 
 
-@pytest.mark.parametrize("cicd", ["Azure DevOps", "GitHub Actions", "GitLab CI", "Atlantis"])
-def test_pipeline_scope_is_not_bounded_by_the_default_directory(tmp_path, cicd):
-    """Azure DevOps commonly keeps azure-pipelines.yml at the repository root,
-    which the default `pipelines` directory would exclude (issue #55 review)."""
+@pytest.mark.parametrize(
+    "cicd, expected, forbidden",
+    [
+        # Azure DevOps keeps azure-pipelines.yml at the root, which the default
+        # `pipelines` directory would exclude. The other platforms must not be
+        # told to look for that file (issue #55 review).
+        ("Azure DevOps", ["azure-pipelines.yml", "hint rather than a boundary"], []),
+        ("GitHub Actions", [".github/workflows", "reusable workflow"], ["azure-pipelines.yml"]),
+        ("GitLab CI", [".gitlab-ci.yml", "include:"], ["azure-pipelines.yml"]),
+        ("Atlantis", ["atlantis.yaml"], ["azure-pipelines.yml", ".gitlab-ci.yml"]),
+    ],
+)
+def test_pipeline_scope_names_only_this_platforms_files(tmp_path, cicd, expected, forbidden):
+    """The scope note must describe where this platform keeps its pipelines, and
+    never cite another platform's filename."""
     ctx = build_context(_pr_review_answers(cicd=cicd))
     generate_files(ctx, tmp_path, target="both", skip_existing=False)
 
@@ -1307,6 +1318,9 @@ def test_pipeline_scope_is_not_bounded_by_the_default_directory(tmp_path, cicd):
         ".claude/commands/review-terraform-pr.md",
     ):
         flat = " ".join((tmp_path / rel).read_text().split())
-        assert "wherever it lives" in flat, f"{rel} ({cicd}) bounds the pipeline scope"
-        assert "a hint, not a boundary" in flat
-        assert "azure-pipelines.yml" in flat
+        for needle in expected:
+            assert needle in flat, f"{rel} ({cicd}) omits {needle!r}"
+        for needle in forbidden:
+            assert needle not in flat, (
+                f"{rel} ({cicd}) cites {needle!r} from another platform"
+            )

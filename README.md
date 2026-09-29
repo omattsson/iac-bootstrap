@@ -357,6 +357,7 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{PIPELINE_CONVENTIONS}}` | (multi-line) | Pipeline naming/structure conventions |
 | `{{PIPELINE_REVIEW_CHECKS}}` | (bullet list) | PR review checks for the CI/CD platform |
 | `{{PIPELINE_DIR}}` | `.github/workflows` | Directory holding pipeline definitions |
+| `{{PIPELINE_SCOPE_NOTE}}` | (sentence) | Where this platform keeps its pipeline definitions, for review scope |
 
 ## Migration Guide
 
