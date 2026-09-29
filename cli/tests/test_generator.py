@@ -824,6 +824,13 @@ def test_pr_reviewer_resolves_the_real_base_ref(tmp_path):
         assert "origin/main...HEAD" not in text, f"{rel} hardcodes origin/main"
         assert "baseRefName" in text, f"{rel} does not resolve the PR base"
         assert "refs/remotes/origin/HEAD" in text, f"{rel} has no default-branch fallback"
+        # Resolving the name is not enough: a stale or shallow clone needs a fetch
+        # before the diff, and gh pr diff is preferred (issue #55 review).
+        assert "git fetch --no-tags origin" in text, (
+            f"{rel} diffs against a possibly stale base ref"
+        )
+        flat = " ".join(text.split())
+        assert "does not depend on what this clone happens to have fetched" in flat
 
 
 def test_pr_review_command_honours_its_arguments(tmp_path):
@@ -936,7 +943,8 @@ def test_pr_reviewer_reviews_the_patch_not_whole_files(tmp_path):
             f"{rel} does not treat deletions as reviewable"
         )
         # The patch itself is fetched, not only a name-only list.
-        assert 'git diff "$BASE"...HEAD' in text
+        assert "gh pr diff" in text
+        assert "git diff FETCH_HEAD...HEAD" in text
 
 
 def test_pr_review_command_fetches_the_pr_patch(tmp_path):

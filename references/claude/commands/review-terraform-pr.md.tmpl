@@ -35,25 +35,31 @@ predates the selection, so do not raise a finding from it.
 
 | `$ARGUMENTS` | Patch to review |
 |--------------|-----------------|
-| empty | `git diff "$BASE"...HEAD` |
-| a base ref, e.g. `release/2.1` | use it as `$BASE`, then diff as above |
+| empty | `gh pr diff`, or the local fallback below |
+| a base ref, e.g. `release/2.1` | use it as `$BASE` in the local fallback |
 | a PR number, e.g. `123` | `gh pr diff 123` |
-| a path, e.g. `modules/network` | resolve `$BASE`, then `git diff "$BASE"...HEAD -- <path>` |
+| a path, e.g. `modules/network` | as for empty, with `-- <path>` appended |
 
 Add `--name-only` to the same command when you just need the file list. Always read the
 patch itself: for a PR number the local checkout may be a different branch entirely, so
 the files on disk are not what that pull request changes.
 
-Resolve `$BASE` whenever the argument does not supply one. Never assume `main`, because a
-pull request may target a release or maintenance branch:
+Prefer `gh pr diff`: it is authoritative and does not depend on what this clone happens to
+have fetched. Use the local fallback only when no pull request is checked out or `gh` is
+unavailable. Resolve the base — never assume `main`, because a pull request may target a
+release or maintenance branch — and **fetch it before diffing**, because a stale clone
+compares against an outdated ref and a shallow one may have no `origin/` ref at all:
 
 ```bash
-# The pull request's own base when one is checked out, else the repository default.
-BASE="origin/$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null)" \
-  || BASE="$(git symbolic-ref --short refs/remotes/origin/HEAD)"
+BASE="$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null \
+  || git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')"
+git fetch --no-tags origin "$BASE"
+
+git diff FETCH_HEAD...HEAD
 ```
 
-If neither resolves, ask which branch to compare against rather than guessing.
+If the base still does not resolve, or the fetch fails, say so and ask which branch to
+compare against rather than reviewing a change set you cannot trust.
 
 In scope: {{REVIEW_FILE_SCOPE}}. Any {{CI_CD_PLATFORM}} pipeline definition is in scope too,
 wherever it lives — commonly under `{{PIPELINE_DIR}}`, but also at the repository root (for

@@ -33,19 +33,30 @@ predates the selection, so do not raise a finding from it.
 
 ## Scope
 
-Review only the changed files. Resolve the base ref first — never assume `main`, because a
-pull request may target a release or maintenance branch:
+Review only the changed files. Prefer the pull request's own diff: it is authoritative and
+does not depend on what this clone happens to have fetched.
 
 ```bash
-# The pull request's own base when one is checked out, else the repository default.
-BASE="origin/$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null)" \
-  || BASE="$(git symbolic-ref --short refs/remotes/origin/HEAD)"
-
-git diff --name-only "$BASE"...HEAD   # what changed
-git diff "$BASE"...HEAD               # the patch you actually review
+gh pr diff --name-only   # what changed
+gh pr diff               # the patch you actually review
 ```
 
-If neither resolves, ask which branch to compare against rather than guessing.
+Only if no pull request is checked out, or `gh` is unavailable, fall back to a local diff.
+Resolve the base — never assume `main`, because a pull request may target a release or
+maintenance branch — and **fetch it before diffing**, because a stale clone compares against
+an outdated ref and a shallow one may have no `origin/` ref at all:
+
+```bash
+BASE="$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null \
+  || git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')"
+git fetch --no-tags origin "$BASE"
+
+git diff --name-only FETCH_HEAD...HEAD
+git diff FETCH_HEAD...HEAD
+```
+
+If the base still does not resolve, or the fetch fails, say so and ask which branch to
+compare against rather than reviewing a change set you cannot trust.
 
 Review the patch, not the whole file. Read a full file only for context when the
 patch alone does not tell you whether a line is correct. Every finding must land on a line
