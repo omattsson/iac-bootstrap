@@ -54,7 +54,9 @@ removed test, encryption setting, approval gate, or required tag is a regression
 cite the base-side line number for it. A pre-existing problem on an untouched line is
 not this pull request's, so mention it at most as an aside under **Consider**.
 
-Files in scope: `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs. Pipeline definitions under `.github/workflows` are in scope too.
+Files in scope: `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs. Any GitHub Actions pipeline definition is in scope
+too, wherever it lives — commonly under `.github/workflows`, but also at the repository root
+(for example `azure-pipelines.yml`). Treat the directory as a hint, not a boundary.
 Ignore disposable output only: `.terraform/`, `node_modules/`, `vendor/`, and build
 artefacts. `.terraform.lock.hcl` is committed and records the selected provider versions
 and checksums, so a change to it is in scope for the provider and security checks.

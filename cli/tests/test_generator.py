@@ -1242,3 +1242,50 @@ def test_validation_safety_note_is_tool_neutral(tmp_path):
         # The note must not name the other orchestration tools.
         for other in ("Terragrunt", "Terramate", "Pulumi"):
             assert other not in flat, f"{rel} names {other} for a no-orchestration workspace"
+
+
+@pytest.mark.parametrize(
+    "orch, initialises",
+    [
+        # Only Terragrunt auto-initialises; Pulumi executes the program. Plain
+        # terraform validate and terramate run do neither (issue #55 review).
+        ("None", False),
+        ("Terramate", False),
+        ("Terragrunt", True),
+        ("Pulumi", True),
+    ],
+)
+def test_validate_safety_note_matches_the_command_behaviour(tmp_path, orch, initialises):
+    ctx = build_context(_pr_review_answers(orch=orch))
+    note = ctx["VALIDATE_COMMAND_SAFETY"]
+    if initialises:
+        assert "trusted branch" in note, f"{orch} note omits the untrusted-code warning"
+    else:
+        assert "downloads n" in note, f"{orch} note wrongly implies a download"
+        # The warning belongs to the init step, not to validation itself.
+        assert "init" in note
+
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        flat = " ".join((tmp_path / rel).read_text().split())
+        assert " ".join(note.split()) in flat, f"{rel} ({orch}) lost the safety note"
+
+
+@pytest.mark.parametrize("cicd", ["Azure DevOps", "GitHub Actions", "GitLab CI", "Atlantis"])
+def test_pipeline_scope_is_not_bounded_by_the_default_directory(tmp_path, cicd):
+    """Azure DevOps commonly keeps azure-pipelines.yml at the repository root,
+    which the default `pipelines` directory would exclude (issue #55 review)."""
+    ctx = build_context(_pr_review_answers(cicd=cicd))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        flat = " ".join((tmp_path / rel).read_text().split())
+        assert "wherever it lives" in flat, f"{rel} ({cicd}) bounds the pipeline scope"
+        assert "a hint, not a boundary" in flat
+        assert "azure-pipelines.yml" in flat

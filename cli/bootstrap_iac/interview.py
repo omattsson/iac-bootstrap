@@ -240,7 +240,11 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
     },
     "Terramate": {
         "validate_command_safety": (
-            "`terramate run terraform validate` initialises the module sources the pull request declares, so it downloads and can execute code the author controls. Run it only for a pull request from a trusted branch, and skip it for an untrusted fork."
+            "`terramate run terraform validate` only dispatches `terraform validate` in each stack, "
+            "and neither command performs `terraform init`, so validation itself downloads "
+            "nothing. It requires an existing init, and that separate `terraform init` step is "
+            "what fetches and can execute code the author controls — run the init only for a "
+            "pull request from a trusted branch."
         ),
         "orchestration_sources": "Terramate configs",
         "review_file_scope": (

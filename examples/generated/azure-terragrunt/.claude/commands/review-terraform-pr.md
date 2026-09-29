@@ -55,7 +55,9 @@ BASE="origin/$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null)" \
 
 If neither resolves, ask which branch to compare against rather than guessing.
 
-In scope: `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs. Pipeline definitions under `.github/workflows` are in scope too.
+In scope: `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs. Any GitHub Actions pipeline definition is in scope too,
+wherever it lives — commonly under `.github/workflows`, but also at the repository root (for
+example `azure-pipelines.yml`). Treat the directory as a hint, not a boundary.
 Out of scope: disposable output only — `.terraform/`, `node_modules/`, `vendor/`, and
 build artefacts. `.terraform.lock.hcl` is committed and records the selected provider
 versions and checksums, so a change to it is in scope for the provider and security
