@@ -30,10 +30,16 @@ pull request may target a release or maintenance branch:
 BASE="origin/$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null)" \
   || BASE="$(git symbolic-ref --short refs/remotes/origin/HEAD)"
 
-git diff --name-only "$BASE"...HEAD
+git diff --name-only "$BASE"...HEAD   # what changed
+git diff "$BASE"...HEAD               # the patch you actually review
 ```
 
 If neither resolves, ask which branch to compare against rather than guessing.
+
+Review the patch, not the whole file. Read a full file only for context when the
+patch alone does not tell you whether a line is correct. Every finding must land on a
+line the patch adds or modifies; a pre-existing problem on an untouched line is not
+this pull request's, so mention it at most as an aside under **Consider**.
 
 Files in scope: `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs. Pipeline definitions under `.github/workflows` are in scope too.
 Ignore generated files, lock files, and vendored directories.
@@ -55,6 +61,9 @@ Work through every category. For each, report findings or state "no issues".
 - Tags are not duplicated per resource when a local already computes them
 
 ### 3. Variable design
+
+Applies to Terraform files only. Skip for non-Terraform sources; section 7 covers those.
+
 - Optional attributes of an object variable use `optional(type, default)`, so callers
   set only what they care about; a variable that is not required declares a `default`
 - Shared inputs come from `common.variables.tf` instead of being redeclared
@@ -64,6 +73,9 @@ Work through every category. For each, report findings or state "no issues".
 - Sensitive inputs are marked `sensitive = true`
 
 ### 4. Test coverage
+
+Applies to Terraform modules only.
+
 - A new or changed module has matching tests under `tests/`
 - Tests use `command = plan` and `mock_provider "azurerm" {}`
 - New behaviour (a conditional resource, a new output, a naming change) has an assertion
@@ -78,6 +90,9 @@ Work through every category. For each, report findings or state "no issues".
 - Authentication uses Managed Identity / OIDC; no static credentials introduced
 
 ### 6. Module structure
+
+Applies to Terraform modules only. A Terragrunt program or config is judged by section 7 instead.
+
 - Files split as `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, and `locals.tf` when naming is computed
 - `versions.tf` pins the provider constraints this workspace standardises on:
 
@@ -114,12 +129,13 @@ Platform: GitHub Actions. The workspace pipeline conventions are:
 - Two-stage: plan (on PR) → apply (on merge to main, with environment protection)
 - Use `concurrency:` to prevent parallel runs on the same stack
 
-Check the change against them, and also:
+Check the change against them, and against the checks for this platform:
 
-- Plan runs on every change; apply is gated on a protected branch and an approval
-- Authentication is identity-based; no credential variables or long-lived secrets
-- A failing plan fails the job; exit codes are not swallowed by a continue-on-error step
-- Pipeline changes keep the plan artifact that the apply stage consumes
+- Plan runs on every pull request; apply runs only on the protected branch
+- The apply job requires an environment approval before it runs
+- Authentication uses OIDC federation, not stored credentials
+- The apply job consumes the plan artifact the plan job published
+- A failing plan fails the job; no `continue-on-error` hides the exit code
 
 ## Verification
 
@@ -130,8 +146,11 @@ terraform fmt -check -recursive
 terragrunt validate
 ```
 
-Run these only for a PR from a trusted branch. Both commands initialise the
-modules the PR declares, which fetches and executes code the author controls.
+`terraform fmt -check` only reads and formats files, so it is safe on any pull
+request. `terragrunt validate` is not: for this workspace it resolves and
+initialises the module sources the pull request declares, which downloads and can
+execute code the author controls. Run it only for a pull request from a trusted
+branch, and skip it for an untrusted fork.
 
 Report a command that fails to run as an observation, not as a finding against the author.
 

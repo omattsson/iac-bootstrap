@@ -634,7 +634,9 @@ def test_build_output_specs_no_orchestration_omits_stack_files():
 # ---------------------------------------------------------------------------
 
 
-def _pr_review_answers(cloud="Azure", orch="Terragrunt", target="both"):
+def _pr_review_answers(
+    cloud="Azure", orch="Terragrunt", target="both", cicd="GitHub Actions"
+):
     """A complete interview answer set, as generate_files requires."""
     return {
         "COMPANY_NAME": "Acme Corp",
@@ -643,7 +645,7 @@ def _pr_review_answers(cloud="Azure", orch="Terragrunt", target="both"):
         "ORCHESTRATION_TOOL": orch,
         # Mirror run_interview: no orchestration means no orchestration dir.
         "ORCHESTRATION_DIR": "." if orch == "None" else "infrastructure-config",
-        "CI_CD_PLATFORM": "GitHub Actions",
+        "CI_CD_PLATFORM": cicd,
         "AUTH_PATTERN": "Managed Identity / OIDC",
         "STATE_BACKEND": "Azure Blob Storage",
         "NAMING_PATTERN": "{prefix}-{type}-{suffix}",
@@ -876,3 +878,95 @@ def test_pr_reviewer_describes_optional_correctly(tmp_path):
         assert "Optional inputs use `optional()`" not in text
         assert "optional(type, default)" in text
         assert "object variable" in text
+
+
+@pytest.mark.parametrize(
+    "cicd, expected, forbidden",
+    [
+        # Atlantis applies via a PR comment with server-side credentials, so
+        # demanding a protected-branch apply job produces false findings (#55).
+        (
+            "Atlantis",
+            ["atlantis apply", "Atlantis server environment"],
+            ["apply job requires an environment approval", "OIDC federation"],
+        ),
+        ("GitHub Actions", ["OIDC federation", "protected branch"], ["atlantis apply"]),
+        ("GitLab CI", ["when: manual", "id_tokens"], ["atlantis apply"]),
+        ("Azure DevOps", ["workload identity service connection"], ["atlantis apply"]),
+    ],
+)
+def test_pr_reviewer_pipeline_checks_match_the_platform(tmp_path, cicd, expected, forbidden):
+    """Section 8 must not impose one platform's workflow on another."""
+    ctx = build_context(_pr_review_answers(cicd=cicd))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for needle in expected:
+            assert needle in text, f"{rel} ({cicd}) should mention {needle!r}"
+        for needle in forbidden:
+            assert needle not in text, (
+                f"{rel} ({cicd}) must not impose {needle!r} from another platform"
+            )
+
+
+def test_pr_reviewer_reviews_the_patch_not_whole_files(tmp_path):
+    """Findings must be tied to changed lines, or the reviewer blames the author
+    for pre-existing problems on untouched lines (issue #55 review)."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "Review the patch, not the whole file" in text
+        assert "adds or modifies" in text, f"{rel} does not scope findings to changed lines"
+        # The patch itself is fetched, not only a name-only list.
+        assert 'git diff "$BASE"...HEAD' in text
+
+
+def test_pr_review_command_fetches_the_pr_patch(tmp_path):
+    """A PR-number invocation must read that PR's patch, not the local checkout."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="claude", skip_existing=False)
+    text = (tmp_path / ".claude/commands/review-terraform-pr.md").read_text()
+    assert "gh pr diff 123`" in text or "gh pr diff 123 " in text or "`gh pr diff 123`" in text
+    assert "the local checkout may be a different branch" in text
+
+
+def test_pr_reviewer_terraform_sections_are_scoped_to_terraform(tmp_path):
+    """Terraform-only checks must not be applied to Pulumi program sources."""
+    ctx = build_context(_pr_review_answers(orch="Pulumi"))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        # Pulumi sources are in scope ...
+        assert "*.ts" in text
+        # ... but the Terraform-only categories say so explicitly.
+        assert text.count("Applies to Terraform") >= 2, (
+            f"{rel} does not scope the Terraform-only checklist sections"
+        )
+
+
+def test_pr_reviewer_command_safety_note_is_accurate(tmp_path):
+    """`terraform fmt` neither initialises modules nor executes code."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "Both commands initialise" not in text, f"{rel} still misstates fmt"
+        assert "only reads and formats files" in text
+        assert "untrusted fork" in text

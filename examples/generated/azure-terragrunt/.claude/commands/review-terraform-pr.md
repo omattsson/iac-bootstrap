@@ -22,12 +22,16 @@ If `CLAUDE.md` contradicts this command, **`CLAUDE.md` wins** — say so in the 
 
 `$ARGUMENTS` is optional. Interpret it before diffing, and apply what it asks for:
 
-| `$ARGUMENTS` | Change set to review |
-|--------------|----------------------|
-| empty | `git diff --name-only "$BASE"...HEAD` |
+| `$ARGUMENTS` | Patch to review |
+|--------------|-----------------|
+| empty | `git diff "$BASE"...HEAD` |
 | a base ref, e.g. `release/2.1` | use it as `$BASE`, then diff as above |
-| a PR number, e.g. `123` | `gh pr diff 123 --name-only` |
-| a path, e.g. `modules/network` | resolve `$BASE`, then `git diff --name-only "$BASE"...HEAD -- <path>` |
+| a PR number, e.g. `123` | `gh pr diff 123` |
+| a path, e.g. `modules/network` | resolve `$BASE`, then `git diff "$BASE"...HEAD -- <path>` |
+
+Add `--name-only` to the same command when you just need the file list. Always read the
+patch itself: for a PR number the local checkout may be a different branch entirely, so
+the files on disk are not what that pull request changes.
 
 Resolve `$BASE` whenever the argument does not supply one. Never assume `main`, because a
 pull request may target a release or maintenance branch:
@@ -42,6 +46,11 @@ If neither resolves, ask which branch to compare against rather than guessing.
 
 In scope: `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs. Pipeline definitions under `.github/workflows` are in scope too.
 Out of scope: generated files, lock files, vendored directories.
+
+Review the patch, not the whole file. Read a full file only for context when the patch
+alone does not tell you whether a line is correct. Every finding must land on a line the
+patch adds or modifies; a pre-existing problem on an untouched line is not this pull
+request's, so mention it at most as an aside under **Consider**.
 
 If no in-scope file changed, say so and stop.
 
@@ -60,6 +69,9 @@ Work through every category and report findings or "no issues" for each.
 - No resource replaces the merge with a bare literal map
 
 ### 3. Variable design
+
+Applies to Terraform files only. Skip for non-Terraform sources; section 7 covers those.
+
 - Optional attributes of an object variable use `optional(type, default)`, so callers
   set only what they care about; a variable that is not required declares a `default`
 - Shared inputs come from `common.variables.tf` rather than being redeclared
@@ -68,6 +80,9 @@ Work through every category and report findings or "no issues" for each.
 - Sensitive inputs marked `sensitive = true`
 
 ### 4. Test coverage
+
+Applies to Terraform modules only.
+
 - New or changed modules have matching tests under `tests/`
 - Tests use `command = plan` with `mock_provider "azurerm" {}`
 - New behaviour has an assertion; changed naming or tagging updates its test
@@ -81,6 +96,9 @@ Work through every category and report findings or "no issues" for each.
 - Authentication uses Managed Identity / OIDC; no static credentials introduced
 
 ### 6. Module structure
+
+Applies to Terraform modules only. A Terragrunt program or config is judged by section 7 instead.
+
 - `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, plus `locals.tf` when naming is computed
 - `versions.tf` pins the provider constraints this workspace standardises on:
 
@@ -116,7 +134,13 @@ Platform: GitHub Actions. The workspace pipeline conventions are:
 - Two-stage: plan (on PR) → apply (on merge to main, with environment protection)
 - Use `concurrency:` to prevent parallel runs on the same stack
 
-Check the change against them, and also:
+Check the change against them, and against the checks for this platform:
+
+- Plan runs on every pull request; apply runs only on the protected branch
+- The apply job requires an environment approval before it runs
+- Authentication uses OIDC federation, not stored credentials
+- The apply job consumes the plan artifact the plan job published
+- A failing plan fails the job; no `continue-on-error` hides the exit code
 
 - Plan on every change; apply gated on a protected branch with approval
 - Identity-based authentication; no credential variables
@@ -131,8 +155,11 @@ terraform fmt -check -recursive
 terragrunt validate
 ```
 
-Run these only for a PR from a trusted branch. Both commands initialise the
-modules the PR declares, which fetches and executes code the author controls.
+`terraform fmt -check` only reads and formats files, so it is safe on any pull
+request. `terragrunt validate` is not: for this workspace it resolves and
+initialises the module sources the pull request declares, which downloads and can
+execute code the author controls. Run it only for a pull request from a trusted
+branch, and skip it for an untrusted fork.
 
 Report a command that cannot run as an observation, not as a finding against the author.
 

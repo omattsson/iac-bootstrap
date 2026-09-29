@@ -414,6 +414,9 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
 
 _CICD_DEFAULTS: dict[str, dict] = {
     "GitHub Actions": {
+        "pipeline_review_checks": (
+            "- Plan runs on every pull request; apply runs only on the protected branch\n- The apply job requires an environment approval before it runs\n- Authentication uses OIDC federation, not stored credentials\n- The apply job consumes the plan artifact the plan job published\n- A failing plan fails the job; no `continue-on-error` hides the exit code"
+        ),
         "pipeline_apply_to": ".github/workflows/**/*.yml",
         "pipeline_dir": ".github/workflows",
         "auth_requirements": (
@@ -436,6 +439,9 @@ _CICD_DEFAULTS: dict[str, dict] = {
         ),
     },
     "Azure DevOps": {
+        "pipeline_review_checks": (
+            "- Plan runs on every pull request; apply runs only on the protected branch\n- The apply stage is gated by an environment check or manual approval\n- Authentication uses a workload identity service connection, not secrets\n- The apply stage downloads the plan artifact the plan stage published\n- A failing plan fails the stage; no step swallows the exit code"
+        ),
         "pipeline_apply_to": "**/pipelines/**/*.yml",
         "pipeline_dir": "pipelines",
         "auth_requirements": (
@@ -459,6 +465,9 @@ _CICD_DEFAULTS: dict[str, dict] = {
         ),
     },
     "GitLab CI": {
+        "pipeline_review_checks": (
+            "- Plan runs on every merge request; apply runs only on the default branch\n- The apply job is `when: manual` so a human releases it\n- Authentication uses OIDC (`id_tokens`), not masked credential variables\n- The apply job consumes the plan artifact the plan job published\n- A failing plan fails the job; no `allow_failure: true` hides it"
+        ),
         "pipeline_apply_to": "**/.gitlab-ci.yml",
         "pipeline_dir": ".",
         "auth_requirements": (
@@ -481,6 +490,9 @@ _CICD_DEFAULTS: dict[str, dict] = {
         ),
     },
     "Atlantis": {
+        "pipeline_review_checks": (
+            "- Repos and workflows are declared in `atlantis.yaml`\n- Plan runs automatically on the pull request; apply is released by an\n  `atlantis apply` comment, so do not expect a protected-branch apply job\n- Provider credentials come from the Atlantis server environment, so do not\n  expect identity configuration in the repository\n- Apply approval is enforced by Atlantis settings, not by a pipeline gate\n- `when_modified:` scopes each project to the files it owns"
+        ),
         "pipeline_apply_to": "atlantis.yaml",
         "pipeline_dir": ".",
         "auth_requirements": (
@@ -761,6 +773,11 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("AUTH_REQUIREMENTS", cicd_defs["auth_requirements"])
     ctx.setdefault("TEMPLATE_REFERENCE_PATTERN", cicd_defs["template_reference_pattern"])
     ctx.setdefault("PIPELINE_CONVENTIONS", cicd_defs["pipeline_conventions"])
+    # Per-platform PR review checks: the reviewer must not demand a
+    # protected-branch apply job from Atlantis, which applies by comment (#55).
+    ctx.setdefault(
+        "PIPELINE_REVIEW_CHECKS", cicd_defs["pipeline_review_checks"]
+    )
     ctx.setdefault("PIPELINE_CONVENTIONS_LIST", cicd_defs["pipeline_conventions"])
     ctx.setdefault("STANDARD_PARAMETERS", cicd_defs["standard_parameters"])
     ctx.setdefault("STANDARD_PARAMETERS_LIST", cicd_defs["standard_parameters"])
