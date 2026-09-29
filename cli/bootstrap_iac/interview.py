@@ -122,6 +122,7 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
 
 _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
     "Terragrunt": {
+        "orchestration_sources": "Terragrunt configs",
         "review_file_scope": (
             "`*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs"
         ),
@@ -235,6 +236,7 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'module_versions = {\n  tf-module-keyvault = "v1.2.0"\n  tf-module-network   = "v2.0.1"\n}',
     },
     "Terramate": {
+        "orchestration_sources": "Terramate configs",
         "review_file_scope": (
             "`*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terramate `*.tm.hcl` / `*.hcl` configs"
         ),
@@ -287,6 +289,7 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'module_versions = {\n  tf-module-keyvault = "v1.2.0"\n}',
     },
     "None": {
+        "orchestration_sources": "any non-Terraform infrastructure sources",
         "review_file_scope": (
             "`*.tf`, `*.tfvars`, and `*.tftest.hcl`"
         ),
@@ -341,6 +344,7 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'terraform {\n  required_providers {\n    azurerm = {\n      version = ">=4.0.0,<5.0.0"\n    }\n  }\n}',
     },
     "Pulumi": {
+        "orchestration_sources": "Pulumi program sources",
         "review_file_scope": (
             "`*.tf`, `*.tfvars`, `*.tftest.hcl`, the Pulumi project and stack config (`Pulumi.yaml`, `Pulumi.*.yaml`), and the Pulumi program sources (`*.ts`, `*.py`, `*.go`, `*.cs`)"
         ),
@@ -754,6 +758,9 @@ def build_context(answers: dict) -> dict:
     # Per-tool PR review checks: the review agent must not tell a workspace
     # to verify a concept its orchestration tool does not have (issue #55).
     ctx.setdefault("REVIEW_FILE_SCOPE", orch_defs["review_file_scope"])
+    # Noun phrase for the tool's own sources, so scope wording never renders
+    # as "None sources" in a workspace without orchestration (#55).
+    ctx.setdefault("ORCHESTRATION_SOURCES", orch_defs["orchestration_sources"])
     ctx.setdefault(
         "ORCHESTRATION_INSTRUCTIONS_REF",
         orch_defs["orchestration_instructions_ref"],

@@ -18,6 +18,17 @@ Read the workspace conventions first and let them override any general Terraform
 
 If `CLAUDE.md` contradicts this command, **`CLAUDE.md` wins** — say so in the report.
 
+Three exceptions, because the workspace chose them explicitly during bootstrap and a
+generated convention file may still show the generic default:
+
+- the naming convention **{{NAMING_PATTERN}}**
+- the tag strategy **{{TAG_STRATEGY}}**
+- the {{CI_CD_PLATFORM}} checks in section 8
+
+Those three are authoritative as stated here. Where a convention file restates a default
+HCL expression or a generic apply-gate that conflicts with them, it is an example that
+predates the selection, so do not raise a finding from it.
+
 ## Scope
 
 `$ARGUMENTS` is optional. Interpret it before diffing, and apply what it asks for:
@@ -48,9 +59,8 @@ In scope: {{REVIEW_FILE_SCOPE}}. Pipeline definitions under `{{PIPELINE_DIR}}` a
 Out of scope: disposable output only — `.terraform/`, `node_modules/`, `vendor/`, and
 build artefacts. `.terraform.lock.hcl` is committed and records the selected provider
 versions and checksums, so a change to it is in scope for the provider and security
-checks. Committed generated infrastructure code stays in scope too: a
-Terramate `_generated_*.tf` file is exactly where a hand edit or generator drift shows up,
-and section 7 depends on seeing it.
+checks. Committed generated infrastructure code stays in scope too: a checked-in generated `.tf`
+file is exactly where a hand edit or generator drift shows up.
 
 Review the patch, not the whole file. Read a full file only for context when the patch
 alone does not tell you whether a line is correct. Every finding must land on a line the
@@ -67,9 +77,9 @@ Work through every category and report findings or "no issues" for each.
 
 ### 1. Naming compliance
 
-The naming rules below are written in HCL terms and apply to Terraform files. The same
-intent applies to {{ORCHESTRATION_TOOL}} sources — judge those by the tool's own idioms
-under section 7, not by `locals.tf`.
+The naming rules below are written in HCL terms and apply to Terraform files. Apply the
+same intent to {{ORCHESTRATION_SOURCES}}, judged by their own idioms under section 7,
+not by `locals.tf`.
 
 - Resource names follow this workspace's convention: **{{NAMING_PATTERN}}**. That is the
   rule. If the workspace uses the default convention, the expression looks like
@@ -82,7 +92,7 @@ under section 7, not by `locals.tf`.
 ### 2. Tag and label strategy
 
 As above, the wording below is the Terraform form. Apply the same intent to
-{{ORCHESTRATION_TOOL}} sources using the tool's own tagging idiom.
+{{ORCHESTRATION_SOURCES}} using their own tagging idiom.
 
 - Taggable resources follow this workspace's tag strategy: **{{TAG_STRATEGY}}**. That is
   the rule. Where the workspace uses the default, it is expressed as
@@ -118,7 +128,7 @@ Applies to Terraform modules only.
 
 ### 6. Module structure
 
-Applies to Terraform modules only. A {{ORCHESTRATION_TOOL}} program or config is judged by section 7 instead.
+Applies to Terraform modules only; section 7 covers {{ORCHESTRATION_SOURCES}}.
 
 - `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, plus `locals.tf` when naming is computed
 - `versions.tf` pins the provider constraints this workspace standardises on:

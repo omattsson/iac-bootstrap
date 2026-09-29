@@ -300,6 +300,8 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{NAMING_LOCALS}}` | `name = substr(...)` | Full locals block for name construction |
 | `{{TAG_MERGE_PATTERN}}` | `merge(var.env_default_tags, var.tags)` | Tag merge expression |
 | `{{TAG_MERGE_LOCAL}}` | `tags = merge(var.env_default_tags, var.tags)` | Full locals line for tag merging |
+| `{{NAMING_PATTERN}}` | `{prefix}-{resource_abbreviation}-{suffix}` | Naming convention selected in the interview (authoritative over the HCL example) |
+| `{{TAG_STRATEGY}}` | `merge(var.env_default_tags, var.tags)` | Tag strategy selected in the interview (authoritative over the HCL example) |
 
 ### Module & provider placeholders
 
@@ -328,6 +330,7 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{ORCHESTRATION_REVIEW_CHECKS}}` | (bullet list) | PR review checks for the orchestration tool |
 | `{{ORCHESTRATION_INSTRUCTIONS_REF}}` | `` `.github/instructions/terragrunt-configs.instructions.md` — orchestration rules `` | Orchestration rules file, or a note when there is none |
 | `{{REVIEW_FILE_SCOPE}}` | `` `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs `` | File types a PR review covers for this tool |
+| `{{ORCHESTRATION_SOURCES}}` | `Terragrunt configs` | Noun phrase for the tool's own sources, used in review scope wording |
 
 ### Variable & testing placeholders
 
@@ -352,6 +355,7 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{STANDARD_PARAMETERS}}` | (multi-line) | Pipeline parameter definitions |
 | `{{PIPELINE_CONVENTIONS}}` | (multi-line) | Pipeline naming/structure conventions |
 | `{{PIPELINE_REVIEW_CHECKS}}` | (bullet list) | PR review checks for the CI/CD platform |
+| `{{PIPELINE_DIR}}` | `.github/workflows` | Directory holding pipeline definitions |
 
 ## Migration Guide
 

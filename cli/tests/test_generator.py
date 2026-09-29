@@ -1021,15 +1021,22 @@ def test_pr_reviewer_pipeline_section_has_no_generic_bullets(tmp_path, cicd):
 
 def test_new_placeholders_are_documented_in_the_readme():
     """CONTRIBUTING requires every new placeholder to appear in the README."""
+    import re
+
     repo_root = Path(__file__).resolve().parents[2]
     readme = (repo_root / "README.md").read_text(encoding="utf-8")
-    for placeholder in (
-        "{{ORCHESTRATION_REVIEW_CHECKS}}",
-        "{{ORCHESTRATION_INSTRUCTIONS_REF}}",
-        "{{REVIEW_FILE_SCOPE}}",
-        "{{PIPELINE_REVIEW_CHECKS}}",
+    # Derive the list from the templates rather than hardcoding it, so a
+    # placeholder added later cannot slip past undocumented.
+    used = set()
+    for rel in (
+        "references/copilot/agents/terraform-pr-reviewer.agent.md.tmpl",
+        "references/claude/commands/review-terraform-pr.md.tmpl",
     ):
-        assert placeholder in readme, f"{placeholder} is not documented in README.md"
+        text = (repo_root / rel).read_text(encoding="utf-8")
+        used |= set(re.findall(r"\{\{[A-Z][A-Z0-9_]*\}\}", text))
+    assert used, "no placeholders found in the PR reviewer templates"
+    missing = sorted(p for p in used if p not in readme)
+    assert not missing, f"undocumented in README.md: {missing}"
 
 
 def test_pr_reviewer_naming_and_tagging_are_scoped_to_terraform(tmp_path):
@@ -1049,8 +1056,9 @@ def test_pr_reviewer_naming_and_tagging_are_scoped_to_terraform(tmp_path):
         assert "is the Terraform form" in text, (
             f"{rel} does not scope the tagging rule to Terraform"
         )
-        # The tool's own idioms are pointed at instead.
-        assert text.count("Pulumi sources") >= 2
+        # The tool's own sources are named by a noun phrase, not the bare tool name.
+        assert text.count("Pulumi program sources") >= 2
+        assert "None sources" not in text
 
 
 def test_pr_reviewer_keeps_committed_generated_iac_in_scope(tmp_path):
@@ -1064,8 +1072,13 @@ def test_pr_reviewer_keeps_committed_generated_iac_in_scope(tmp_path):
         ".claude/commands/review-terraform-pr.md",
     ):
         text = (tmp_path / rel).read_text()
-        assert "_generated_*.tf" in text, f"{rel} does not keep generated IaC in scope"
-        assert "Committed generated infrastructure code stays in scope" in text
+        flat = " ".join(text.split())
+        assert "Committed generated infrastructure code stays in scope" in flat, (
+            f"{rel} does not keep generated IaC in scope"
+        )
+        assert "checked-in generated `.tf` file" in flat
+        # The note must not name one tool for every workspace.
+        assert "Terramate" not in flat or ctx["ORCHESTRATION_TOOL"] == "Terramate"
         # The blanket exclusion is gone.
         assert "Ignore generated files, lock files" not in text
         assert "Out of scope: generated files" not in text
@@ -1120,3 +1133,43 @@ def test_pr_reviewer_keeps_the_terraform_lock_file_in_scope(tmp_path):
         # The blanket "lock files" exclusion is gone.
         assert "disposable output only: lock files" not in text
         assert "disposable output only — lock files" not in text
+
+
+@pytest.mark.parametrize("orch", ["None", "Terragrunt", "Terramate", "Pulumi"])
+def test_pr_reviewer_never_renders_the_tool_name_as_a_noun(tmp_path, orch):
+    """"None sources" and "A None program" are nonsense for a workspace with no
+    orchestration, and one tool's name must not leak into another's guidance."""
+    ctx = build_context(_pr_review_answers(orch=orch))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    others = {"Terragrunt", "Terramate", "Pulumi"} - {orch}
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for bad in ("None sources", "A None program", "None program or config"):
+            assert bad not in text, f"{rel} ({orch}) renders {bad!r}"
+        for other in others:
+            assert other not in text, f"{rel} ({orch}) leaks {other} guidance"
+
+
+def test_pr_reviewer_keeps_selected_conventions_authoritative(tmp_path):
+    """Declaring the convention files authoritative must not re-open the door to
+    the hardcoded defaults those files still contain (issue #55 review)."""
+    answers = _pr_review_answers(cicd="Atlantis")
+    answers["NAMING_PATTERN"] = "{team}-{service}-{environment}"
+    answers["TAG_STRATEGY"] = "merge(local.required_tags, var.extra_tags)"
+    ctx = build_context(answers)
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        flat = " ".join((tmp_path / rel).read_text().split())
+        assert "Three exceptions" in flat, f"{rel} has no precedence carve-out"
+        assert "{team}-{service}-{environment}" in flat
+        assert "merge(local.required_tags, var.extra_tags)" in flat
+        assert "Atlantis checks in section 8" in flat
+        assert "predates the selection" in flat
