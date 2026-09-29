@@ -38,7 +38,7 @@ predates the selection, so do not raise a finding from it.
 | empty | `gh pr diff`, or the local fallback below |
 | a base ref, e.g. `release/2.1` | use it as `$BASE` in the local fallback |
 | a PR number, e.g. `123` | `gh pr diff 123` |
-| a path, e.g. `modules/network` | as for empty, with `-- <path>` appended |
+| a path, e.g. `modules/network` | the local fallback below with `-- <path>` appended. `gh pr diff` takes no pathspec, so narrow its output yourself rather than passing `-- <path>` to it |
 
 Add `--name-only` to the same command when you just need the file list. Always read the
 patch itself: for a PR number the local checkout may be a different branch entirely, so
@@ -56,6 +56,7 @@ BASE="$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null \
 git fetch --no-tags origin "$BASE"
 
 git diff FETCH_HEAD...HEAD
+git diff FETCH_HEAD...HEAD -- <path>   # when a path argument was given
 ```
 
 If the base still does not resolve, or the fetch fails, say so and ask which branch to

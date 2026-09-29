@@ -842,8 +842,21 @@ def test_pr_review_command_honours_its_arguments(tmp_path):
     assert "$ARGUMENTS" in text
     # Each advertised invocation mode has a concrete resolution.
     assert "gh pr diff" in text, "a PR number argument has no resolution"
-    assert '-- <path>' in text, "a path argument is never applied as a filter"
     assert "a base ref" in text, "a base ref argument has no resolution"
+    # A path filter must be attached to `git diff`, which accepts a pathspec ...
+    assert "git diff FETCH_HEAD...HEAD -- <path>" in text, (
+        "a path argument is never applied to a command that supports a pathspec"
+    )
+    # ... and never to `gh pr diff`, which does not (issue #55 review). Match the
+    # literal invocation, so the sentence warning against it does not count.
+    for bad in (
+        "gh pr diff -- ",
+        "gh pr diff --name-only -- ",
+        "gh pr diff 123 -- ",
+        "gh pr diff <number> -- ",
+    ):
+        assert bad not in text, f"invalid pathspec usage: {bad!r}"
+    assert "takes no pathspec" in text, "the gh pr diff limitation is not stated"
 
 
 @pytest.mark.parametrize(
