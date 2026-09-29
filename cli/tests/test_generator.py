@@ -802,3 +802,77 @@ def test_pr_reviewer_keeps_multiline_values_out_of_bullets(tmp_path):
         assert "```hcl\nterraform {" in text
         # Pipeline conventions start their own block, not mid-sentence.
         assert "Conventions: -" not in text
+
+
+def test_pr_reviewer_resolves_the_real_base_ref(tmp_path):
+    """The diff base must come from the PR, not a hardcoded `origin/main`.
+
+    A PR targeting a release branch would otherwise be reviewed against the
+    wrong change set (issue #55 review).
+    """
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "origin/main...HEAD" not in text, f"{rel} hardcodes origin/main"
+        assert "baseRefName" in text, f"{rel} does not resolve the PR base"
+        assert "refs/remotes/origin/HEAD" in text, f"{rel} has no default-branch fallback"
+
+
+def test_pr_review_command_honours_its_arguments(tmp_path):
+    """The Claude command advertises $ARGUMENTS, so it must actually use them."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="claude", skip_existing=False)
+    text = (tmp_path / ".claude/commands/review-terraform-pr.md").read_text()
+
+    assert "$ARGUMENTS" in text
+    # Each advertised invocation mode has a concrete resolution.
+    assert "gh pr diff" in text, "a PR number argument has no resolution"
+    assert '-- <path>' in text, "a path argument is never applied as a filter"
+    assert "a base ref" in text, "a base ref argument has no resolution"
+
+
+@pytest.mark.parametrize(
+    "orch, expected",
+    [
+        ("Pulumi", ["Pulumi.yaml", "*.ts", "*.py"]),
+        ("Terragrunt", ["*.tf", "*.hcl"]),
+        ("Terramate", ["*.tm.hcl"]),
+        ("None", ["*.tf", "*.tfvars"]),
+    ],
+)
+def test_pr_reviewer_file_scope_covers_the_tools_own_sources(tmp_path, orch, expected):
+    """A Pulumi workspace's review must not skip the Pulumi program files."""
+    ctx = build_context(_pr_review_answers(orch=orch))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for needle in expected:
+            assert needle in text, f"{rel} ({orch}) omits {needle!r} from the review scope"
+
+
+def test_pr_reviewer_describes_optional_correctly(tmp_path):
+    """`optional()` applies to object attributes, not to top-level variables.
+
+    Advising otherwise makes the reviewer raise false findings, and contradicts
+    references/iac-best-practices.md (issue #55 review).
+    """
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "Optional inputs use `optional()`" not in text
+        assert "optional(type, default)" in text
+        assert "object variable" in text

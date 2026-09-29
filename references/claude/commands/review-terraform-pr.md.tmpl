@@ -4,7 +4,7 @@ Review a Terraform pull request against the {{COMPANY_NAME}} workspace conventio
 
 ## Usage
 
-Run with no argument to review the current branch against `main`, or pass a base ref, a PR number, or a path: `$ARGUMENTS`
+Run with no argument to review the current branch against its pull request base, or pass a base ref, a PR number, or a path to narrow the review: `$ARGUMENTS`
 
 ## Before You Review
 
@@ -20,18 +20,27 @@ If `CLAUDE.md` contradicts this command, **`CLAUDE.md` wins** — say so in the 
 
 ## Scope
 
-Identify the changed files first:
+`$ARGUMENTS` is optional. Interpret it before diffing, and apply what it asks for:
+
+| `$ARGUMENTS` | Change set to review |
+|--------------|----------------------|
+| empty | `git diff --name-only "$BASE"...HEAD` |
+| a base ref, e.g. `release/2.1` | use it as `$BASE`, then diff as above |
+| a PR number, e.g. `123` | `gh pr diff 123 --name-only` |
+| a path, e.g. `modules/network` | resolve `$BASE`, then `git diff --name-only "$BASE"...HEAD -- <path>` |
+
+Resolve `$BASE` whenever the argument does not supply one. Never assume `main`, because a
+pull request may target a release or maintenance branch:
 
 ```bash
-git diff --name-only origin/main...HEAD
+# The pull request's own base when one is checked out, else the repository default.
+BASE="origin/$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null)" \
+  || BASE="$(git symbolic-ref --short refs/remotes/origin/HEAD)"
 ```
 
-If `origin/main` does not resolve, use the repository's default branch
-(`git symbolic-ref --short refs/remotes/origin/HEAD`) or the base ref given above.
+If neither resolves, ask which branch to compare against rather than guessing.
 
-For a PR number, fetch it with `gh pr diff <number> --name-only`.
-
-In scope: `*.tf`, `*.tfvars`, `*.hcl`, `*.tftest.hcl`, and pipeline definitions under `{{PIPELINE_DIR}}`.
+In scope: {{REVIEW_FILE_SCOPE}}. Pipeline definitions under `{{PIPELINE_DIR}}` are in scope too.
 Out of scope: generated files, lock files, vendored directories.
 
 If no in-scope file changed, say so and stop.
@@ -51,7 +60,8 @@ Work through every category and report findings or "no issues" for each.
 - No resource replaces the merge with a bare literal map
 
 ### 3. Variable design
-- Optional inputs use `optional()` with a default
+- Optional attributes of an object variable use `optional(type, default)`, so callers
+  set only what they care about; a variable that is not required declares a `default`
 - Shared inputs come from `{{COMMON_VARS_FILE}}` rather than being redeclared
 - Every variable has a `description` and an explicit `type`
 - No hardcoded account, subscription, or project identifiers

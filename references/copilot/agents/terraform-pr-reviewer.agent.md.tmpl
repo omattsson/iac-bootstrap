@@ -22,16 +22,20 @@ If a convention file contradicts this agent, **the convention file wins** — sa
 
 ## Scope
 
-Review only the changed files. Identify them first:
+Review only the changed files. Resolve the base ref first — never assume `main`, because a
+pull request may target a release or maintenance branch:
 
 ```bash
-git diff --name-only origin/main...HEAD
+# The pull request's own base when one is checked out, else the repository default.
+BASE="origin/$(gh pr view --json baseRefName --jq .baseRefName 2>/dev/null)" \
+  || BASE="$(git symbolic-ref --short refs/remotes/origin/HEAD)"
+
+git diff --name-only "$BASE"...HEAD
 ```
 
-If `origin/main` does not resolve, use the repository's default branch
-(`git symbolic-ref --short refs/remotes/origin/HEAD`) or the base ref given above.
+If neither resolves, ask which branch to compare against rather than guessing.
 
-Files in scope: `*.tf`, `*.tfvars`, `*.hcl`, `*.tftest.hcl`, and pipeline definitions under `{{PIPELINE_DIR}}`.
+Files in scope: {{REVIEW_FILE_SCOPE}}. Pipeline definitions under `{{PIPELINE_DIR}}` are in scope too.
 Ignore generated files, lock files, and vendored directories.
 
 ## Review Checklist
@@ -51,7 +55,8 @@ Work through every category. For each, report findings or state "no issues".
 - Tags are not duplicated per resource when a local already computes them
 
 ### 3. Variable design
-- Optional inputs use `optional()` with a default rather than `null` plus a conditional
+- Optional attributes of an object variable use `optional(type, default)`, so callers
+  set only what they care about; a variable that is not required declares a `default`
 - Shared inputs come from `{{COMMON_VARS_FILE}}` instead of being redeclared
 - Every variable has a `description` and an explicit `type`
 - `validation` blocks guard values with a limited valid range
