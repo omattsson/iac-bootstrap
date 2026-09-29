@@ -37,9 +37,11 @@ git diff "$BASE"...HEAD               # the patch you actually review
 If neither resolves, ask which branch to compare against rather than guessing.
 
 Review the patch, not the whole file. Read a full file only for context when the
-patch alone does not tell you whether a line is correct. Every finding must land on a
-line the patch adds or modifies; a pre-existing problem on an untouched line is not
-this pull request's, so mention it at most as an aside under **Consider**.
+patch alone does not tell you whether a line is correct. Every finding must land on a line
+the patch touches — added, modified, or **deleted**. A deletion can be the defect: a
+removed test, encryption setting, approval gate, or required tag is a regression, so
+cite the base-side line number for it. A pre-existing problem on an untouched line is
+not this pull request's, so mention it at most as an aside under **Consider**.
 
 Files in scope: `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs. Pipeline definitions under `.github/workflows` are in scope too.
 Ignore generated files, lock files, and vendored directories.

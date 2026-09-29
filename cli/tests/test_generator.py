@@ -888,7 +888,13 @@ def test_pr_reviewer_describes_optional_correctly(tmp_path):
         (
             "Atlantis",
             ["atlantis apply", "Atlantis server environment"],
-            ["apply job requires an environment approval", "OIDC federation"],
+            [
+                "apply job requires an environment approval",
+                "OIDC federation",
+                # Generic bullets that PIPELINE_REVIEW_CHECKS replaces.
+                "apply gated on a protected branch",
+                "Identity-based authentication",
+            ],
         ),
         ("GitHub Actions", ["OIDC federation", "protected branch"], ["atlantis apply"]),
         ("GitLab CI", ["when: manual", "id_tokens"], ["atlantis apply"]),
@@ -925,7 +931,9 @@ def test_pr_reviewer_reviews_the_patch_not_whole_files(tmp_path):
     ):
         text = (tmp_path / rel).read_text()
         assert "Review the patch, not the whole file" in text
-        assert "adds or modifies" in text, f"{rel} does not scope findings to changed lines"
+        assert "added, modified, or **deleted**" in text, (
+            f"{rel} does not treat deletions as reviewable"
+        )
         # The patch itself is fetched, not only a name-only list.
         assert 'git diff "$BASE"...HEAD' in text
 
@@ -970,3 +978,55 @@ def test_pr_reviewer_command_safety_note_is_accurate(tmp_path):
         assert "Both commands initialise" not in text, f"{rel} still misstates fmt"
         assert "only reads and formats files" in text
         assert "untrusted fork" in text
+
+
+def test_pr_reviewer_treats_deletions_as_reviewable(tmp_path):
+    """A removed test, encryption setting, or approval gate is a regression.
+
+    Scoping findings to added/modified lines only would let those through
+    (issue #55 review).
+    """
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "added, modified, or **deleted**" in text
+        assert "base-side line" in text, f"{rel} does not say how to cite a deletion"
+        # The earlier, narrower rule must be gone.
+        assert "adds or modifies;" not in text
+
+
+@pytest.mark.parametrize("cicd", ["Atlantis", "GitHub Actions", "GitLab CI", "Azure DevOps"])
+def test_pr_reviewer_pipeline_section_has_no_generic_bullets(tmp_path, cicd):
+    """Section 8 must rely only on the platform-specific checks."""
+    ctx = build_context(_pr_review_answers(cicd=cicd))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for generic in (
+            "Plan on every change; apply gated on a protected branch with approval",
+            "Identity-based authentication; no credential variables",
+            "Plan runs on every change; apply is gated on a protected branch and an approval",
+        ):
+            assert generic not in text, f"{rel} ({cicd}) still imposes {generic!r}"
+
+
+def test_new_placeholders_are_documented_in_the_readme():
+    """CONTRIBUTING requires every new placeholder to appear in the README."""
+    repo_root = Path(__file__).resolve().parents[2]
+    readme = (repo_root / "README.md").read_text(encoding="utf-8")
+    for placeholder in (
+        "{{ORCHESTRATION_REVIEW_CHECKS}}",
+        "{{ORCHESTRATION_INSTRUCTIONS_REF}}",
+        "{{REVIEW_FILE_SCOPE}}",
+        "{{PIPELINE_REVIEW_CHECKS}}",
+    ):
+        assert placeholder in readme, f"{placeholder} is not documented in README.md"

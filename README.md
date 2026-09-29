@@ -325,6 +325,9 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{MOCK_OUTPUTS_EXAMPLE}}` | (HCL block) | Example mock_outputs block |
 | `{{VALIDATE_COMMAND}}` | `terragrunt validate` | Validation command |
 | `{{PLAN_COMMAND}}` | `terragrunt plan` | Plan command |
+| `{{ORCHESTRATION_REVIEW_CHECKS}}` | (bullet list) | PR review checks for the orchestration tool |
+| `{{ORCHESTRATION_INSTRUCTIONS_REF}}` | `` `.github/instructions/terragrunt-configs.instructions.md` — orchestration rules `` | Orchestration rules file, or a note when there is none |
+| `{{REVIEW_FILE_SCOPE}}` | `` `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs `` | File types a PR review covers for this tool |
 
 ### Variable & testing placeholders
 
@@ -348,6 +351,7 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{DRIFT_PIPELINE}}` | (YAML block) | Drift detection pipeline template |
 | `{{STANDARD_PARAMETERS}}` | (multi-line) | Pipeline parameter definitions |
 | `{{PIPELINE_CONVENTIONS}}` | (multi-line) | Pipeline naming/structure conventions |
+| `{{PIPELINE_REVIEW_CHECKS}}` | (bullet list) | PR review checks for the CI/CD platform |
 
 ## Migration Guide
 

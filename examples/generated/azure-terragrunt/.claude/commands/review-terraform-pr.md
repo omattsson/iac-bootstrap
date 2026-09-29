@@ -49,8 +49,10 @@ Out of scope: generated files, lock files, vendored directories.
 
 Review the patch, not the whole file. Read a full file only for context when the patch
 alone does not tell you whether a line is correct. Every finding must land on a line the
-patch adds or modifies; a pre-existing problem on an untouched line is not this pull
-request's, so mention it at most as an aside under **Consider**.
+patch touches — added, modified, or **deleted**. A deletion can be the defect: a removed
+test, encryption setting, approval gate, or required tag is a regression, so cite the
+base-side line number for it. A pre-existing problem on an untouched line is not this
+pull request's, so mention it at most as an aside under **Consider**.
 
 If no in-scope file changed, say so and stop.
 
@@ -141,10 +143,6 @@ Check the change against them, and against the checks for this platform:
 - Authentication uses OIDC federation, not stored credentials
 - The apply job consumes the plan artifact the plan job published
 - A failing plan fails the job; no `continue-on-error` hides the exit code
-
-- Plan on every change; apply gated on a protected branch with approval
-- Identity-based authentication; no credential variables
-- A failing plan fails the job; exit codes are not swallowed
 
 ## Verification
 
