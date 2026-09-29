@@ -44,8 +44,10 @@ cite the base-side line number for it. A pre-existing problem on an untouched li
 not this pull request's, so mention it at most as an aside under **Consider**.
 
 Files in scope: `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs. Pipeline definitions under `.github/workflows` are in scope too.
-Ignore disposable output only: lock files, `.terraform/`, `node_modules/`, `vendor/`, and
-build artefacts. Committed generated infrastructure code stays in scope — a Terramate
+Ignore disposable output only: `.terraform/`, `node_modules/`, `vendor/`, and build
+artefacts. `.terraform.lock.hcl` is committed and records the selected provider versions
+and checksums, so a change to it is in scope for the provider and security checks.
+Committed generated infrastructure code stays in scope too — a Terramate
 `_generated_*.tf` file is exactly where a hand edit or generator drift shows up, and
 section 7 depends on seeing it.
 
@@ -59,18 +61,22 @@ The naming rules below are written in HCL terms and apply to Terraform files. Th
 intent applies to Terragrunt sources — judge those by the tool's own idioms
 under section 7, not by `locals.tf`.
 
-- Resource names follow the workspace pattern: `name = "${var.prefix}-${local.resource_abbreviation}-${local.suffix}"`
-- Human-readable convention: {prefix}-{resource_abbreviation}-{suffix}
+- Resource names follow this workspace's convention: **{prefix}-{resource_abbreviation}-{suffix}**. That is the
+  rule. If the workspace uses the default convention, the expression looks like
+  `name = "${var.prefix}-${local.resource_abbreviation}-${local.suffix}"` — treat that as an illustration, not as the rule, and never
+  raise a finding merely because a name is not written that exact way
 - New module directories use the `tf-module-{name}` prefix
 - Names are built in `locals.tf`, not inlined per resource
 - No hardcoded environment or region strings inside a name
 
 ### 2. Tag and label strategy
 
-As above, `merge(var.env_default_tags, var.tags)` is the Terraform form. Apply the same intent to
+As above, the wording below is the Terraform form. Apply the same intent to
 Terragrunt sources using the tool's own tagging idiom.
 
-- Every taggable resource carries `merge(var.env_default_tags, var.tags)`
+- Taggable resources follow this workspace's tag strategy: **merge(var.env_default_tags, var.tags)**. That is
+  the rule. Where the workspace uses the default, it is expressed as
+  `merge(var.env_default_tags, var.tags)` — an illustration, not the rule
 - No resource overrides the merge with a bare literal map
 - Tags are not duplicated per resource when a local already computes them
 
@@ -179,7 +185,7 @@ Group findings by severity, most severe first. Cite `file:line` and quote the co
 
 ### Blocking
 - `modules/tf-module-example/main.tf:24` — Resource name is hardcoded.
-  Convention: names follow `name = "${var.prefix}-${local.resource_abbreviation}-${local.suffix}"` and are computed in `locals.tf`.
+  Convention: names follow {prefix}-{resource_abbreviation}-{suffix} and are computed in `locals.tf`.
   Suggested: move the name into `locals.tf` and reference `local.name`.
 
 ### Should fix

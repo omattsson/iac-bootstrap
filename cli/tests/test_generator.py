@@ -1069,3 +1069,54 @@ def test_pr_reviewer_keeps_committed_generated_iac_in_scope(tmp_path):
         # The blanket exclusion is gone.
         assert "Ignore generated files, lock files" not in text
         assert "Out of scope: generated files" not in text
+
+
+def test_pr_reviewer_defers_to_the_selected_naming_and_tag_conventions(tmp_path):
+    """NAMING_PATTERN_HCL and TAG_MERGE_PATTERN are hardcoded cloud defaults that
+    build_context sets independently of the interview answers. Enforcing them as
+    the rule produces false findings in a customised workspace (issue #55 review).
+    """
+    answers = _pr_review_answers()
+    answers["NAMING_PATTERN"] = "{team}-{service}-{environment}"
+    answers["TAG_STRATEGY"] = "merge(local.required_tags, var.extra_tags)"
+    ctx = build_context(answers)
+    # The custom answers survive, while the HCL forms stay at their defaults.
+    assert ctx["NAMING_PATTERN"] == "{team}-{service}-{environment}"
+    assert "resource_abbreviation" in ctx["NAMING_PATTERN_HCL"]
+
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        # The workspace's own convention is stated as the rule ...
+        assert "{team}-{service}-{environment}" in text, f"{rel} ignores the convention"
+        assert "merge(local.required_tags, var.extra_tags)" in text, (
+            f"{rel} ignores the tag strategy"
+        )
+        # ... and the default HCL form is demoted to an illustration.
+        assert "an illustration, not as the rule" in text
+        assert "an illustration, not the rule" in text
+        # The report example cites the convention, not the hardcoded expression.
+        assert "Convention: names follow {team}-{service}-{environment}" in text
+
+
+def test_pr_reviewer_keeps_the_terraform_lock_file_in_scope(tmp_path):
+    """.terraform.lock.hcl is committed and records provider versions and
+    checksums, so it must not be excluded as disposable output."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        # Collapse wrapping so the assertion does not depend on line breaks.
+        flat = " ".join(text.split())
+        assert ".terraform.lock.hcl" in text, f"{rel} does not mention the lock file"
+        assert "in scope for the provider and security checks" in flat
+        # The blanket "lock files" exclusion is gone.
+        assert "disposable output only: lock files" not in text
+        assert "disposable output only — lock files" not in text
