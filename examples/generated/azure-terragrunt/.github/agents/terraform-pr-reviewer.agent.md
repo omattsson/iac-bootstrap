@@ -44,13 +44,21 @@ cite the base-side line number for it. A pre-existing problem on an untouched li
 not this pull request's, so mention it at most as an aside under **Consider**.
 
 Files in scope: `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs. Pipeline definitions under `.github/workflows` are in scope too.
-Ignore generated files, lock files, and vendored directories.
+Ignore disposable output only: lock files, `.terraform/`, `node_modules/`, `vendor/`, and
+build artefacts. Committed generated infrastructure code stays in scope — a Terramate
+`_generated_*.tf` file is exactly where a hand edit or generator drift shows up, and
+section 7 depends on seeing it.
 
 ## Review Checklist
 
 Work through every category. For each, report findings or state "no issues".
 
 ### 1. Naming compliance
+
+The naming rules below are written in HCL terms and apply to Terraform files. The same
+intent applies to Terragrunt sources — judge those by the tool's own idioms
+under section 7, not by `locals.tf`.
+
 - Resource names follow the workspace pattern: `name = "${var.prefix}-${local.resource_abbreviation}-${local.suffix}"`
 - Human-readable convention: {prefix}-{resource_abbreviation}-{suffix}
 - New module directories use the `tf-module-{name}` prefix
@@ -58,6 +66,10 @@ Work through every category. For each, report findings or state "no issues".
 - No hardcoded environment or region strings inside a name
 
 ### 2. Tag and label strategy
+
+As above, `merge(var.env_default_tags, var.tags)` is the Terraform form. Apply the same intent to
+Terragrunt sources using the tool's own tagging idiom.
+
 - Every taggable resource carries `merge(var.env_default_tags, var.tags)`
 - No resource overrides the merge with a bare literal map
 - Tags are not duplicated per resource when a local already computes them

@@ -44,13 +44,21 @@ cite the base-side line number for it. A pre-existing problem on an untouched li
 not this pull request's, so mention it at most as an aside under **Consider**.
 
 Files in scope: {{REVIEW_FILE_SCOPE}}. Pipeline definitions under `{{PIPELINE_DIR}}` are in scope too.
-Ignore generated files, lock files, and vendored directories.
+Ignore disposable output only: lock files, `.terraform/`, `node_modules/`, `vendor/`, and
+build artefacts. Committed generated infrastructure code stays in scope — a Terramate
+`_generated_*.tf` file is exactly where a hand edit or generator drift shows up, and
+section 7 depends on seeing it.
 
 ## Review Checklist
 
 Work through every category. For each, report findings or state "no issues".
 
 ### 1. Naming compliance
+
+The naming rules below are written in HCL terms and apply to Terraform files. The same
+intent applies to {{ORCHESTRATION_TOOL}} sources — judge those by the tool's own idioms
+under section 7, not by `locals.tf`.
+
 - Resource names follow the workspace pattern: `{{NAMING_PATTERN_HCL}}`
 - Human-readable convention: {{NAMING_PATTERN}}
 - New module directories use the `{{MODULE_PREFIX}}-{name}` prefix
@@ -58,6 +66,10 @@ Work through every category. For each, report findings or state "no issues".
 - No hardcoded environment or region strings inside a name
 
 ### 2. Tag and label strategy
+
+As above, `{{TAG_MERGE_PATTERN}}` is the Terraform form. Apply the same intent to
+{{ORCHESTRATION_TOOL}} sources using the tool's own tagging idiom.
+
 - Every taggable resource carries `{{TAG_MERGE_PATTERN}}`
 - No resource overrides the merge with a bare literal map
 - Tags are not duplicated per resource when a local already computes them

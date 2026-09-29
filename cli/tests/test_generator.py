@@ -1030,3 +1030,42 @@ def test_new_placeholders_are_documented_in_the_readme():
         "{{PIPELINE_REVIEW_CHECKS}}",
     ):
         assert placeholder in readme, f"{placeholder} is not documented in README.md"
+
+
+def test_pr_reviewer_naming_and_tagging_are_scoped_to_terraform(tmp_path):
+    """Sections 1 and 2 are written in HCL terms, so a Pulumi program must not
+    be judged by `locals.tf` or the HCL tag merge (issue #55 review)."""
+    ctx = build_context(_pr_review_answers(orch="Pulumi"))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "apply to Terraform files" in text, (
+            f"{rel} does not scope the naming rules to Terraform"
+        )
+        assert "is the Terraform form" in text, (
+            f"{rel} does not scope the tagging rule to Terraform"
+        )
+        # The tool's own idioms are pointed at instead.
+        assert text.count("Pulumi sources") >= 2
+
+
+def test_pr_reviewer_keeps_committed_generated_iac_in_scope(tmp_path):
+    """A blanket "ignore generated files" rule would hide Terramate's committed
+    _generated_*.tf, which is where a hand edit or drift shows up."""
+    ctx = build_context(_pr_review_answers(orch="Terramate"))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert "_generated_*.tf" in text, f"{rel} does not keep generated IaC in scope"
+        assert "Committed generated infrastructure code stays in scope" in text
+        # The blanket exclusion is gone.
+        assert "Ignore generated files, lock files" not in text
+        assert "Out of scope: generated files" not in text
