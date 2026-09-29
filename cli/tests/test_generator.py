@@ -649,7 +649,8 @@ def _pr_review_answers(
         "AUTH_PATTERN": "Managed Identity / OIDC",
         "STATE_BACKEND": "Azure Blob Storage",
         "NAMING_PATTERN": "{prefix}-{type}-{suffix}",
-        "TAG_STRATEGY": "merge(var.env_default_tags, var.tags)",
+        # TAG_STRATEGY is deliberately not set: the cloud default is multiline,
+        # which is what interactive generation produces (issue #55 review).
         "STANDARD_VARIABLES": "- prefix",
         "TARGET": target,
         "ORG": "acme",
@@ -1109,8 +1110,9 @@ def test_pr_reviewer_defers_to_the_selected_naming_and_tag_conventions(tmp_path)
             f"{rel} ignores the tag strategy"
         )
         # ... and the default HCL form is demoted to an illustration.
-        assert "an illustration, not as the rule" in text
-        assert "an illustration, not the rule" in text
+        flat = " ".join(text.split())
+        assert "an illustration, not as the rule" in flat
+        assert "an illustration, not the rule" in flat
         # The report example cites the convention, not the hardcoded expression.
         assert "Convention: names follow {team}-{service}-{environment}" in text
 
@@ -1173,3 +1175,70 @@ def test_pr_reviewer_keeps_selected_conventions_authoritative(tmp_path):
         assert "merge(local.required_tags, var.extra_tags)" in flat
         assert "Atlantis checks in section 8" in flat
         assert "predates the selection" in flat
+
+
+def test_pr_reviewer_renders_a_multiline_tag_strategy_as_a_block(tmp_path):
+    """TAG_STRATEGY is multiline by default for every cloud. Inlining it inside
+    bold text splits the list item and leaves emphasis spanning lines (#55 review).
+    """
+    ctx = build_context(_pr_review_answers())
+    assert "\n" in ctx["TAG_STRATEGY"], "expected the default multiline tag strategy"
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    first_line = ctx["TAG_STRATEGY"].splitlines()[0]
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        assert ctx["TAG_STRATEGY"] in text, f"{rel} does not carry the tag strategy"
+        for line in text.splitlines():
+            # The strategy must start its own line, not sit inside a bullet or bold.
+            if first_line in line:
+                assert line.strip() == first_line, (
+                    f"{rel}: multiline tag strategy inlined into {line!r}"
+                )
+            # Emphasis must never be left open at end of line.
+            assert line.count("**") % 2 == 0, f"{rel}: unbalanced emphasis in {line!r}"
+
+
+def test_pulumi_scope_covers_every_supported_runtime(tmp_path):
+    """A PR touching only index.js or Main.java must not be skipped entirely."""
+    ctx = build_context(_pr_review_answers(orch="Pulumi"))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for ext in ("*.ts", "*.js", "*.py", "*.go", "*.cs", "*.fs", "*.java"):
+            assert ext in text, f"{rel} omits {ext} from the Pulumi review scope"
+
+
+def test_both_reviewers_check_the_same_hardcoded_values(tmp_path):
+    """The Copilot agent and the Claude command must not disagree on a rule."""
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+    agent = (tmp_path / ".github/agents/terraform-pr-reviewer.agent.md").read_text()
+    command = (tmp_path / ".claude/commands/review-terraform-pr.md").read_text()
+    for text, name in ((agent, "agent"), (command, "command")):
+        assert "region literals" in text, f"{name} does not check hardcoded regions"
+
+
+def test_validation_safety_note_is_tool_neutral(tmp_path):
+    """`terraform validate` expects a prior init and does not fetch code, so the
+    note must not claim every validate command initialises (issue #55 review)."""
+    ctx = build_context(_pr_review_answers(orch="None"))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        flat = " ".join((tmp_path / rel).read_text().split())
+        assert "neither downloads nor executes module code" in flat, (
+            f"{rel} still claims every validate command initialises"
+        )
+        assert "safe to run on any pull request" in flat
+        # The note must not name the other orchestration tools.
+        for other in ("Terragrunt", "Terramate", "Pulumi"):
+            assert other not in flat, f"{rel} names {other} for a no-orchestration workspace"

@@ -122,6 +122,9 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
 
 _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
     "Terragrunt": {
+        "validate_command_safety": (
+            "`terragrunt validate` resolves and initialises the module sources the pull request declares, so it downloads and can execute code the author controls. Run it only for a pull request from a trusted branch, and skip it for an untrusted fork."
+        ),
         "orchestration_sources": "Terragrunt configs",
         "review_file_scope": (
             "`*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs"
@@ -236,6 +239,9 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'module_versions = {\n  tf-module-keyvault = "v1.2.0"\n  tf-module-network   = "v2.0.1"\n}',
     },
     "Terramate": {
+        "validate_command_safety": (
+            "`terramate run terraform validate` initialises the module sources the pull request declares, so it downloads and can execute code the author controls. Run it only for a pull request from a trusted branch, and skip it for an untrusted fork."
+        ),
         "orchestration_sources": "Terramate configs",
         "review_file_scope": (
             "`*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terramate `*.tm.hcl` / `*.hcl` configs"
@@ -289,6 +295,9 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'module_versions = {\n  tf-module-keyvault = "v1.2.0"\n}',
     },
     "None": {
+        "validate_command_safety": (
+            "`terraform validate` expects an existing init, so it neither downloads nor executes module code and is safe to run on any pull request."
+        ),
         "orchestration_sources": "any non-Terraform infrastructure sources",
         "review_file_scope": (
             "`*.tf`, `*.tfvars`, and `*.tftest.hcl`"
@@ -344,9 +353,12 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'terraform {\n  required_providers {\n    azurerm = {\n      version = ">=4.0.0,<5.0.0"\n    }\n  }\n}',
     },
     "Pulumi": {
+        "validate_command_safety": (
+            "`pulumi preview` runs the program and resolves its providers, so it executes code the author controls. Run it only for a pull request from a trusted branch, and skip it for an untrusted fork."
+        ),
         "orchestration_sources": "Pulumi program sources",
         "review_file_scope": (
-            "`*.tf`, `*.tfvars`, `*.tftest.hcl`, the Pulumi project and stack config (`Pulumi.yaml`, `Pulumi.*.yaml`), and the Pulumi program sources (`*.ts`, `*.py`, `*.go`, `*.cs`)"
+            "`*.tf`, `*.tfvars`, `*.tftest.hcl`, the Pulumi project and stack config (`Pulumi.yaml`, `Pulumi.*.yaml`), and the Pulumi program sources (`*.ts`, `*.js`, `*.py`, `*.go`, `*.cs`, `*.fs`, `*.java`)"
         ),
         "orchestration_instructions_ref": (
             "`.github/instructions/pulumi-configs.instructions.md` — orchestration rules"
@@ -761,6 +773,11 @@ def build_context(answers: dict) -> dict:
     # Noun phrase for the tool's own sources, so scope wording never renders
     # as "None sources" in a workspace without orchestration (#55).
     ctx.setdefault("ORCHESTRATION_SOURCES", orch_defs["orchestration_sources"])
+    # Whether the validate command fetches and executes author-controlled
+    # code differs per tool, so the safety note must too (#55).
+    ctx.setdefault(
+        "VALIDATE_COMMAND_SAFETY", orch_defs["validate_command_safety"]
+    )
     ctx.setdefault(
         "ORCHESTRATION_INSTRUCTIONS_REF",
         orch_defs["orchestration_instructions_ref"],

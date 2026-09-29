@@ -22,7 +22,7 @@ Three exceptions, because the workspace chose them explicitly during bootstrap a
 generated convention file may still show the generic default:
 
 - the naming convention **{prefix}-{resource_abbreviation}-{suffix}**
-- the tag strategy **merge(var.env_default_tags, var.tags)**
+- the tag strategy stated in section 2
 - the GitHub Actions checks in section 8
 
 Those three are authoritative as stated here. Where a convention file restates a default
@@ -94,9 +94,13 @@ not by `locals.tf`.
 As above, the wording below is the Terraform form. Apply the same intent to
 Terragrunt configs using their own tagging idiom.
 
-- Taggable resources follow this workspace's tag strategy: **merge(var.env_default_tags, var.tags)**. That is
-  the rule. Where the workspace uses the default, it is expressed as
-  `merge(var.env_default_tags, var.tags)` — an illustration, not the rule
+This workspace's tag strategy is the rule:
+
+merge(var.env_default_tags, var.tags)
+
+Where the workspace uses the default, that is expressed as `merge(var.env_default_tags, var.tags)` — an
+illustration, not the rule. Then check that:
+
 - No resource replaces the merge with a bare literal map
 
 ### 3. Variable design
@@ -107,7 +111,7 @@ Applies to Terraform files only. Skip for non-Terraform sources; section 7 cover
   set only what they care about; a variable that is not required declares a `default`
 - Shared inputs come from `common.variables.tf` rather than being redeclared
 - Every variable has a `description` and an explicit `type`
-- No hardcoded account, subscription, or project identifiers
+- No hardcoded account IDs, subscription IDs, project IDs, or region literals
 - Sensitive inputs marked `sensitive = true`
 
 ### 4. Test coverage
@@ -183,10 +187,7 @@ terragrunt validate
 ```
 
 `terraform fmt -check` only reads and formats files, so it is safe on any pull
-request. `terragrunt validate` is not: for this workspace it resolves and
-initialises the module sources the pull request declares, which downloads and can
-execute code the author controls. Run it only for a pull request from a trusted
-branch, and skip it for an untrusted fork.
+request. `terragrunt validate` resolves and initialises the module sources the pull request declares, so it downloads and can execute code the author controls. Run it only for a pull request from a trusted branch, and skip it for an untrusted fork.
 
 Report a command that cannot run as an observation, not as a finding against the author.
 

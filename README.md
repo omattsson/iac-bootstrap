@@ -331,6 +331,7 @@ All `.tmpl` files use `{{PLACEHOLDER}}` syntax. The bootstrap procedure replaces
 | `{{ORCHESTRATION_INSTRUCTIONS_REF}}` | `` `.github/instructions/terragrunt-configs.instructions.md` — orchestration rules `` | Orchestration rules file, or a note when there is none |
 | `{{REVIEW_FILE_SCOPE}}` | `` `*.tf`, `*.tfvars`, `*.tftest.hcl`, and Terragrunt `*.hcl` configs `` | File types a PR review covers for this tool |
 | `{{ORCHESTRATION_SOURCES}}` | `Terragrunt configs` | Noun phrase for the tool's own sources, used in review scope wording |
+| `{{VALIDATE_COMMAND_SAFETY}}` | (sentence) | Whether the tool's validate command fetches and executes author-controlled code |
 
 ### Variable & testing placeholders
 

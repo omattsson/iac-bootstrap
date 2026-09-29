@@ -24,7 +24,7 @@ Three exceptions, because the workspace chose them explicitly during bootstrap a
 generated convention file may still show the generic default:
 
 - the naming convention **{prefix}-{resource_abbreviation}-{suffix}**
-- the tag strategy **merge(var.env_default_tags, var.tags)**
+- the tag strategy stated in section 2
 - the GitHub Actions checks in section 8
 
 Those three are authoritative as stated here. Where a convention file restates a default
@@ -84,9 +84,13 @@ not by `locals.tf`.
 As above, the wording below is the Terraform form. Apply the same intent to
 Terragrunt configs using their own tagging idiom.
 
-- Taggable resources follow this workspace's tag strategy: **merge(var.env_default_tags, var.tags)**. That is
-  the rule. Where the workspace uses the default, it is expressed as
-  `merge(var.env_default_tags, var.tags)` — an illustration, not the rule
+This workspace's tag strategy is the rule:
+
+merge(var.env_default_tags, var.tags)
+
+Where the workspace uses the default, that is expressed as `merge(var.env_default_tags, var.tags)` — an
+illustration, not the rule. Then check that:
+
 - No resource overrides the merge with a bare literal map
 - Tags are not duplicated per resource when a local already computes them
 
@@ -177,10 +181,7 @@ terragrunt validate
 ```
 
 `terraform fmt -check` only reads and formats files, so it is safe on any pull
-request. `terragrunt validate` is not: for this workspace it resolves and
-initialises the module sources the pull request declares, which downloads and can
-execute code the author controls. Run it only for a pull request from a trusted
-branch, and skip it for an untrusted fork.
+request. `terragrunt validate` resolves and initialises the module sources the pull request declares, so it downloads and can execute code the author controls. Run it only for a pull request from a trusted branch, and skip it for an untrusted fork.
 
 Report a command that fails to run as an observation, not as a finding against the author.
 
