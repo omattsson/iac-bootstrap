@@ -124,6 +124,38 @@ _ORCH_CHOICES = click.Choice(list(ORCH_MAP), case_sensitive=False)
 _CICD_CHOICES = click.Choice(list(CICD_MAP), case_sensitive=False)
 
 
+def _validated_workspace(workspace_dir: str) -> Path:
+    """Resolve *workspace_dir*, exiting 2 if it is missing or not a directory.
+
+    Fail fast on a path typo so it cannot look like an empty-but-successful scan.
+    """
+    ws_path = Path(workspace_dir).resolve()
+    try:
+        ws_stat = os.stat(ws_path)
+    except FileNotFoundError:
+        click.secho(
+            f"  ✗  Workspace not found: {ws_path}", fg="red", bold=True, err=True
+        )
+        sys.exit(2)
+    except OSError as exc:
+        click.secho(
+            f"  ✗  Could not access workspace {ws_path}: {exc.strerror or exc}",
+            fg="red",
+            bold=True,
+            err=True,
+        )
+        sys.exit(2)
+    if not stat.S_ISDIR(ws_stat.st_mode):
+        click.secho(
+            f"  ✗  Workspace is not a directory: {ws_path}",
+            fg="red",
+            bold=True,
+            err=True,
+        )
+        sys.exit(2)
+    return ws_path
+
+
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option(__version__, "-V", "--version")
 # ---- Core interview options (non-interactive mode) ----
@@ -254,6 +286,41 @@ _CICD_CHOICES = click.Choice(list(CICD_MAP), case_sensitive=False)
     ),
 )
 @click.option(
+    "--maturity-report",
+    "maturity_report",
+    is_flag=True,
+    default=False,
+    help=(
+        "Assess --workspace against the IaC maturity model and print the report, "
+        "then exit. Runs discovery only: no interview, and nothing is generated."
+    ),
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["markdown", "json"], case_sensitive=False),
+    default="markdown",
+    show_default=True,
+    help="Output format for --maturity-report.",
+)
+@click.option(
+    "--output",
+    "output_file",
+    metavar="FILE",
+    type=click.Path(dir_okay=False, writable=True),
+    help="Write the --maturity-report output to FILE instead of stdout.",
+)
+@click.option(
+    "--maturity-threshold",
+    "maturity_threshold",
+    metavar="SCORE",
+    type=click.IntRange(0, 100),
+    help=(
+        "Exit 1 when the maturity score is below SCORE, for gating in CI. "
+        "Without it the command exits 0 whenever the report is produced."
+    ),
+)
+@click.option(
     "--ignore-dir",
     "ignore_dirs",
     metavar="DIR",
@@ -286,6 +353,10 @@ def main(
     save_config: bool,
     check_config: bool,
     discover: bool,
+    maturity_report: bool,
+    output_format: str,
+    output_file: Optional[str],
+    maturity_threshold: Optional[int],
     ignore_dirs: tuple[str, ...],
 ) -> None:
     """Bootstrap AI agent customisations for a Terraform IaC workspace.
@@ -295,8 +366,9 @@ def main(
 
     Run without flags for fully interactive mode.
     """
-    # --discover emits machine-readable JSON on stdout, so it prints no banner.
-    if not discover:
+    # --discover and --maturity-report write their result to stdout, so they
+    # print no banner that would corrupt piped or redirected output.
+    if not discover and not maturity_report:
         _print_header()
 
     # ------------------------------------------------------------------ #
@@ -436,35 +508,106 @@ def main(
     # ------------------------------------------------------------------ #
     # --discover mode: print the discovery result as JSON and exit.       #
     # ------------------------------------------------------------------ #
+    # The maturity flags only mean something with --maturity-report. Failing
+    # loudly beats silently ignoring them, especially for the generic --output
+    # on a tool whose main job is writing files (issue #54 review).
+    if not maturity_report:
+        stray = [
+            name
+            for name, given in (
+                ("--format", output_format.lower() != "markdown"),
+                ("--output", output_file is not None),
+                ("--maturity-threshold", maturity_threshold is not None),
+            )
+            if given
+        ]
+        if stray:
+            click.secho(
+                f"  ✗  {', '.join(stray)} requires --maturity-report.",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            sys.exit(2)
+    elif discover:
+        click.secho(
+            "  ✗  --discover and --maturity-report cannot be combined; "
+            "run them separately.",
+            fg="red",
+            bold=True,
+            err=True,
+        )
+        sys.exit(2)
+
     if discover:
-        ws_path = Path(workspace_dir).resolve()
-        # Fail fast on a missing or non-directory workspace so a path typo does
-        # not look like an empty-but-successful scan.
-        try:
-            ws_stat = os.stat(ws_path)
-        except FileNotFoundError:
-            click.secho(
-                f"  ✗  Workspace not found: {ws_path}", fg="red", bold=True, err=True
-            )
-            sys.exit(2)
-        except OSError as exc:
-            click.secho(
-                f"  ✗  Could not access workspace {ws_path}: {exc.strerror or exc}",
-                fg="red",
-                bold=True,
-                err=True,
-            )
-            sys.exit(2)
-        if not stat.S_ISDIR(ws_stat.st_mode):
-            click.secho(
-                f"  ✗  Workspace is not a directory: {ws_path}",
-                fg="red",
-                bold=True,
-                err=True,
-            )
-            sys.exit(2)
+        ws_path = _validated_workspace(workspace_dir)
         discovery = scan_workspace(ws_path, ignored_dirs=list(ignore_dirs) or None)
         click.echo(json.dumps(discovery.to_dict(), indent=2))
+        sys.exit(0)
+
+    # ------------------------------------------------------------------ #
+    # --maturity-report mode: assess the workspace and exit.              #
+    # ------------------------------------------------------------------ #
+    if maturity_report:
+        from bootstrap_iac.maturity import assess
+
+        ws_path = _validated_workspace(workspace_dir)
+        discovery = scan_workspace(ws_path, ignored_dirs=list(ignore_dirs) or None)
+        report = assess(
+            discovery,
+            ws_path,
+            ignored_dirs=list(ignore_dirs) or None,
+            company=company or "this workspace",
+        )
+        try:
+            rendered = (
+                report.to_json()
+                if output_format.lower() == "json"
+                else report.render()
+            )
+        except (OSError, GenerationError) as exc:
+            click.secho(
+                f"  ✗  Could not produce the maturity report: {exc}",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            sys.exit(2)
+
+        if output_file:
+            try:
+                out = Path(output_file)
+                if out.parent and not out.parent.exists():
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(rendered + "\n", encoding="utf-8")
+            except OSError as exc:
+                click.secho(
+                    f"  ✗  Could not write {output_file}: {exc.strerror or exc}",
+                    fg="red",
+                    bold=True,
+                    err=True,
+                )
+                sys.exit(2)
+            # Progress goes to stderr so stdout stays clean for redirection.
+            click.secho(
+                f"  ✓  Maturity report written to {output_file} "
+                f"({report.overall_score}%, {report.rating})",
+                fg="green",
+                err=True,
+            )
+        else:
+            click.echo(rendered)
+
+        # Exit code gates on the threshold only when one was asked for.
+        if maturity_threshold is not None and report.overall_score < maturity_threshold:
+            click.secho(
+                f"  ✗  Maturity score {report.overall_score}% is below the "
+                f"threshold of {maturity_threshold}%.",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            sys.exit(1)
         sys.exit(0)
 
     # ------------------------------------------------------------------ #
