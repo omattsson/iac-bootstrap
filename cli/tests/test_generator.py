@@ -627,3 +627,178 @@ def test_build_output_specs_no_orchestration_omits_stack_files():
     output_paths = [s.output_rel for s in specs]
     assert not any("stack-manager" in p for p in output_paths)
     assert not any("create-" in p and "-stack" in p for p in output_paths)
+
+
+# ---------------------------------------------------------------------------
+# PR review agent / command (issue #55)
+# ---------------------------------------------------------------------------
+
+
+def _pr_review_answers(cloud="Azure", orch="Terragrunt", target="both"):
+    """A complete interview answer set, as generate_files requires."""
+    return {
+        "COMPANY_NAME": "Acme Corp",
+        "CLOUD_PROVIDER": cloud,
+        "MODULE_PREFIX": "tf-module",
+        "ORCHESTRATION_TOOL": orch,
+        # Mirror run_interview: no orchestration means no orchestration dir.
+        "ORCHESTRATION_DIR": "." if orch == "None" else "infrastructure-config",
+        "CI_CD_PLATFORM": "GitHub Actions",
+        "AUTH_PATTERN": "Managed Identity / OIDC",
+        "STATE_BACKEND": "Azure Blob Storage",
+        "NAMING_PATTERN": "{prefix}-{type}-{suffix}",
+        "TAG_STRATEGY": "merge(var.env_default_tags, var.tags)",
+        "STANDARD_VARIABLES": "- prefix",
+        "TARGET": target,
+        "ORG": "acme",
+    }
+
+
+@pytest.mark.parametrize("cloud", ["Azure", "AWS", "GCP"])
+@pytest.mark.parametrize("orch", ["None", "Terragrunt", "Terramate", "Pulumi"])
+def test_pr_reviewer_is_generated_for_every_cloud_and_orchestration(cloud, orch):
+    """The PR reviewer is convention-driven, so it ships in every combination."""
+    tdir = get_templates_dir()
+    ctx = build_context({"CLOUD_PROVIDER": cloud, "ORCHESTRATION_TOOL": orch})
+    output_paths = [s.output_rel for s in _build_output_specs(ctx, tdir)]
+    assert ".github/agents/terraform-pr-reviewer.agent.md" in output_paths
+    assert ".claude/commands/review-terraform-pr.md" in output_paths
+
+
+def test_pr_reviewer_outputs_are_split_by_target():
+    """The agent belongs to the copilot target and the command to claude."""
+    tdir = get_templates_dir()
+    ctx = build_context({"CLOUD_PROVIDER": "Azure", "ORCHESTRATION_TOOL": "Terragrunt"})
+    specs = {s.output_rel: s for s in _build_output_specs(ctx, tdir)}
+    assert specs[".github/agents/terraform-pr-reviewer.agent.md"].target == "copilot"
+    assert specs[".claude/commands/review-terraform-pr.md"].target == "claude"
+
+
+@pytest.mark.parametrize("cloud", ["Azure", "AWS", "GCP"])
+@pytest.mark.parametrize("orch", ["None", "Terragrunt", "Terramate", "Pulumi"])
+def test_pr_reviewer_renders_without_placeholders_and_keeps_conventions(
+    tmp_path, cloud, orch
+):
+    """Generated review guidance resolves fully and cites workspace conventions."""
+    ctx = build_context(_pr_review_answers(cloud=cloud, orch=orch))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    agent = (tmp_path / ".github/agents/terraform-pr-reviewer.agent.md").read_text()
+    command = (tmp_path / ".claude/commands/review-terraform-pr.md").read_text()
+
+    for text, name in ((agent, "agent"), (command, "command")):
+        assert "{{" not in text, f"{name} has an unresolved placeholder"
+        # The workspace's own conventions must appear, not generic advice.
+        assert ctx["MODULE_PREFIX"] in text, f"{name} omits the module prefix"
+        assert ctx["TAG_MERGE_PATTERN"] in text, f"{name} omits the tag merge pattern"
+        assert ctx["PROVIDER_NAME"] in text, f"{name} omits the provider name"
+        assert ctx["COMMON_VARS_FILE"] in text, f"{name} omits the common vars file"
+        # All eight review categories from the issue are covered.
+        for heading in (
+            "Naming compliance",
+            "Tag and label strategy",
+            "Variable design",
+            "Test coverage",
+            "Security",
+            "Module structure",
+            "Orchestration compliance",
+            "Pipeline standards",
+        ):
+            assert heading in text, f"{name} is missing the '{heading}' category"
+        # Severity vocabulary the report format depends on.
+        for severity in ("Blocking", "Should fix", "Consider", "Verified"):
+            assert severity in text, f"{name} is missing the '{severity}' severity"
+
+
+def test_pr_reviewer_agent_has_valid_frontmatter(tmp_path):
+    """The Copilot agent needs frontmatter with a description to be discovered."""
+    import yaml
+
+    ctx = build_context(_pr_review_answers(orch="None"))
+    generate_files(ctx, tmp_path, target="copilot", skip_existing=False)
+    text = (tmp_path / ".github/agents/terraform-pr-reviewer.agent.md").read_text()
+
+    assert text.startswith("---\n")
+    frontmatter = yaml.safe_load(text.split("---", 2)[1])
+    assert isinstance(frontmatter, dict)
+    assert frontmatter["description"].strip()
+    assert "tools" in frontmatter
+
+
+def test_pr_reviewer_command_is_omitted_for_the_copilot_target(tmp_path):
+    """A copilot-only run must not write the Claude command, and vice versa."""
+    ctx = build_context(_pr_review_answers(orch="None"))
+
+    copilot_dir = tmp_path / "copilot"
+    generate_files(ctx, copilot_dir, target="copilot", skip_existing=False)
+    assert (copilot_dir / ".github/agents/terraform-pr-reviewer.agent.md").is_file()
+    assert not (copilot_dir / ".claude/commands/review-terraform-pr.md").exists()
+
+    claude_dir = tmp_path / "claude"
+    generate_files(ctx, claude_dir, target="claude", skip_existing=False)
+    assert (claude_dir / ".claude/commands/review-terraform-pr.md").is_file()
+    assert not (claude_dir / ".github/agents/terraform-pr-reviewer.agent.md").exists()
+
+
+@pytest.mark.parametrize(
+    "orch, expected, forbidden",
+    [
+        # Without orchestration the review must not ask for concepts that do
+        # not exist, and must not name an instructions file that is never
+        # generated (issue #55 review).
+        ("None", ["no orchestration layer"], ["mock_outputs", "_envcommon", "StackReference"]),
+        ("Terragrunt", ["_envcommon/", "mock_outputs"], ["StackReference", "generate_hcl"]),
+        ("Terramate", ["generate_hcl", "terraform_remote_state"], ["mock_outputs", "_envcommon"]),
+        ("Pulumi", ["StackReference", "ComponentResource"], ["mock_outputs", "_envcommon"]),
+    ],
+)
+def test_pr_reviewer_orchestration_section_matches_the_tool(tmp_path, orch, expected, forbidden):
+    """Section 7 must describe the workspace's actual orchestration tool."""
+    ctx = build_context(_pr_review_answers(orch=orch))
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for needle in expected:
+            assert needle in text, f"{rel} ({orch}) should mention {needle!r}"
+        for needle in forbidden:
+            assert needle not in text, (
+                f"{rel} ({orch}) must not mention {needle!r} from another tool"
+            )
+        # The "in use: None" phrasing that read as a broken sentence is gone.
+        assert "in use: None" not in text
+
+
+def test_pr_reviewer_does_not_reference_a_missing_instructions_file(tmp_path):
+    """Without orchestration there is no *-configs.instructions.md to read."""
+    ctx = build_context(_pr_review_answers(orch="None"))
+    generate_files(ctx, tmp_path, target="copilot", skip_existing=False)
+    text = (tmp_path / ".github/agents/terraform-pr-reviewer.agent.md").read_text()
+    assert "configs.instructions.md" not in text
+    assert "no orchestration layer" in text
+
+
+def test_pr_reviewer_keeps_multiline_values_out_of_bullets(tmp_path):
+    """Multi-line context values must be fenced, not inlined into a list item.
+
+    PROVIDER_VERSION_CONSTRAINTS and PIPELINE_CONVENTIONS are multi-line; if
+    they are interpolated mid-bullet the markdown list breaks (issue #55 review).
+    """
+    ctx = build_context(_pr_review_answers())
+    generate_files(ctx, tmp_path, target="both", skip_existing=False)
+
+    for rel in (
+        ".github/agents/terraform-pr-reviewer.agent.md",
+        ".claude/commands/review-terraform-pr.md",
+    ):
+        text = (tmp_path / rel).read_text()
+        for line in text.splitlines():
+            if line.startswith("- ") and line.rstrip().endswith("{"):
+                raise AssertionError(f"{rel}: multi-line value inlined in bullet: {line!r}")
+        # The provider block is fenced as HCL.
+        assert "```hcl\nterraform {" in text
+        # Pipeline conventions start their own block, not mid-sentence.
+        assert "Conventions: -" not in text

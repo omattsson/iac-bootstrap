@@ -122,6 +122,17 @@ _CLOUD_PROVIDER_DEFAULTS: dict[str, dict] = {
 
 _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
     "Terragrunt": {
+        "orchestration_instructions_ref": (
+            "`.github/instructions/terragrunt-configs.instructions.md` — orchestration rules"
+        ),
+        "orchestration_review_checks": (
+            "- Terragrunt configs under `{orchestration_dir}` follow the DRY hierarchy\n"
+            "- Shared values live in `_envcommon/` rather than repeated per component\n"
+            "- `terraform { source = ... }` pins a module version tag, never a branch\n"
+            "- Every `dependency` block declares realistic `mock_outputs` and\n"
+            "  `mock_outputs_allowed_terraform_commands`\n"
+            "- Component `terragrunt.hcl` carries only component-specific overrides"
+        ),
         "tool_lower": "terragrunt",
         "validate_command": "terragrunt validate",
         "plan_command": "terragrunt plan",
@@ -221,6 +232,17 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'module_versions = {\n  tf-module-keyvault = "v1.2.0"\n  tf-module-network   = "v2.0.1"\n}',
     },
     "Terramate": {
+        "orchestration_instructions_ref": (
+            "`.github/instructions/terramate-configs.instructions.md` — orchestration rules"
+        ),
+        "orchestration_review_checks": (
+            "- Terramate stacks under `{orchestration_dir}` declare `stack { name, id }`\n"
+            "- Generated files come from `generate_hcl` blocks, not hand-edited copies\n"
+            "- Shared globals are defined once and inherited, not repeated per stack\n"
+            "- Cross-stack values use `terraform_remote_state`, with the producing\n"
+            "  stack listed in `after` so ordering is explicit\n"
+            "- Module sources pin a version tag, never a branch"
+        ),
         "tool_lower": "terramate",
         "validate_command": "terramate run terraform validate",
         "plan_command": "terramate run terraform plan",
@@ -259,6 +281,17 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'module_versions = {\n  tf-module-keyvault = "v1.2.0"\n}',
     },
     "None": {
+        "orchestration_instructions_ref": (
+            "No orchestration instructions file — this workspace has no orchestration layer"
+        ),
+        "orchestration_review_checks": (
+            "- This workspace has no orchestration layer, so there is no stack\n"
+            "  hierarchy to review. Check the equivalent concerns in the root module:\n"
+            "- Module sources pin a version tag, never a branch or a floating ref\n"
+            "- Per-environment values come from `.tfvars` or a backend config, not\n"
+            "  from edited-in-place defaults\n"
+            "- The backend configuration is not duplicated across environments"
+        ),
         "tool_lower": "terraform",
         "validate_command": "terraform validate",
         "plan_command": "terraform plan",
@@ -299,6 +332,17 @@ _ORCHESTRATION_DEFAULTS: dict[str, dict] = {
         "version_tag_example": 'terraform {\n  required_providers {\n    azurerm = {\n      version = ">=4.0.0,<5.0.0"\n    }\n  }\n}',
     },
     "Pulumi": {
+        "orchestration_instructions_ref": (
+            "`.github/instructions/pulumi-configs.instructions.md` — orchestration rules"
+        ),
+        "orchestration_review_checks": (
+            "- Pulumi projects under `{orchestration_dir}` keep per-stack settings in\n"
+            "  `Pulumi.{stack}.yaml`, not hardcoded in program code\n"
+            "- Reusable logic is a ComponentResource, not copy-pasted between stacks\n"
+            "- Cross-stack values use `StackReference`, never a hardcoded id\n"
+            "- Secrets use Pulumi encrypted config, never plaintext in a config file\n"
+            "- Resource options such as `dependsOn` and `protect` are set deliberately"
+        ),
         "tool_lower": "pulumi",
         "validate_command": "pulumi preview",
         "plan_command": "pulumi preview",
@@ -683,6 +727,18 @@ def build_context(answers: dict) -> dict:
     ctx.setdefault("DEPENDENCY_CONVENTIONS", orch_defs["dependency_conventions"])
     ctx.setdefault("VERSION_TAG_LOCATION", orch_defs["version_tag_location"])
     ctx.setdefault("VERSION_TAG_EXAMPLE", orch_defs["version_tag_example"])
+    # Per-tool PR review checks: the review agent must not tell a workspace
+    # to verify a concept its orchestration tool does not have (issue #55).
+    ctx.setdefault(
+        "ORCHESTRATION_INSTRUCTIONS_REF",
+        orch_defs["orchestration_instructions_ref"],
+    )
+    ctx.setdefault(
+        "ORCHESTRATION_REVIEW_CHECKS",
+        orch_defs["orchestration_review_checks"].replace(
+            "{orchestration_dir}", str(ctx.get("ORCHESTRATION_DIR", "."))
+        ),
+    )
 
     # ---- CI/CD derived values ----
     cicd_key = cicd if cicd in _CICD_DEFAULTS else "GitHub Actions"

@@ -1,0 +1,161 @@
+# Review Terraform PR
+
+Review a Terraform pull request against the Acme Corp workspace conventions.
+
+## Usage
+
+Run with no argument to review the current branch against `main`, or pass a base ref, a PR number, or a path: `$ARGUMENTS`
+
+## Before You Review
+
+Read the workspace conventions first and let them override any general Terraform advice:
+
+1. `CLAUDE.md` — workspace rules, naming, tagging, and module conventions
+2. `.claude/commands/create-terraform-module.md` — the module shape this workspace expects
+3. `.claude/commands/create-infra-pipeline.md` — pipeline structure
+4. The orchestration command for Terragrunt, when the workspace uses one —
+   skip this step if there is no orchestration layer
+
+If `CLAUDE.md` contradicts this command, **`CLAUDE.md` wins** — say so in the report.
+
+## Scope
+
+Identify the changed files first:
+
+```bash
+git diff --name-only origin/main...HEAD
+```
+
+If `origin/main` does not resolve, use the repository's default branch
+(`git symbolic-ref --short refs/remotes/origin/HEAD`) or the base ref given above.
+
+For a PR number, fetch it with `gh pr diff <number> --name-only`.
+
+In scope: `*.tf`, `*.tfvars`, `*.hcl`, `*.tftest.hcl`, and pipeline definitions under `.github/workflows`.
+Out of scope: generated files, lock files, vendored directories.
+
+If no in-scope file changed, say so and stop.
+
+## Review Checklist
+
+Work through every category and report findings or "no issues" for each.
+
+### 1. Naming compliance
+- Resource names follow `name = "${var.prefix}-${local.resource_abbreviation}-${local.suffix}"` ({prefix}-{resource_abbreviation}-{suffix})
+- New module directories use the `tf-module-{name}` prefix
+- Names are computed in `locals.tf`, not inlined per resource
+- No hardcoded environment or region strings inside a name
+
+### 2. Tag and label strategy
+- Taggable resources carry `merge(var.env_default_tags, var.tags)`
+- No resource replaces the merge with a bare literal map
+
+### 3. Variable design
+- Optional inputs use `optional()` with a default
+- Shared inputs come from `common.variables.tf` rather than being redeclared
+- Every variable has a `description` and an explicit `type`
+- No hardcoded account, subscription, or project identifiers
+- Sensitive inputs marked `sensitive = true`
+
+### 4. Test coverage
+- New or changed modules have matching tests under `tests/`
+- Tests use `command = plan` with `mock_provider "azurerm" {}`
+- New behaviour has an assertion; changed naming or tagging updates its test
+- Test variables match the module interface, including `common.variables.tf` inputs
+
+### 5. Security
+- No secrets, tokens, connection strings, or keys in code or `.tfvars`
+- Storage and network resources private by default; public access opt-in and justified
+- Least-privilege access grants, no wildcard actions or principals
+- Encryption at rest and in transit enabled where supported
+- Authentication uses Managed Identity / OIDC; no static credentials introduced
+
+### 6. Module structure
+- `main.tf`, `variables.tf`, `outputs.tf`, `versions.tf`, plus `locals.tf` when naming is computed
+- `versions.tf` pins the provider constraints this workspace standardises on:
+
+```hcl
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = ">=4.0.0,<5.0.0"
+    }
+  }
+}
+```
+
+- Outputs expose name and id; sensitive outputs marked
+- No provider block inside a reusable module
+
+### 7. Orchestration compliance
+
+Module sources follow `git::https://github.com/acme/tf-module-{name}?ref={tag}`.
+
+- Terragrunt configs under `infrastructure-config` follow the DRY hierarchy
+- Shared values live in `_envcommon/` rather than repeated per component
+- `terraform { source = ... }` pins a module version tag, never a branch
+- Every `dependency` block declares realistic `mock_outputs` and
+  `mock_outputs_allowed_terraform_commands`
+- Component `terragrunt.hcl` carries only component-specific overrides
+
+### 8. Pipeline standards
+Platform: GitHub Actions. The workspace pipeline conventions are:
+
+- Name: `{action}-{component}.yml` (e.g. `deploy-networking.yml`)
+- Two-stage: plan (on PR) → apply (on merge to main, with environment protection)
+- Use `concurrency:` to prevent parallel runs on the same stack
+
+Check the change against them, and also:
+
+- Plan on every change; apply gated on a protected branch with approval
+- Identity-based authentication; no credential variables
+- A failing plan fails the job; exit codes are not swallowed
+
+## Verification
+
+Where the workspace supports it, run:
+
+```bash
+terraform fmt -check -recursive
+terragrunt validate
+```
+
+Run these only for a PR from a trusted branch. Both commands initialise the
+modules the PR declares, which fetches and executes code the author controls.
+
+Report a command that cannot run as an observation, not as a finding against the author.
+
+## Report Format
+
+Group findings by severity, most severe first. Cite `file:line` and quote the convention applied.
+
+```markdown
+## Terraform PR Review
+
+**Scope:** N files changed
+
+### Blocking
+- `modules/tf-module-example/main.tf:24` — Resource name is hardcoded.
+  Convention: names follow `name = "${var.prefix}-${local.resource_abbreviation}-${local.suffix}"`, computed in `locals.tf`.
+  Suggested: move the name into `locals.tf` and reference `local.name`.
+
+### Should fix
+- `modules/tf-module-example/variables.tf:10` — `tags` has no description.
+
+### Consider
+- Extract the repeated subnet block into a `for_each`.
+
+### Verified
+- Naming, tagging, and module structure follow the workspace conventions.
+- Tests cover the new conditional resource.
+```
+
+Rules for the report:
+- **Blocking** — breaks a stated convention, or introduces a security or correctness defect
+- **Should fix** — a real but non-blocking deviation
+- **Consider** — a suggestion the author may decline
+- List a category with no findings under **Verified**, so the author knows it was checked
+- Do not invent a convention the workspace has not stated
+- Do not report formatting that `terraform fmt` already fixes
+- Report findings; do not rewrite the author's code unless asked

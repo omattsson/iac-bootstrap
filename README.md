@@ -12,6 +12,7 @@ The bootstrap process scans your IaC workspace, interviews you about conventions
 | **Planning agent** | `.github/agents/infra-architect.agent.md` | Embedded in `CLAUDE.md` |
 | **Module builder agent** | `.github/agents/terraform-module-builder.agent.md` | Embedded in `CLAUDE.md` |
 | **Test writer agent** | `.github/agents/terraform-test-writer.agent.md` | Embedded in `CLAUDE.md` |
+| **PR review agent** | `.github/agents/terraform-pr-reviewer.agent.md` | `.claude/commands/review-terraform-pr.md` |
 | **Orchestration agent** | `.github/agents/*-stack-manager.agent.md` | Embedded in `CLAUDE.md` |
 | **File-scoped standards** | `.github/instructions/*.instructions.md` | Rules section in `CLAUDE.md` |
 | **Module scaffolding** | `.github/skills/create-terraform-module/SKILL.md` | `.claude/commands/create-terraform-module.md` |
@@ -240,6 +241,8 @@ Files that contain cloud-specific provider references, data sources, naming patt
 
 - `agents/infra-architect.agent.md.tmpl` — planning agent (uses `{{PLACEHOLDER}}` tokens)
 - `agents/terraform-test-writer.agent.md.tmpl` — test patterns (resolved via `{{DATA_SOURCE_OVERRIDE}}`)
+- `agents/terraform-pr-reviewer.agent.md.tmpl` — PR review against workspace conventions
+- `commands/review-terraform-pr.md.tmpl` — Claude Code counterpart of the PR reviewer
 - `agents/*-stack-manager.agent.md.tmpl` — orchestration-specific, not cloud-specific
 - `skills/create-infra-pipeline.skill.md.tmpl` — CI/CD-specific, not cloud-specific
 - `instructions/pipeline-templates.instructions.md.tmpl` — CI/CD platform rules

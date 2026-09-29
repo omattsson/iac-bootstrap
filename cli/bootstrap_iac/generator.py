@@ -149,6 +149,11 @@ def _build_output_specs(context: dict, templates_dir: Path) -> list[OutputSpec]:
             "copilot",
         ),
         OutputSpec(
+            "copilot/agents/terraform-pr-reviewer.agent.md.tmpl",
+            ".github/agents/terraform-pr-reviewer.agent.md",
+            "copilot",
+        ),
+        OutputSpec(
             _cp("copilot/skills/create-terraform-module.skill.md.tmpl"),
             ".github/skills/create-terraform-module/SKILL.md",
             "copilot",
@@ -232,6 +237,11 @@ def _build_output_specs(context: dict, templates_dir: Path) -> list[OutputSpec]:
         OutputSpec(
             "claude/commands/create-infra-pipeline.md.tmpl",
             ".claude/commands/create-infra-pipeline.md",
+            "claude",
+        ),
+        OutputSpec(
+            "claude/commands/review-terraform-pr.md.tmpl",
+            ".claude/commands/review-terraform-pr.md",
             "claude",
         ),
     ]

@@ -141,6 +141,7 @@ Select the cloud-specific subdirectory first, then fall back to the base templat
 | `.github/agents/infra-architect.agent.md` | `copilot/agents/infra-architect.agent.md.tmpl` | ← same | ← same |
 | `.github/agents/terraform-module-builder.agent.md` | `copilot/agents/terraform-module-builder.agent.md.tmpl` | `copilot/aws/agents/terraform-module-builder.agent.md.tmpl` | `copilot/gcp/agents/terraform-module-builder.agent.md.tmpl` |
 | `.github/agents/terraform-test-writer.agent.md` | `copilot/agents/terraform-test-writer.agent.md.tmpl` | ← same | ← same |
+| `.github/agents/terraform-pr-reviewer.agent.md` | `copilot/agents/terraform-pr-reviewer.agent.md.tmpl` | ← same | ← same |
 | `.github/agents/*-stack-manager.agent.md` | `copilot/agents/orchestration-stack-manager.agent.md.tmpl` | ← same | ← same |
 | `.github/skills/create-terraform-module/SKILL.md` | `copilot/skills/create-terraform-module.skill.md.tmpl` | `copilot/aws/skills/create-terraform-module.skill.md.tmpl` | `copilot/gcp/skills/create-terraform-module.skill.md.tmpl` |
 | `.github/skills/create-*-stack/SKILL.md` | `copilot/skills/create-orchestration-stack.skill.md.tmpl` | ← same | ← same |
@@ -158,6 +159,7 @@ Select the cloud-specific subdirectory first, then fall back to the base templat
 | `.claude/commands/create-terraform-module.md` | `claude/commands/create-terraform-module.md.tmpl` | `claude/aws/commands/create-terraform-module.md.tmpl` | `claude/gcp/commands/create-terraform-module.md.tmpl` |
 | `.claude/commands/create-{tool}-stack.md` | `claude/commands/create-orchestration-stack.md.tmpl` | ← same | ← same |
 | `.claude/commands/create-infra-pipeline.md` | `claude/commands/create-infra-pipeline.md.tmpl` | ← same | ← same |
+| `.claude/commands/review-terraform-pr.md` | `claude/commands/review-terraform-pr.md.tmpl` | ← same | ← same |
 
 #### Cloud-Specific Placeholder Reference
 
