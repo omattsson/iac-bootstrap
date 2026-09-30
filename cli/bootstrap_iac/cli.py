@@ -374,6 +374,53 @@ def main(
     # ------------------------------------------------------------------ #
     # --validate mode                                                      #
     # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------ #
+    # Mode validation — before any mode can run and exit early.           #
+    # ------------------------------------------------------------------ #
+    # These modes each run and exit, so combining them would silently run
+    # whichever is checked first. Reject the combination up front instead
+    # (issue #54 review).
+    modes = [
+        name
+        for name, given in (
+            ("--validate", validate_path is not None),
+            ("--check-config", check_config),
+            ("--discover", discover),
+            ("--maturity-report", maturity_report),
+        )
+        if given
+    ]
+    if len(modes) > 1:
+        click.secho(
+            f"  ✗  {' and '.join(modes)} cannot be combined; run them separately.",
+            fg="red",
+            bold=True,
+            err=True,
+        )
+        sys.exit(2)
+
+    # The maturity flags only mean something with --maturity-report. Failing
+    # loudly beats silently ignoring them, especially for the generic --output
+    # on a tool whose main job is writing files.
+    if not maturity_report:
+        stray = [
+            name
+            for name, given in (
+                ("--format", output_format.lower() != "markdown"),
+                ("--output", output_file is not None),
+                ("--maturity-threshold", maturity_threshold is not None),
+            )
+            if given
+        ]
+        if stray:
+            click.secho(
+                f"  ✗  {', '.join(stray)} requires --maturity-report.",
+                fg="red",
+                bold=True,
+                err=True,
+            )
+            sys.exit(2)
+
     if validate_path is not None:
         scan_path = Path(validate_path) if validate_path else Path(workspace_dir)
         click.echo(f"  Scanning {scan_path} for unreplaced placeholders …\n")
@@ -508,37 +555,6 @@ def main(
     # ------------------------------------------------------------------ #
     # --discover mode: print the discovery result as JSON and exit.       #
     # ------------------------------------------------------------------ #
-    # The maturity flags only mean something with --maturity-report. Failing
-    # loudly beats silently ignoring them, especially for the generic --output
-    # on a tool whose main job is writing files (issue #54 review).
-    if not maturity_report:
-        stray = [
-            name
-            for name, given in (
-                ("--format", output_format.lower() != "markdown"),
-                ("--output", output_file is not None),
-                ("--maturity-threshold", maturity_threshold is not None),
-            )
-            if given
-        ]
-        if stray:
-            click.secho(
-                f"  ✗  {', '.join(stray)} requires --maturity-report.",
-                fg="red",
-                bold=True,
-                err=True,
-            )
-            sys.exit(2)
-    elif discover:
-        click.secho(
-            "  ✗  --discover and --maturity-report cannot be combined; "
-            "run them separately.",
-            fg="red",
-            bold=True,
-            err=True,
-        )
-        sys.exit(2)
-
     if discover:
         ws_path = _validated_workspace(workspace_dir)
         discovery = scan_workspace(ws_path, ignored_dirs=list(ignore_dirs) or None)
@@ -591,7 +607,7 @@ def main(
             # Progress goes to stderr so stdout stays clean for redirection.
             click.secho(
                 f"  ✓  Maturity report written to {output_file} "
-                f"({report.overall_score}%, {report.rating})",
+                f"({report.display_score}%, {report.rating})",
                 fg="green",
                 err=True,
             )
@@ -601,7 +617,7 @@ def main(
         # Exit code gates on the threshold only when one was asked for.
         if maturity_threshold is not None and report.overall_score < maturity_threshold:
             click.secho(
-                f"  ✗  Maturity score {report.overall_score}% is below the "
+                f"  ✗  Maturity score {report.display_score}% is below the "
                 f"threshold of {maturity_threshold}%.",
                 fg="red",
                 bold=True,

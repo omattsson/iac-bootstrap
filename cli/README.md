@@ -124,8 +124,17 @@ that produced it:
 | Missing | zero | Not found |
 | N/A | excluded | Does not apply; remaining weights are renormalised to 100 |
 
-Orchestration is reported as N/A for a plain-Terraform workspace, so such a
-workspace is not penalised for a layer it deliberately does not have.
+Two categories can be N/A, so a workspace is not penalised for something it
+deliberately does not have:
+
+- **Orchestration** is N/A for a plain-Terraform workspace.
+- **State Management** is N/A for a pure module library. Backends belong in
+  root stacks, and Terraform ignores a `backend` block inside a child module,
+  so only a root stack's backend counts.
+
+The score is reported to one decimal place, and that same number is used for
+the rating and for `--maturity-threshold`, so a report never prints one score
+and gates on another.
 
 A **critical gap** is any Missing category, or a Partial in a category weighted
 15 or more (Module Design, Testing, CI/CD, Security). A **moderate gap** is a
@@ -147,6 +156,9 @@ report, so gating is opt-in.
 
 When `--output` is given, the report goes to the file and only a one-line
 summary goes to stderr, leaving stdout clean for redirection.
+
+`--maturity-report` cannot be combined with `--validate`, `--check-config` or
+`--discover`; each is a separate mode that runs and exits.
 
 ## Options
 

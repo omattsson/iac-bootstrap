@@ -44,7 +44,9 @@ def _mature_workspace(root: Path) -> Path:
         '  type = object({ a = optional(string, "x") })\n}\n'
     )
     (module / "outputs.tf").write_text('output "name" { value = local.name }\n')
-    (module / "versions.tf").write_text('terraform {\n  backend "azurerm" {}\n}\n')
+    # A reusable module pins versions but declares no backend: Terraform ignores
+    # a backend in a child module, so it belongs in the root stacks below.
+    (module / "versions.tf").write_text('terraform {\n  required_version = ">= 1.5"\n}\n')
     (module / "locals.tf").write_text('locals { name = "${var.prefix}-st" }\n')
     (module / "storage.tftest.hcl").write_text('run "naming" { command = plan }\n')
     (root / ".tflint.hcl").write_text('plugin "azurerm" {}\n')
@@ -52,9 +54,21 @@ def _mature_workspace(root: Path) -> Path:
     (root / "policy.rego").write_text("package x\n")
     workflows = root / ".github" / "workflows"
     workflows.mkdir(parents=True)
-    (workflows / "plan.yml").write_text("on: pull_request\n")
+    (workflows / "plan.yml").write_text(
+        "on: pull_request\n"
+        "jobs:\n  plan:\n    steps:\n"
+        "      - run: terraform fmt -check -recursive\n"
+        "      - run: tflint --recursive\n"
+        "      - run: terraform plan -out=tfplan\n"
+    )
+    # Each environment is a root stack that calls the module and owns its state.
     for env in ("dev", "staging", "prod"):
-        (root / "environments" / env).mkdir(parents=True)
+        stack = root / "environments" / env
+        stack.mkdir(parents=True)
+        (stack / "main.tf").write_text(
+            'module "storage" {\n  source = "../../modules/tf-module-storage"\n}\n'
+        )
+        (stack / "backend.tf").write_text('terraform {\n  backend "azurerm" {}\n}\n')
     return root
 
 
@@ -369,8 +383,11 @@ def test_description_must_be_an_attribute_not_a_word(tmp_path):
         'variable "b" { type = string }\n'
     )
     variable = next(c for c in _assess(tmp_path).categories if c.key == "variable")
-    assert variable.status == MISSING
-    assert any("0 description" in e for e in variable.evidence)
+    # The word "description" in a comment and a default string earns nothing.
+    assert any("0 described" in e for e in variable.evidence), variable.evidence
+    # The variables are typed, so this is Partial rather than Missing, but it
+    # must never be Adopted.
+    assert variable.status != ADOPTED
 
 
 def test_module_design_needs_a_real_majority(tmp_path):
@@ -446,17 +463,62 @@ def test_orchestration_is_scored_when_a_tool_is_present(tmp_path):
     assert report.available_points == 100, "orchestration should no longer be N/A"
 
 
-def test_threshold_compares_the_unrounded_score():
-    """79.5% must not pass a threshold of 80 just because display rounds up."""
+def test_display_rating_and_gating_share_one_score():
+    """A 79.5 must print, rate and gate as the same number.
+
+    Integer display with exact rating printed "80%" beside a Developing rating;
+    integer gating let 79.5 pass a threshold of 80 (issue #54 review).
+    """
     cats = [
-        CategoryScore("a", "A", 79, ADOPTED),
-        CategoryScore("b", "B", 1, PARTIAL),
-        CategoryScore("c", "C", 20, MISSING),
+        CategoryScore("module_design", "Module Design", 79, ADOPTED),
+        CategoryScore("naming", "Naming & Tagging", 1, PARTIAL),
+        CategoryScore("testing", "Testing", 20, MISSING),
     ]
     report = MaturityReport(workspace=Path("."), categories=cats)
-    assert report.score_exact == pytest.approx(79.5)
-    assert report.overall_score == 80  # display rounds
-    assert report.score_exact < 80  # gating does not
+    assert report.overall_score == pytest.approx(79.5)
+    assert report.display_score == "79.5"
+    assert "Developing" in report.rating
+    assert report.overall_score < 80  # so a threshold of 80 fails
+
+
+def test_whole_scores_display_without_a_decimal():
+    cats = [CategoryScore("module_design", "Module Design", 100, ADOPTED)]
+    assert MaturityReport(workspace=Path("."), categories=cats).display_score == "100"
+
+
+def test_total_row_is_normalised_when_a_category_is_na():
+    """All adopted with Orchestration N/A must read 100% and 100/100, not 95/100."""
+    cats = [
+        CategoryScore(k, t, w, NOT_APPLICABLE if k == "orchestration" else ADOPTED)
+        for k, t, w in CATEGORIES
+    ]
+    ctx = MaturityReport(workspace=Path("."), categories=cats).context()
+    assert ctx["OVERALL_SCORE"] == "100"
+    assert ctx["OVERALL_SCORE_POINTS"] == "100"
+
+
+def test_cli_gates_on_the_score_it_displays(tmp_path):
+    """Exercise the CLI comparison itself, not only the model property.
+
+    The previous test checked `score_exact` on the model while the CLI still
+    compared the rounded integer, so it passed with the bug in place.
+    """
+    ws = _mature_workspace(tmp_path)
+    runner = CliRunner()
+    data = json.loads(
+        runner.invoke(main, ["--maturity-report", "--workspace", str(ws), "--format", "json"]).output
+    )
+    score = data["overall_score"]
+    at = runner.invoke(
+        main, ["--maturity-report", "--workspace", str(ws), "--maturity-threshold", str(int(score))]
+    )
+    assert at.exit_code == 0, f"score {score} should pass a threshold of {int(score)}"
+    above = int(score) + 1
+    if above <= 100:
+        over = runner.invoke(
+            main, ["--maturity-report", "--workspace", str(ws), "--maturity-threshold", str(above)]
+        )
+        assert over.exit_code == 1, f"score {score} should fail a threshold of {above}"
 
 
 def test_a_fifo_in_the_workspace_does_not_block(tmp_path):
@@ -530,3 +592,128 @@ def test_output_mode_leaves_stdout_empty_for_redirection(tmp_path):
     # The one-line summary goes to stderr instead.
     assert "Maturity report written" in proc.stderr
     assert out.is_file()
+
+
+# --- regressions from the Copilot review on PR #74 ---------------------------
+
+
+@pytest.mark.parametrize(
+    "mode_args",
+    [["--validate", "."], ["--check-config"], ["--discover"]],
+)
+def test_every_exclusive_mode_conflicts_with_maturity_report(tmp_path, mode_args):
+    """--validate and --check-config used to exit before the conflict check,
+    so combining them with --maturity-report silently ran the other mode."""
+    result = CliRunner().invoke(
+        main, mode_args + ["--maturity-report", "--workspace", str(tmp_path)]
+    )
+    assert result.exit_code == 2
+    assert "cannot be combined" in result.output
+    # No report was produced by whichever mode happened to run first.
+    assert "IaC Maturity Assessment" not in result.output
+
+
+def test_untyped_variables_are_not_adopted(tmp_path):
+    """Descriptions plus one validation used to earn Adopted with no types."""
+    (tmp_path / "variables.tf").write_text(
+        'variable "a" {\n  description = "a"\n'
+        "  validation {\n    condition = length(var.a) > 0\n"
+        '    error_message = "empty"\n  }\n}\n'
+        'variable "b" {\n  description = "b"\n}\n'
+    )
+    variable = next(c for c in _assess(tmp_path).categories if c.key == "variable")
+    assert variable.status == PARTIAL
+    assert any("0 typed" in e for e in variable.evidence), variable.evidence
+
+
+def test_one_documented_variable_does_not_cover_the_others(tmp_path):
+    """Per-block checks: a file total could be met by a single variable."""
+    (tmp_path / "variables.tf").write_text(
+        'variable "a" {\n  description = "a"\n  type = string\n}\n'
+        'variable "b" {}\n'
+    )
+    variable = next(c for c in _assess(tmp_path).categories if c.key == "variable")
+    assert variable.status == PARTIAL
+
+
+@pytest.mark.parametrize(
+    "name, body",
+    [
+        ("prod.tfvars", 'admin_password = "hunter2-real-value"\n'),
+        ("terragrunt.hcl", 'inputs = {\n  client_secret = "hunter2-real-value"\n}\n'),
+    ],
+)
+def test_credentials_in_value_and_config_files_are_found(tmp_path, name, body):
+    """Hardcoded values usually live in .tfvars or Terragrunt .hcl, not in .tf."""
+    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    (tmp_path / "policy.rego").write_text("package x\n")
+    (tmp_path / name).write_text(body)
+    security = next(c for c in _assess(tmp_path).categories if c.key == "security")
+    assert security.status == MISSING
+    assert any(name in e for e in security.evidence), security.evidence
+
+
+def test_test_fixture_dummy_values_are_not_credentials(tmp_path):
+    """A .tftest.hcl is expected to carry dummy values, and is not deployed."""
+    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    (tmp_path / "policy.rego").write_text("package x\n")
+    (tmp_path / "m.tftest.hcl").write_text(
+        'variables {\n  admin_password = "not-a-real-password"\n}\n'
+    )
+    security = next(c for c in _assess(tmp_path).categories if c.key == "security")
+    assert security.status == ADOPTED
+
+
+def test_backend_in_a_child_module_is_not_state_management(tmp_path):
+    """Terraform ignores a backend in a child module, so it must not earn Adopted."""
+    module = tmp_path / "modules" / "net"
+    module.mkdir(parents=True)
+    (module / "main.tf").write_text('terraform {\n  backend "azurerm" {}\n}\n')
+    stack = tmp_path / "environments" / "prod"
+    stack.mkdir(parents=True)
+    (stack / "main.tf").write_text('module "n" { source = "../../modules/net" }\n')
+    state = next(c for c in _assess(tmp_path).categories if c.key == "state")
+    assert state.status == PARTIAL
+    assert any("reusable module" in e for e in state.evidence), state.evidence
+
+
+def test_a_pure_module_library_has_no_state_to_manage(tmp_path):
+    """Backends belong to the callers, so a module-only repo is N/A, not Missing."""
+    module = tmp_path / "modules" / "net"
+    module.mkdir(parents=True)
+    (module / "main.tf").write_text('resource "x" "y" {}\n')
+    state = next(c for c in _assess(tmp_path).categories if c.key == "state")
+    assert state.status == NOT_APPLICABLE
+
+
+def test_a_pipeline_file_alone_is_not_adopted_cicd(tmp_path):
+    """Any pipeline file used to score Adopted, whatever it ran."""
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "lint.yml").write_text("on: push\njobs:\n  x:\n    steps:\n      - run: echo hi\n")
+    cicd = next(c for c in _assess(tmp_path).categories if c.key == "cicd")
+    assert cicd.status == PARTIAL
+    assert any("no plan step" in e for e in cicd.evidence)
+
+
+def test_code_quality_needs_ci_to_run_the_linter(tmp_path):
+    """A config file plus an unrelated pipeline is not enforcement."""
+    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "deploy.yml").write_text("on: push\njobs:\n  x:\n    steps:\n      - run: echo hi\n")
+    quality = next(c for c in _assess(tmp_path).categories if c.key == "code_quality")
+    assert quality.status == PARTIAL
+
+
+def test_tests_must_cover_modules_not_just_outnumber_them(tmp_path):
+    """Two tests in one module must not stand in for an untested second module."""
+    for name in ("a", "b"):
+        d = tmp_path / "modules" / name
+        d.mkdir(parents=True)
+        (d / "main.tf").write_text('resource "x" "y" {}\n')
+    (tmp_path / "modules" / "a" / "one.tftest.hcl").write_text('run "1" { command = plan }\n')
+    (tmp_path / "modules" / "a" / "two.tftest.hcl").write_text('run "2" { command = plan }\n')
+    testing = next(c for c in _assess(tmp_path).categories if c.key == "testing")
+    assert testing.status == PARTIAL
+    assert any("1/2 module(s)" in e for e in testing.evidence), testing.evidence

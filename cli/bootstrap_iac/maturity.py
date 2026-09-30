@@ -153,14 +153,26 @@ class MaturityReport:
         return self.earned_points / self.available_points * 100
 
     @property
-    def overall_score(self) -> int:
-        """Percentage for display, with N/A categories excluded."""
-        return round(self.score_exact)
+    def overall_score(self) -> float:
+        """The one score used for display, rating and gating.
+
+        Rounded to one decimal place, and that same number is what the report
+        prints, what the rating band is chosen from, and what the threshold is
+        compared against. Rounding to an integer for display while rating and
+        gating on the exact value made a 79.5 print as "80%" yet rate
+        Developing and fail a threshold of 80 (issue #54 review).
+        """
+        return round(self.score_exact, 1)
+
+    @property
+    def display_score(self) -> str:
+        """The canonical score as printed: "80" or "79.5", never "80.0"."""
+        return _fmt_points(self.overall_score)
 
     @property
     def rating(self) -> str:
         for floor, label in _RATINGS:
-            if self.score_exact >= floor:
+            if self.overall_score >= floor:
                 return label
         return _RATINGS[-1][1]  # pragma: no cover - the 0 floor always matches
 
@@ -223,8 +235,11 @@ class MaturityReport:
             "WORKSPACE_DESCRIPTION": str(self.workspace),
             "ASSESSMENT_DATE": date.today().isoformat(),
             "ASSESSOR": assessor,
-            "OVERALL_SCORE": str(self.overall_score),
-            "OVERALL_SCORE_POINTS": _fmt_points(self.earned_points),
+            "OVERALL_SCORE": self.display_score,
+            # The Total row is out of 100, so it must show the normalised score.
+            # Raw earned points read "95/100" beside an overall "100%" whenever
+            # a category is N/A (issue #54 review).
+            "OVERALL_SCORE_POINTS": self.display_score,
             "MATURITY_RATING": self.rating,
             "CRITICAL_GAP_COUNT": str(len(self.critical_gaps)),
             "MODERATE_GAP_COUNT": str(len(self.moderate_gaps)),
@@ -367,6 +382,8 @@ def assess(
     names = {_rel(p, ws) for p in files}
     basenames = {p.name for p in files}
     modules = _module_dirs(tf_files)
+    pipelines = _pipeline_files(files, names, ws)
+    pipeline_text = "\n".join(_read(p) for p in pipelines).lower()
 
     scores = [
         _module_design(ws, modules),
@@ -374,10 +391,10 @@ def assess(
         _variable_design(tf_files),
         _testing(files, modules),
         _orchestration(discovery),
-        _cicd(discovery, names),
-        _security(files, basenames, tf_files, names, ws),
-        _code_quality(basenames, names, discovery),
-        _state(discovery, tf_files, ws),
+        _cicd(discovery, pipelines, pipeline_text, ws),
+        _security(files, basenames, _secret_scan_files(files), pipeline_text, ws),
+        _code_quality(basenames, pipelines, pipeline_text),
+        _state(tf_files, ws),
         _rollout(ws, ignored),
     ]
     return MaturityReport(workspace=ws, categories=scores, company=company)
@@ -442,45 +459,81 @@ def _naming(discovery: DiscoveryResult, tf_files: list[Path], ws: Path) -> Categ
     return _score("naming", MISSING, ["no naming pattern or tag merge detected"])
 
 
+_VARIABLE_OPEN = re.compile(
+    r'^(?!\s*(?:#|//))\s*variable\s+"[^"]+"\s*\{', re.MULTILINE
+)
 _DESCRIPTION_ATTR = re.compile(r'^(?!\s*(?:#|//))\s*description\s*=', re.MULTILINE)
-_RICH_TYPE = re.compile(r'^(?!\s*(?:#|//))\s*(?:.*\boptional\s*\(|validation\s*\{)', re.MULTILINE)
+_TYPE_ATTR = re.compile(r'^(?!\s*(?:#|//))\s*type\s*=', re.MULTILINE)
+_RICH_TYPE = re.compile(
+    r'^(?!\s*(?:#|//))\s*(?:.*\boptional\s*\(|validation\s*\{)', re.MULTILINE
+)
+
+
+def _variable_blocks(text: str) -> list[str]:
+    """The body of each ``variable "x" { ... }`` block, with nested braces matched.
+
+    Checking each block, rather than counting over the whole file, is what lets
+    "every variable has a description and a type" actually be verified: a file
+    total can be satisfied by one well-described variable (issue #54 review).
+    """
+    bodies = []
+    for match in _VARIABLE_OPEN.finditer(text):
+        depth, i = 1, match.end()
+        while i < len(text) and depth:
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+            i += 1
+        bodies.append(text[match.end() : i - 1])
+    return bodies
 
 
 def _variable_design(tf_files: list[Path]) -> CategoryScore:
     var_files = [p for p in tf_files if p.name == "variables.tf"]
     if not var_files:
         return _score("variable", MISSING, ["no variables.tf found"])
-    text = "\n".join(_code(p) for p in var_files)
-    blocks = re.findall(r'^(?!\s*(?:#|//))\s*variable\s+"[^"]+"\s*\{', text, re.MULTILINE)
-    # Count the attribute, not the word: a comment or a default string that
-    # mentions "description" must not earn points (issue #54 review).
-    described = len(_DESCRIPTION_ATTR.findall(text))
-    rich = bool(_RICH_TYPE.search(text))
-    evidence = [f"{len(blocks)} variable(s), {described} description(s) across {len(var_files)} file(s)"]
+    blocks = [b for p in var_files for b in _variable_blocks(_code(p))]
     if not blocks:
         return _score("variable", MISSING, ["variables.tf present but declares no variables"])
-    if described >= len(blocks) and rich:
+
+    described = sum(1 for b in blocks if _DESCRIPTION_ATTR.search(b))
+    typed = sum(1 for b in blocks if _TYPE_ATTR.search(b))
+    evidence = [
+        f"{len(blocks)} variable(s) across {len(var_files)} file(s): "
+        f"{described} described, {typed} typed"
+    ]
+    if any(_RICH_TYPE.search(b) for b in blocks):
         evidence.append("uses optional() or validation")
+    # Adopted means what the remediation text asks for: every variable has both
+    # a description and a type. optional()/validation are evidence, not a
+    # requirement, since not every module needs an object type.
+    if described == typed == len(blocks):
         return _score("variable", ADOPTED, evidence)
-    if described:
+    if described or typed:
         return _score("variable", PARTIAL, evidence)
     return _score("variable", MISSING, evidence)
+
+
+# Adopted needs most modules to carry their own native tests.
+_TESTED_ADOPTED_RATIO = 0.8
 
 
 def _testing(files: list[Path], modules: list[Path]) -> CategoryScore:
     native = [p for p in files if p.name.endswith(".tftest.hcl")]
     go_tests = [p for p in files if p.name.endswith("_test.go")]
-    evidence = []
-    if native:
-        evidence.append(f"{len(native)} native .tftest.hcl file(s)")
-    if go_tests:
-        evidence.append(f"{len(go_tests)} Go test file(s)")
     if not native and not go_tests:
         return _score("testing", MISSING, ["no .tftest.hcl or _test.go files found"])
-    count = len(modules) or 1
-    if len(native) + len(go_tests) >= count:
+
+    # Map tests to the modules they sit in: comparing a total test count with
+    # the module count lets one heavily tested module stand in for several
+    # untested ones (issue #54 review).
+    covered = [m for m in modules if any(m in t.parents for t in native)]
+    evidence = [f"{len(covered)}/{len(modules)} module(s) have their own .tftest.hcl"]
+    if go_tests:
+        evidence.append(f"{len(go_tests)} Go test file(s), not mapped to modules")
+    if modules and len(covered) / len(modules) >= _TESTED_ADOPTED_RATIO:
         return _score("testing", ADOPTED, evidence)
-    evidence.append(f"fewer test files than the {count} module(s)")
     return _score("testing", PARTIAL, evidence)
 
 
@@ -499,23 +552,41 @@ def _orchestration(discovery: DiscoveryResult) -> CategoryScore:
     return _score("orchestration", PARTIAL, evidence + ["no orchestration directory found"])
 
 
-def _cicd(discovery: DiscoveryResult, names: set[str]) -> CategoryScore:
+# What a pipeline must actually run for CI/CD to count as adopted.
+_PLAN_STEPS = (
+    "terraform plan",
+    "terragrunt plan",
+    "run-all plan",
+    "terramate run",
+    "pulumi preview",
+    "terraform-plan",
+    "tf plan",
+)
+
+
+def _cicd(
+    discovery: DiscoveryResult,
+    pipelines: list[Path],
+    pipeline_text: str,
+    ws: Path,
+) -> CategoryScore:
     platform = discovery.ci_cd_platform
-    if not platform:
+    if not platform and not pipelines:
         return _score("cicd", MISSING, ["no CI/CD platform detected"])
-    evidence = [f"{platform} detected"]
-    pipeline_files = [
-        n
-        for n in names
-        if n.startswith(".github/workflows/")
-        or n.endswith((".gitlab-ci.yml", "atlantis.yaml"))
-        or "azure-pipelines" in n
-        or (discovery.pipeline_dir and n.startswith(f"{discovery.pipeline_dir}/"))
-    ]
-    if pipeline_files:
-        evidence.append(f"{len(pipeline_files)} pipeline file(s)")
+    label = platform if platform and platform != "Unknown" else "a pipeline directory"
+    evidence = [f"{label} detected"]
+    if not pipelines:
+        return _score("cicd", PARTIAL, evidence + ["no pipeline definition files found"])
+    evidence.append(f"{len(pipelines)} pipeline file(s)")
+    # Atlantis plans on every pull request by design, so its config is enough.
+    plans = any(step in pipeline_text for step in _PLAN_STEPS) or any(
+        p.name == "atlantis.yaml" for p in pipelines
+    )
+    if plans:
+        evidence.append("a pipeline runs a plan step")
         return _score("cicd", ADOPTED, evidence)
-    return _score("cicd", PARTIAL, evidence + ["no pipeline definition files found"])
+    # Any pipeline file used to score Adopted, whatever it ran (#54 review).
+    return _score("cicd", PARTIAL, evidence + ["no plan step found in any pipeline"])
 
 
 _SECURITY_FILES = (
@@ -530,8 +601,11 @@ _SECURITY_FILES = (
 # Most teams run these as pinned CI steps with no config file at all, so a
 # config-file-only probe reports a false Missing (issue #54 review).
 _SCANNERS = ("checkov", "tfsec", "trivy", "terrascan", "conftest", "regula", "tflint")
+# The key is an identifier that *ends* in a sensitive word. A bare `\bpassword`
+# never matched `admin_password` or `db_password`, because `_` is a word
+# character and leaves no boundary before "password" (issue #54 review).
 _SECRET_HINT = re.compile(
-    r'^(?!\s*(?:#|//))[^\n]*\b(password|secret|access_key|client_secret|api_key)'
+    r'^(?!\s*(?:#|//))[^\n]*\b[A-Za-z0-9_]*(password|passwd|secret|access_key|api_key|token)'
     r'\s*=\s*"[^"$\n]{8,}"',
     re.IGNORECASE | re.MULTILINE,
 )
@@ -556,11 +630,30 @@ def _pipeline_files(files: list[Path], names: set[str], ws: Path) -> list[Path]:
     return out
 
 
+# Hardcoded values usually live in the value and config files, not in the
+# module code, so scanning only .tf misses them (issue #54 review).
+_SECRET_SCAN_SUFFIXES = (".tf", ".tfvars", ".hcl")
+
+
+def _secret_scan_files(files: list[Path]) -> list[Path]:
+    """Terraform, variable-value and Terragrunt files to scan for credentials.
+
+    Native test files are skipped: a `.tftest.hcl` is expected to carry dummy
+    values for its `variables {}` block, and they are not deployed.
+    """
+    return [
+        p
+        for p in files
+        if (p.suffix in _SECRET_SCAN_SUFFIXES or p.name.endswith(".tfvars.json"))
+        and not p.name.endswith(".tftest.hcl")
+    ]
+
+
 def _security(
     files: list[Path],
     basenames: set[str],
-    tf_files: list[Path],
-    names: set[str],
+    scan_files: list[Path],
+    pipeline_text: str,
     ws: Path,
 ) -> CategoryScore:
     tooling = sorted(basenames & set(_SECURITY_FILES))
@@ -572,16 +665,13 @@ def _security(
         evidence.append(f"{len(rego)} OPA policy file(s)")
 
     # A scanner invoked from a pipeline counts as much as a config file.
-    in_ci: set[str] = set()
-    for path in _pipeline_files(files, names, ws):
-        text = _read(path).lower()
-        in_ci.update(name for name in _SCANNERS if name in text)
+    in_ci = sorted(name for name in _SCANNERS if name in pipeline_text)
     if in_ci:
-        evidence.append("scanners in CI: " + ", ".join(sorted(in_ci)))
+        evidence.append("scanners in CI: " + ", ".join(in_ci))
 
-    # Every .tf file is scanned: a cap would let a credential late in a large
-    # repository pass as Adopted (issue #54 review).
-    secret = _search_tf(tf_files, _SECRET_HINT)
+    # Every file is scanned: a cap would let a credential late in a large
+    # repository pass as Adopted.
+    secret = _search_tf(scan_files, _SECRET_HINT)
     if secret:
         return _score(
             "security",
@@ -599,27 +689,25 @@ def _security(
 _QUALITY_FILES = (".pre-commit-config.yaml", ".pre-commit-config.yml", ".tflint.hcl", ".editorconfig")
 
 
+# Invocations that show a pipeline actually enforces formatting or linting.
+_QUALITY_STEPS = ("fmt", "tflint", "pre-commit", "terraform validate", "terragrunt hclfmt")
+
+
 def _code_quality(
-    basenames: set[str], names: set[str], discovery: DiscoveryResult
+    basenames: set[str], pipelines: list[Path], pipeline_text: str
 ) -> CategoryScore:
     found = sorted(basenames & set(_QUALITY_FILES))
-    # Match real pipeline locations: "pipelines" as a bare substring also hits
-    # modules/data-pipelines/ (issue #54 review).
-    pipeline_dir = (discovery.pipeline_dir or "").strip("./")
-    has_ci = any(
-        n.startswith(".github/workflows/")
-        or n.endswith((".gitlab-ci.yml", ".gitlab-ci.yaml"))
-        or "azure-pipelines" in n.rsplit("/", 1)[-1]
-        or (pipeline_dir and n.startswith(f"{pipeline_dir}/"))
-        for n in names
-    )
     evidence = []
     if found:
         evidence.append("config: " + ", ".join(found))
-    if found and has_ci:
-        evidence.append("a pipeline is present to run it")
+    runs = sorted(step for step in _QUALITY_STEPS if step in pipeline_text)
+    if runs:
+        evidence.append("a pipeline runs: " + ", ".join(runs))
+    # A config file plus any pipeline used to score Adopted, even when no
+    # pipeline ran the formatter or linter at all (issue #54 review).
+    if found and runs:
         return _score("code_quality", ADOPTED, evidence)
-    if found:
+    if found or runs:
         return _score("code_quality", PARTIAL, evidence)
     return _score("code_quality", MISSING, ["no linter or formatter configuration found"])
 
@@ -628,19 +716,45 @@ _BACKEND_BLOCK = re.compile(r'^(?!\s*(?:#|//))\s*backend\s+"', re.MULTILINE)
 _LOCAL_BACKEND = re.compile(r'^(?!\s*(?:#|//))\s*backend\s+"local"', re.MULTILINE)
 
 
-def _state(discovery: DiscoveryResult, tf_files: list[Path], ws: Path) -> CategoryScore:
-    if discovery.state_backend:
-        return _score("state", ADOPTED, [f"remote backend: {discovery.state_backend}"])
-    if _search_tf(tf_files, _LOCAL_BACKEND):
-        return _score("state", PARTIAL, ["local backend configured"])
-    # Anchor on a backend *block*: "backend" alone also matches attributes such
-    # as backend_address_pool (issue #54 review).
-    block = _search_tf(tf_files, _BACKEND_BLOCK)
-    if block:
+_BACKEND_TYPE = re.compile(r'^(?!\s*(?:#|//))\s*backend\s+"([^"]+)"', re.MULTILINE)
+
+
+def _state(tf_files: list[Path], ws: Path) -> CategoryScore:
+    """Score state management from backends declared in root modules.
+
+    Terraform ignores a ``backend`` block in a child module, so one under
+    ``modules/`` must not earn Adopted while the deployable roots still use
+    local state (issue #54 review).
+    """
+    roots = [p for p in tf_files if "modules" not in p.relative_to(ws).parts[:-1]]
+    if tf_files and not roots:
+        # Every Terraform directory is a reusable module: backends belong to
+        # the callers, so there is no state here to manage.
+        return _score(
+            "state",
+            NOT_APPLICABLE,
+            ["module library: no root stack, so state belongs to the callers"],
+        )
+    backends = []
+    for path in roots:
+        for match in _BACKEND_TYPE.finditer(_code(path)):
+            backends.append((path, match.group(1)))
+    remote = [(p, t) for p, t in backends if t != "local"]
+    if remote:
+        path, kind = remote[0]
+        return _score(
+            "state", ADOPTED, [f'remote backend "{kind}" in {_rel(path, ws)}']
+        )
+    if backends:
+        return _score("state", PARTIAL, ["only a local backend is configured"])
+    in_modules = any(
+        _BACKEND_TYPE.search(_code(p)) for p in tf_files if p not in roots
+    )
+    if in_modules:
         return _score(
             "state",
             PARTIAL,
-            [f"a backend block in {_rel(block[0], ws)} was not identified"],
+            ["a backend is declared only inside a reusable module, where Terraform ignores it"],
         )
     return _score("state", MISSING, ["no state backend configuration found"])
 
