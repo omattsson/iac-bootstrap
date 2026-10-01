@@ -299,9 +299,10 @@ def _validated_workspace(workspace_dir: str) -> Path:
     "--format",
     "output_format",
     type=click.Choice(["markdown", "json"], case_sensitive=False),
-    default="markdown",
-    show_default=True,
-    help="Output format for --maturity-report.",
+    # No Click default: an explicit `--format markdown` must still be seen as
+    # given, so it is rejected without --maturity-report (issue #54 review).
+    default=None,
+    help="Output format for --maturity-report: markdown (the default) or json.",
 )
 @click.option(
     "--output",
@@ -354,7 +355,7 @@ def main(
     check_config: bool,
     discover: bool,
     maturity_report: bool,
-    output_format: str,
+    output_format: Optional[str],
     output_file: Optional[str],
     maturity_threshold: Optional[int],
     ignore_dirs: tuple[str, ...],
@@ -406,7 +407,7 @@ def main(
         stray = [
             name
             for name, given in (
-                ("--format", output_format.lower() != "markdown"),
+                ("--format", output_format is not None),
                 ("--output", output_file is not None),
                 ("--maturity-threshold", maturity_threshold is not None),
             )
@@ -578,7 +579,7 @@ def main(
         try:
             rendered = (
                 report.to_json()
-                if output_format.lower() == "json"
+                if (output_format or "markdown").lower() == "json"
                 else report.render()
             )
         except (OSError, GenerationError) as exc:

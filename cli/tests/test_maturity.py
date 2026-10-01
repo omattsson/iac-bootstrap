@@ -132,17 +132,20 @@ def test_rating_bands_match_the_template(score, rating):
     assert rating in report.rating
 
 
-def test_gap_classification_splits_critical_from_moderate():
-    """Missing is always critical; Partial is critical only at weight >= 15."""
+def test_gap_classification_follows_skill_md():
+    """SKILL.md: any Missing is critical; a Partial is critical only in Security,
+    Testing or CI/CD. Module Design is Partial-moderate despite its 15% weight,
+    so the discriminator is category membership, not weight (#54 review)."""
     cats = [
-        CategoryScore("security", "Security", 20, PARTIAL),   # heavy partial
-        CategoryScore("state", "State Management", 5, PARTIAL),  # light partial
-        CategoryScore("naming", "Naming & Tagging", 10, MISSING),  # any missing
+        CategoryScore("security", "Security", 20, PARTIAL),        # critical
+        CategoryScore("module_design", "Module Design", 15, PARTIAL),  # moderate, not weight
+        CategoryScore("state", "State Management", 5, PARTIAL),    # moderate
+        CategoryScore("naming", "Naming & Tagging", 10, MISSING),  # any Missing is critical
         CategoryScore("testing", "Testing", 15, ADOPTED),
     ]
     report = MaturityReport(workspace=Path("."), categories=cats)
     assert [c.key for c in report.critical_gaps] == ["security", "naming"]
-    assert [c.key for c in report.moderate_gaps] == ["state"]
+    assert [c.key for c in report.moderate_gaps] == ["module_design", "state"]
     assert [c.key for c in report.strengths] == ["testing"]
 
 
@@ -555,10 +558,11 @@ def test_discover_and_maturity_report_conflict(tmp_path):
 def test_report_definitions_match_the_implementation(tmp_path):
     """The rendered document must not argue with its own printed definitions."""
     rendered = _assess(tmp_path).render(templates_dir=_REPO_ROOT / "references")
-    assert "weighted 15% or more" in rendered
-    assert "A Partial status in a category weighted under 15%." in rendered
-    # The superseded wording, which contradicted the code, must be gone.
+    assert "a Partial status in Security, Testing, or CI/CD." in rendered
+    assert "A Partial status in any other category, including Module Design." in rendered
+    # Superseded wordings that contradicted the code or SKILL.md must be gone.
     assert "Partial or Missing status in categories other than" not in rendered
+    assert "weighted 15% or more" not in rendered
 
 
 def test_output_mode_leaves_stdout_empty_for_redirection(tmp_path):
@@ -717,3 +721,109 @@ def test_tests_must_cover_modules_not_just_outnumber_them(tmp_path):
     testing = next(c for c in _assess(tmp_path).categories if c.key == "testing")
     assert testing.status == PARTIAL
     assert any("1/2 module(s)" in e for e in testing.evidence), testing.evidence
+
+
+# --- regressions from the second Copilot review on PR #74 --------------------
+
+
+def test_severity_model_agrees_across_skill_template_readme_and_code():
+    """Bootstrap and --maturity-report must classify the same assessment the
+    same way, so every document names the same critical-if-Partial set."""
+    from bootstrap_iac.maturity import _CRITICAL_IF_PARTIAL
+
+    assert _CRITICAL_IF_PARTIAL == {"security", "testing", "cicd"}
+    skill = (_REPO_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    template = (_REPO_ROOT / "references" / "maturity-report.md.tmpl").read_text(encoding="utf-8")
+    readme = (_REPO_ROOT / "cli" / "README.md").read_text(encoding="utf-8")
+    for doc, name in ((skill, "SKILL.md"), (template, "template"), (readme, "README")):
+        flat = " ".join(doc.split())
+        assert "Partial status in Security, Testing, or CI/CD" in flat or (
+            "Partial in Security, Testing or CI/CD" in flat
+        ), f"{name} does not name the critical-if-Partial categories"
+        assert "including Module Design" in flat, f"{name} does not keep Module Design moderate"
+        # No document may list Module Design among the critical categories.
+        assert "(Module Design, Testing, CI/CD, Security)" not in flat, name
+
+
+def test_explicit_markdown_format_still_requires_the_mode(tmp_path):
+    """`--format markdown` used to look identical to the default and slip through."""
+    result = CliRunner().invoke(
+        main, ["--workspace", str(tmp_path), "--format", "markdown"]
+    )
+    assert result.exit_code == 2
+    assert "--format" in result.output and "requires --maturity-report" in result.output
+
+
+def test_markdown_is_still_the_default_format(tmp_path):
+    result = CliRunner().invoke(main, ["--maturity-report", "--workspace", str(tmp_path)])
+    assert result.exit_code == 0
+    assert result.output.lstrip().startswith("# IaC Maturity Assessment")
+
+
+def test_braces_inside_strings_do_not_end_a_variable_block(tmp_path):
+    """`default = "}"` before the description and type must not close the block."""
+    (tmp_path / "variables.tf").write_text(
+        'variable "suffix" {\n'
+        '  default     = "}"\n'
+        '  description = "closing brace is data, not structure"\n'
+        "  type        = string\n"
+        "}\n"
+        'variable "tpl" {\n'
+        '  default     = "${join("}", ["a"])} # not a comment"\n'
+        '  description = "template with a nested quoted brace"\n'
+        "  type        = string\n"
+        "}\n"
+        'variable "doc" {\n'
+        "  default     = <<-EOT\n"
+        "    { not: structure }\n"
+        "  EOT\n"
+        '  description = "heredoc containing braces"\n'
+        "  type        = string\n"
+        "}\n"
+    )
+    variable = next(c for c in _assess(tmp_path).categories if c.key == "variable")
+    assert variable.status == ADOPTED, variable.evidence
+    assert any("3 variable(s)" in e and "3 described, 3 typed" in e for e in variable.evidence)
+
+
+def test_line_comment_braces_do_not_end_a_variable_block(tmp_path):
+    (tmp_path / "variables.tf").write_text(
+        'variable "a" {\n'
+        "  # } this brace is in a comment\n"
+        '  description = "a"\n'
+        "  type        = string\n"
+        "}\n"
+    )
+    variable = next(c for c in _assess(tmp_path).categories if c.key == "variable")
+    assert variable.status == ADOPTED, variable.evidence
+
+
+def test_credentials_in_tfvars_json_are_found(tmp_path):
+    """.tfvars.json uses a quoted key and a colon, which the HCL pattern missed."""
+    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    (tmp_path / "policy.rego").write_text("package x\n")
+    (tmp_path / "prod.tfvars.json").write_text('{"admin_password": "hardcoded-value-123"}\n')
+    security = next(c for c in _assess(tmp_path).categories if c.key == "security")
+    assert security.status == MISSING
+    assert any("prod.tfvars.json" in e for e in security.evidence), security.evidence
+
+
+def test_cloud_block_is_remote_state(tmp_path):
+    """Terraform Cloud / Enterprise uses `cloud {}` rather than a backend block."""
+    (tmp_path / "main.tf").write_text(
+        'terraform {\n  cloud {\n    organization = "acme"\n'
+        '    workspaces { name = "prod" }\n  }\n}\n'
+    )
+    state = next(c for c in _assess(tmp_path).categories if c.key == "state")
+    assert state.status == ADOPTED
+    assert any("cloud" in e.lower() for e in state.evidence), state.evidence
+
+
+def test_cloud_block_in_a_child_module_is_still_ignored(tmp_path):
+    module = tmp_path / "modules" / "net"
+    module.mkdir(parents=True)
+    (module / "main.tf").write_text('terraform {\n  cloud {\n    organization = "x"\n  }\n}\n')
+    (tmp_path / "main.tf").write_text('module "n" { source = "./modules/net" }\n')
+    state = next(c for c in _assess(tmp_path).categories if c.key == "state")
+    assert state.status == PARTIAL
+    assert any("reusable module" in e for e in state.evidence)

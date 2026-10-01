@@ -136,9 +136,10 @@ The score is reported to one decimal place, and that same number is used for
 the rating and for `--maturity-threshold`, so a report never prints one score
 and gates on another.
 
-A **critical gap** is any Missing category, or a Partial in a category weighted
-15 or more (Module Design, Testing, CI/CD, Security). A **moderate gap** is a
-Partial in a lighter category.
+A **critical gap** is any Missing category, or a Partial in Security, Testing or
+CI/CD. A **moderate gap** is a Partial in any other category, including Module
+Design. This is the same severity model the bootstrap flow uses (see
+`SKILL.md`), so both paths classify an assessment identically.
 
 #### Gating in CI
 

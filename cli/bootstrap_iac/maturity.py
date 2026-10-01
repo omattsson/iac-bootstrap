@@ -9,9 +9,11 @@ The scoring model is the template's own:
 * Adopted = full category weight, Partial = half, Missing = zero.
 * A category that does not apply is marked N/A and excluded, and the remaining
   weights are renormalised to 100.
-* Critical gap = any Missing category, or a Partial in a category weighted 15
-  or more (Testing, CI/CD, Security, Module Design).
-* Moderate gap = a Partial in a lighter category.
+* Critical gap = any Missing category, or a Partial in Security, Testing or
+  CI/CD. This follows SKILL.md: membership in those three categories is the
+  discriminator, not weight, so a Partial Module Design is moderate despite
+  its 15% weight.
+* Moderate gap = a Partial in any other category.
 
 Every category records the evidence it scored from, so a result can be traced
 back to the files that produced it rather than taken on trust.
@@ -63,8 +65,10 @@ CATEGORIES: tuple[tuple[str, str, int], ...] = (
     ("rollout", "Progressive Rollout", 5),
 )
 
-# A Partial here is still critical: these areas carry the most risk.
-_HIGH_WEIGHT = 15
+# SKILL.md gap severity: any Missing is critical, and a Partial is critical only
+# in the three highest-risk categories. Module Design stays moderate when
+# Partial despite its 15% weight, so membership, not weight, decides (#54 review).
+_CRITICAL_IF_PARTIAL = frozenset({"security", "testing", "cicd"})
 
 # Remediation hint per category, used for the recommended actions list.
 _ACTIONS = {
@@ -182,7 +186,7 @@ class MaturityReport:
             c
             for c in self.applicable
             if c.status == MISSING
-            or (c.status == PARTIAL and c.weight >= _HIGH_WEIGHT)
+            or (c.status == PARTIAL and c.key in _CRITICAL_IF_PARTIAL)
         ]
 
     @property
@@ -190,7 +194,7 @@ class MaturityReport:
         return [
             c
             for c in self.applicable
-            if c.status == PARTIAL and c.weight < _HIGH_WEIGHT
+            if c.status == PARTIAL and c.key not in _CRITICAL_IF_PARTIAL
         ]
 
     @property
@@ -478,15 +482,99 @@ def _variable_blocks(text: str) -> list[str]:
     """
     bodies = []
     for match in _VARIABLE_OPEN.finditer(text):
-        depth, i = 1, match.end()
-        while i < len(text) and depth:
-            if text[i] == "{":
-                depth += 1
-            elif text[i] == "}":
-                depth -= 1
-            i += 1
-        bodies.append(text[match.end() : i - 1])
+        end = _block_end(text, match.end())
+        if end is None:
+            continue  # unterminated block: skip rather than guess at its body
+        bodies.append(text[match.end() : end])
     return bodies
+
+
+_HEREDOC_OPEN = re.compile(r'<<-?\s*"?([A-Za-z_][A-Za-z0-9_]*)"?')
+
+
+def _block_end(text: str, start: int) -> Optional[int]:
+    """Index of the ``}`` that closes the block opened just before *start*.
+
+    A brace inside a quoted string, a line comment or a heredoc is data, not
+    structure: a variable with ``default = "}"`` must not end its own block
+    early (issue #54 review). Block comments are already stripped by ``_code``.
+    """
+    depth, i, n = 1, start, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == '"':
+            i = _skip_string(text, i)
+            continue
+        if ch == "#" or text.startswith("//", i):
+            i = text.find("\n", i)
+            if i == -1:
+                return None
+            continue
+        if text.startswith("<<", i):
+            opened = _HEREDOC_OPEN.match(text, i)
+            if opened:
+                i = _skip_heredoc(text, opened.end(), opened.group(1))
+                if i is None:
+                    return None
+                continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return None
+
+
+def _skip_string(text: str, i: int) -> int:
+    """Return the index just past the string whose opening quote is at *i*.
+
+    Handles ``\\"`` escapes and ``${ ... }`` / ``%{ ... }`` templates, whose
+    bodies may themselves contain quoted strings.
+    """
+    n = len(text)
+    i += 1
+    while i < n:
+        ch = text[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == '"':
+            return i + 1
+        if text.startswith("${", i) or text.startswith("%{", i):
+            i = _skip_template(text, i + 2)
+            continue
+        i += 1
+    return n
+
+
+def _skip_template(text: str, i: int) -> int:
+    """Return the index just past the ``}`` closing a template opened before *i*."""
+    depth, n = 1, len(text)
+    while i < n and depth:
+        ch = text[i]
+        if ch == '"':
+            i = _skip_string(text, i)
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        i += 1
+    return i
+
+
+def _skip_heredoc(text: str, i: int, marker: str) -> Optional[int]:
+    """Return the index at the end of the line that terminates a heredoc."""
+    line_start = text.find("\n", i)
+    while line_start != -1:
+        line_end = text.find("\n", line_start + 1)
+        line = text[line_start + 1 : line_end if line_end != -1 else len(text)]
+        if line.strip() == marker:
+            return line_end if line_end != -1 else len(text)
+        line_start = line_end
+    return None
 
 
 def _variable_design(tf_files: list[Path]) -> CategoryScore:
@@ -604,9 +692,11 @@ _SCANNERS = ("checkov", "tfsec", "trivy", "terrascan", "conftest", "regula", "tf
 # The key is an identifier that *ends* in a sensitive word. A bare `\bpassword`
 # never matched `admin_password` or `db_password`, because `_` is a word
 # character and leaves no boundary before "password" (issue #54 review).
+# The key may be bare HCL (``admin_password = "..."``) or a quoted JSON key with
+# a colon (``"admin_password": "..."``), as in .tfvars.json (issue #54 review).
 _SECRET_HINT = re.compile(
-    r'^(?!\s*(?:#|//))[^\n]*\b[A-Za-z0-9_]*(password|passwd|secret|access_key|api_key|token)'
-    r'\s*=\s*"[^"$\n]{8,}"',
+    r'^(?!\s*(?:#|//))[^\n]*\b[A-Za-z0-9_]*(password|passwd|secret|access_key|api_key|token)"?'
+    r'\s*[=:]\s*"[^"$\n]{8,}"',
     re.IGNORECASE | re.MULTILINE,
 )
 _PIPELINE_HINT = (".yml", ".yaml")
@@ -717,6 +807,17 @@ _LOCAL_BACKEND = re.compile(r'^(?!\s*(?:#|//))\s*backend\s+"local"', re.MULTILIN
 
 
 _BACKEND_TYPE = re.compile(r'^(?!\s*(?:#|//))\s*backend\s+"([^"]+)"', re.MULTILINE)
+# Terraform Cloud / Enterprise configures remote state with `cloud {}` rather
+# than a backend block, and discovery already treats it as one (issue #54 review).
+_CLOUD_BLOCK = re.compile(r'^(?!\s*(?:#|//))\s*cloud\s*\{', re.MULTILINE)
+
+
+def _remote_state_declarations(code: str) -> list[str]:
+    """Backend kinds declared in *code*; a cloud block counts as ``"cloud"``."""
+    kinds = [m.group(1) for m in _BACKEND_TYPE.finditer(code)]
+    if _CLOUD_BLOCK.search(code):
+        kinds.append("cloud")
+    return kinds
 
 
 def _state(tf_files: list[Path], ws: Path) -> CategoryScore:
@@ -735,20 +836,23 @@ def _state(tf_files: list[Path], ws: Path) -> CategoryScore:
             NOT_APPLICABLE,
             ["module library: no root stack, so state belongs to the callers"],
         )
-    backends = []
-    for path in roots:
-        for match in _BACKEND_TYPE.finditer(_code(path)):
-            backends.append((path, match.group(1)))
+    backends = [
+        (path, kind) for path in roots for kind in _remote_state_declarations(_code(path))
+    ]
     remote = [(p, t) for p, t in backends if t != "local"]
     if remote:
         path, kind = remote[0]
-        return _score(
-            "state", ADOPTED, [f'remote backend "{kind}" in {_rel(path, ws)}']
+        where = _rel(path, ws)
+        label = (
+            f"Terraform Cloud / Enterprise `cloud {{}}` block in {where}"
+            if kind == "cloud"
+            else f'remote backend "{kind}" in {where}'
         )
+        return _score("state", ADOPTED, [label])
     if backends:
         return _score("state", PARTIAL, ["only a local backend is configured"])
     in_modules = any(
-        _BACKEND_TYPE.search(_code(p)) for p in tf_files if p not in roots
+        _remote_state_declarations(_code(p)) for p in tf_files if p not in roots
     )
     if in_modules:
         return _score(
