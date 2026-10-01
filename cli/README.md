@@ -97,6 +97,70 @@ Discovery prunes a built-in list of directories (`.terraform`,
 Pipeline detection accepts both `.yml` and `.yaml`, and an empty
 `.github/workflows/` is not treated as GitHub Actions.
 
+### Assess maturity (`--maturity-report`)
+
+Score a workspace against the ten IaC practice areas without generating anything.
+Discovery only: no interview, and no agent or instruction files are written.
+
+```bash
+# Print the report for the current workspace
+bootstrap-iac --maturity-report
+
+# Assess another workspace and write the report to a file
+bootstrap-iac --maturity-report --workspace ~/my-iac-workspace --output maturity-report.md
+
+# Machine-readable output
+bootstrap-iac --maturity-report --format json
+```
+
+Each category is scored from discovery plus read-only filesystem probes, and
+records the evidence it scored from, so a result can be traced back to the files
+that produced it:
+
+| Status | Points | Meaning |
+| ------ | ------ | ------- |
+| Adopted | full weight | The practice is in place |
+| Partial | half weight | Present but incomplete |
+| Missing | zero | Not found |
+| N/A | excluded | Does not apply; remaining weights are renormalised to 100 |
+
+Two categories can be N/A, so a workspace is not penalised for something it
+deliberately does not have:
+
+- **Orchestration** is N/A for a plain-Terraform workspace.
+- **State Management** is N/A for a pure module library. Backends belong in
+  root stacks, and Terraform ignores a `backend` block inside a child module,
+  so only a root stack's backend counts.
+
+The score is reported to one decimal place, and that same number is used for
+the rating and for `--maturity-threshold`, so a report never prints one score
+and gates on another.
+
+A **critical gap** is any Missing category, or a Partial in Security, Testing or
+CI/CD. A **moderate gap** is a Partial in any other category, including Module
+Design. This is the same severity model the bootstrap flow uses (see
+`SKILL.md`), so both paths classify an assessment identically.
+
+#### Gating in CI
+
+`--maturity-threshold` makes the exit code reflect the score, so a pipeline can
+fail on a regression:
+
+```bash
+bootstrap-iac --maturity-report --maturity-threshold 60 --output maturity.md
+```
+
+Exit codes: `0` when the score is at or above the threshold, `1` when it is
+below, `2` when the workspace is missing or the report cannot be produced.
+Without `--maturity-threshold` the command exits `0` whenever it produced a
+report, so gating is opt-in.
+
+When `--output` is given, the report goes to the file and only a one-line
+summary goes to stderr, leaving stdout clean for redirection.
+
+`--maturity-report` cannot be combined with `--validate`, `--check-config` or
+`--discover`; each is a separate mode that runs and exits.
+
 ## Options
 
 | Flag | Short form | Description |
@@ -123,6 +187,10 @@ Pipeline detection accepts both `.yml` and `.yaml`, and an empty
 | `--save-config` | | Write interview answers after generation (to `--config` path or workspace) |
 | `--check-config` | | Validate the config file and exit (0 valid, 1 invalid, 2 missing) |
 | `--discover` | | Scan `--workspace` and print the discovery result as JSON, then exit |
+| `--maturity-report` | | Assess `--workspace` against the maturity model and print the report, then exit |
+| `--format FORMAT` | | Output format for `--maturity-report`: `markdown` (default) or `json` |
+| `--output FILE` | | Write the `--maturity-report` output to FILE instead of stdout |
+| `--maturity-threshold SCORE` | | Exit 1 when the maturity score is below SCORE (opt-in CI gating) |
 | `--ignore-dir DIR` | | Skip a directory during discovery (repeatable; adds to the built-in ignore list) |
 | `--version` | `-V` | Show version and exit |
 | `--help` | `-h` | Show help and exit |
