@@ -25,6 +25,7 @@ import json
 import os
 import re
 import stat
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -130,6 +131,9 @@ class MaturityReport:
     workspace: Path
     categories: list[CategoryScore]
     company: str = "this workspace"
+    # Workspace-relative paths that could not be read; the scan is incomplete
+    # for them, so they are reported rather than silently scored as empty.
+    unreadable: list[str] = field(default_factory=list)
 
     # -- derived values ----------------------------------------------------
 
@@ -218,6 +222,7 @@ class MaturityReport:
             "moderate_gaps": [c.key for c in self.moderate_gaps],
             "strengths": [c.key for c in self.strengths],
             "recommended_actions": self.recommended_actions(),
+            "unreadable": self.unreadable,
         }
 
     def to_json(self) -> str:
@@ -346,10 +351,24 @@ def _search_tf(tf_files: list[Path], pattern: "re.Pattern[str]") -> Optional[tup
     return None
 
 
+# Files that could not be read during the current assessment. A ContextVar keeps
+# assess() re-entrant without threading a collector through every probe.
+_UNREADABLE: "ContextVar[Optional[set[Path]]]" = ContextVar("_UNREADABLE", default=None)
+
+
 def _read(path: Path) -> str:
+    """Return the file's text, recording it as unreadable on failure.
+
+    A read failure used to become an empty string silently, so an unreadable
+    file holding a credential was scored as clean (issue #54 review). The
+    failure is now recorded and surfaced on the report.
+    """
     try:
         return path.read_text(encoding="utf-8", errors="replace")
     except OSError:
+        sink = _UNREADABLE.get()
+        if sink is not None:
+            sink.add(path)
         return ""
 
 
@@ -380,7 +399,29 @@ def assess(
     """
     ws = Path(workspace or discovery.workspace_path).resolve()
     ignored = DEFAULT_IGNORED_DIRS | frozenset(ignored_dirs or ())
+    unreadable: set[Path] = set()
+    token = _UNREADABLE.set(unreadable)
+    try:
+        return _assess(discovery, ws, ignored, company, unreadable)
+    finally:
+        _UNREADABLE.reset(token)
+
+
+def _assess(
+    discovery: DiscoveryResult,
+    ws: Path,
+    ignored: frozenset[str],
+    company: str,
+    unreadable: set[Path],
+) -> MaturityReport:
     files = _walk(ws, ignored)
+    # Read every candidate once up front, so a file that fails to open is
+    # recorded before the probes run (Security consults the record).
+    for path in files:
+        if path.suffix in (".tf", ".tfvars", ".hcl", ".yml", ".yaml") or path.name.endswith(
+            ".tfvars.json"
+        ):
+            _read(path)
 
     tf_files = [p for p in files if p.suffix == ".tf"]
     names = {_rel(p, ws) for p in files}
@@ -401,7 +442,12 @@ def assess(
         _state(tf_files, ws),
         _rollout(ws, ignored),
     ]
-    return MaturityReport(workspace=ws, categories=scores, company=company)
+    return MaturityReport(
+        workspace=ws,
+        categories=scores,
+        company=company,
+        unreadable=sorted(_rel(p, ws) for p in unreadable),
+    )
 
 
 _MODULE_FILES = ("main.tf", "variables.tf", "outputs.tf")
@@ -683,12 +729,14 @@ _SECURITY_FILES = (
     "tfsec.yml",
     "tfsec.yaml",
     ".trivyignore",
-    ".tflint.hcl",
     ".terrascan.toml",
 )
+# TFLint is deliberately absent here and below. The repository's own reference
+# classes it as structural linting, not security scanning, and Code Quality
+# already credits it (references/iac-best-practices.md; issue #54 review).
 # Most teams run these as pinned CI steps with no config file at all, so a
 # config-file-only probe reports a false Missing (issue #54 review).
-_SCANNERS = ("checkov", "tfsec", "trivy", "terrascan", "conftest", "regula", "tflint")
+_SCANNERS = ("checkov", "tfsec", "trivy", "terrascan", "conftest", "regula")
 # The key is an identifier that *ends* in a sensitive word. A bare `\bpassword`
 # never matched `admin_password` or `db_password`, because `_` is a word
 # character and leaves no boundary before "password" (issue #54 review).
@@ -769,6 +817,17 @@ def _security(
             evidence
             + [f"a literal credential-shaped value appears in {_rel(secret[0], ws)}"],
         )
+    unreadable = _UNREADABLE.get() or set()
+    unscanned = [p for p in scan_files if p in unreadable]
+    if unscanned:
+        evidence.append(
+            f"{len(unscanned)} file(s) could not be read, so the credential scan "
+            f"is incomplete: {', '.join(_rel(p, ws) for p in unscanned[:5])}"
+        )
+        # Tooling may be fine, but an unread file may hold a credential.
+        if in_ci or tooling or rego:
+            return _score("security", PARTIAL, evidence)
+        return _score("security", MISSING, evidence)
     if in_ci or (tooling and rego):
         return _score("security", ADOPTED, evidence)
     if tooling or rego:

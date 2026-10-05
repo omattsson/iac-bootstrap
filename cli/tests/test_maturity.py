@@ -59,6 +59,7 @@ def _mature_workspace(root: Path) -> Path:
         "jobs:\n  plan:\n    steps:\n"
         "      - run: terraform fmt -check -recursive\n"
         "      - run: tflint --recursive\n"
+        "      - run: checkov -d .\n"
         "      - run: terraform plan -out=tfplan\n"
     )
     # Each environment is a root stack that calls the module and owns its state.
@@ -182,7 +183,7 @@ def test_orchestration_is_not_applicable_without_a_tool(tmp_path):
 
 def test_hardcoded_credential_forces_security_to_missing(tmp_path):
     """Configured tooling must not mask a literal credential in the code."""
-    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    (tmp_path / ".checkov.yml").write_text("framework: terraform\n")
     (tmp_path / "policy.rego").write_text("package x\n")
     (tmp_path / "main.tf").write_text(
         'resource "x" "y" {\n  client_secret = "s3cr3t-value-not-a-var"\n}\n'
@@ -344,7 +345,7 @@ def test_secret_is_found_beyond_any_file_cap(tmp_path):
     """
     for i in range(420):
         (tmp_path / f"m{i:04d}.tf").write_text('resource "x" "y" {}\n')
-    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    (tmp_path / ".checkov.yml").write_text("framework: terraform\n")
     (tmp_path / "policy.rego").write_text("package x\n")
     (tmp_path / "zzz_last.tf").write_text(
         'resource "a" "b" {\n  client_secret = "hardcoded-real-secret-1234"\n}\n'
@@ -368,7 +369,7 @@ def test_scanner_wired_into_ci_counts_without_a_config_file(tmp_path):
 
 def test_commented_out_credential_is_not_a_finding(tmp_path):
     """A commented example must not be reported as a hardcoded credential."""
-    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    (tmp_path / ".checkov.yml").write_text("framework: terraform\n")
     (tmp_path / "policy.rego").write_text("package x\n")
     (tmp_path / "main.tf").write_text(
         'resource "x" "y" {\n  # password = "changeme-in-production"\n}\n'
@@ -649,7 +650,7 @@ def test_one_documented_variable_does_not_cover_the_others(tmp_path):
 )
 def test_credentials_in_value_and_config_files_are_found(tmp_path, name, body):
     """Hardcoded values usually live in .tfvars or Terragrunt .hcl, not in .tf."""
-    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    (tmp_path / ".checkov.yml").write_text("framework: terraform\n")
     (tmp_path / "policy.rego").write_text("package x\n")
     (tmp_path / name).write_text(body)
     security = next(c for c in _assess(tmp_path).categories if c.key == "security")
@@ -659,7 +660,7 @@ def test_credentials_in_value_and_config_files_are_found(tmp_path, name, body):
 
 def test_test_fixture_dummy_values_are_not_credentials(tmp_path):
     """A .tftest.hcl is expected to carry dummy values, and is not deployed."""
-    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    (tmp_path / ".checkov.yml").write_text("framework: terraform\n")
     (tmp_path / "policy.rego").write_text("package x\n")
     (tmp_path / "m.tftest.hcl").write_text(
         'variables {\n  admin_password = "not-a-real-password"\n}\n'
@@ -800,7 +801,7 @@ def test_line_comment_braces_do_not_end_a_variable_block(tmp_path):
 
 def test_credentials_in_tfvars_json_are_found(tmp_path):
     """.tfvars.json uses a quoted key and a colon, which the HCL pattern missed."""
-    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    (tmp_path / ".checkov.yml").write_text("framework: terraform\n")
     (tmp_path / "policy.rego").write_text("package x\n")
     (tmp_path / "prod.tfvars.json").write_text('{"admin_password": "hardcoded-value-123"}\n')
     security = next(c for c in _assess(tmp_path).categories if c.key == "security")
@@ -827,3 +828,69 @@ def test_cloud_block_in_a_child_module_is_still_ignored(tmp_path):
     state = next(c for c in _assess(tmp_path).categories if c.key == "state")
     assert state.status == PARTIAL
     assert any("reusable module" in e for e in state.evidence)
+
+
+# --- regressions from the third Copilot review on PR #74 ---------------------
+
+
+def test_cli_does_not_hang_on_a_fifo(tmp_path):
+    """End to end: discovery used to read a FIFO named *.tf and block forever.
+
+    The earlier FIFO test bypassed discovery, so it never exercised the real
+    --maturity-report path (issue #54 review).
+    """
+    import subprocess
+    import sys
+
+    if not hasattr(os, "mkfifo"):  # pragma: no cover - POSIX only
+        pytest.skip("mkfifo unavailable")
+    (tmp_path / "main.tf").write_text('resource "x" "y" {}\n')
+    os.mkfifo(tmp_path / "pipe.tf")
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(_REPO_ROOT / "cli") + os.pathsep + env.get("PYTHONPATH", "")
+    for mode in ("--maturity-report", "--discover"):
+        proc = subprocess.run(
+            [sys.executable, "-m", "bootstrap_iac", mode, "--workspace", str(tmp_path)],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,  # a hang fails the test instead of stalling the suite
+        )
+        assert proc.returncode == 0, f"{mode}: {proc.stderr}"
+
+
+def test_unreadable_file_is_surfaced_and_blocks_adopted_security(tmp_path):
+    """An unreadable file may hold a credential, so it must not score as clean."""
+    if os.geteuid() == 0:  # pragma: no cover - root reads anything
+        pytest.skip("root ignores file permissions")
+    (tmp_path / ".checkov.yml").write_text("framework: terraform\n")
+    (tmp_path / "policy.rego").write_text("package x\n")
+    locked = tmp_path / "secrets.tf"
+    locked.write_text('resource "a" "b" {\n  client_secret = "hardcoded-real-secret"\n}\n')
+    locked.chmod(0)
+    try:
+        report = assess(DiscoveryResult(workspace_path=tmp_path), tmp_path)
+        assert "secrets.tf" in report.unreadable
+        assert report.to_dict()["unreadable"] == ["secrets.tf"]
+        security = next(c for c in report.categories if c.key == "security")
+        assert security.status != ADOPTED, security.evidence
+        assert any("could not be read" in e for e in security.evidence)
+
+        result = CliRunner().invoke(
+            main, ["--maturity-report", "--workspace", str(tmp_path), "--format", "json"]
+        )
+        assert "could not be read" in result.output  # warning on stderr
+    finally:
+        locked.chmod(0o644)
+
+
+def test_tflint_alone_is_not_security_scanning(tmp_path):
+    """TFLint is structural linting, per references/iac-best-practices.md."""
+    (tmp_path / ".tflint.hcl").write_text("plugin {}\n")
+    workflows = tmp_path / ".github" / "workflows"
+    workflows.mkdir(parents=True)
+    (workflows / "lint.yml").write_text("jobs:\n  l:\n    steps:\n      - run: tflint --recursive\n")
+    by_key = {c.key: c for c in _assess(tmp_path).categories}
+    assert by_key["security"].status == MISSING, by_key["security"].evidence
+    # It still counts where it belongs.
+    assert by_key["code_quality"].status == ADOPTED, by_key["code_quality"].evidence

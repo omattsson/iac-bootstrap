@@ -576,6 +576,16 @@ def main(
             ignored_dirs=list(ignore_dirs) or None,
             company=company or "this workspace",
         )
+        if report.unreadable:
+            # Stderr, so stdout stays clean for redirected Markdown or JSON.
+            click.secho(
+                f"  ⚠  {len(report.unreadable)} file(s) could not be read; the "
+                "assessment is incomplete for them: "
+                + ", ".join(report.unreadable[:5])
+                + (" …" if len(report.unreadable) > 5 else ""),
+                fg="yellow",
+                err=True,
+            )
         try:
             rendered = (
                 report.to_json()
