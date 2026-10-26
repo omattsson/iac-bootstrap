@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import stat
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -150,7 +151,16 @@ def _iter_files(
         dirnames[:] = [d for d in dirnames if d not in ignored]
         for name in filenames:
             if match is None or match(name):
-                results.append(Path(dirpath) / name)
+                path = Path(dirpath) / name
+                # Only regular files: reading a FIFO named `*.tf` blocks forever,
+                # which hung both --discover and --maturity-report. A symlink to
+                # a regular file is still followed (issue #54 review).
+                try:
+                    if not stat.S_ISREG(os.stat(path).st_mode):
+                        continue
+                except OSError:
+                    continue
+                results.append(path)
     results.sort()
     return results
 
