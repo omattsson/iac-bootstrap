@@ -24,13 +24,13 @@ Use a local virtualenv (gitignored):
 .venv/bin/python scripts/validate_templates.py
 .venv/bin/python scripts/build_examples.py --check
 .venv/bin/pytest cli/tests/ -q
-npx --yes markdownlint-cli2 --config .markdownlint.yml "**/*.md" "#node_modules" "#.venv"
+npx --yes markdownlint-cli2 --config .markdownlint.yml "**/*.md" "#examples/generated" "#cli/build" "#**/node_modules" "#.venv"
 ```
 
 ## If a check fails
 
 - `build_examples.py --check` fails: the templates or generator changed. Run `.venv/bin/python scripts/build_examples.py`, review the diff in `examples/generated/`, and commit it.
 - `validate_templates.py` fails on the bundle comparison: run `build_templates.py` again. The bundle is gitignored and never edited by hand.
-- markdownlint: match the glob and ignores to the `markdownlint` step in `validate.yml` if they have changed.
+- markdownlint: the globs and ignores mirror the `markdownlint` step in `validate.yml` (plus `.venv`); update them if that step changes.
 
 Report which checks passed and which failed. Do not claim success unless every check exited 0.
