@@ -30,7 +30,9 @@ jobs:
 
   cli-tests:
     name: CLI tests (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which has no Python 3.9 build.
+    # 24.04 provides every version in the matrix below.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
